@@ -1,0 +1,31 @@
+{
+  "name": "configurator",
+  "version": "1.0.0",
+  "description": "vehicle configurator",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.13.4"
+  },
+  "devDependencies": {
+    "dat-gui": "^0.5.0",
+    "gulp": "^3.9.1",
+    "gulp-batch": "^1.0.5",
+    "gulp-concat": "^2.6.0",
+    "gulp-rename": "^1.2.2",
+    "gulp-sourcemaps": "^1.6.0",
+    "gulp-uglify": "^1.5.3",
+    "gulp-watch": "^4.3.5",
+    "path": "^0.12.7",
+    "three": "^0.76.1",
+    "tween.js": "^16.3.4"
+  },
+  "scripts": {
+    "test": ""
+  },
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theshanergy/configurator"
+  },
+  "license": "MIT"
+}
