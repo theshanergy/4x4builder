@@ -4,6 +4,7 @@ var gulp = require('gulp'),
     rename = require('gulp-rename'),
     sourcemaps = require('gulp-sourcemaps');
     uglify = require('gulp-uglify');
+    cleanCSS = require('gulp-clean-css');
     watch = require('gulp-watch');
     batch = require('gulp-batch');
 
@@ -18,30 +19,25 @@ gulp.task('build-js', function() {
       './node_modules/three/examples/js/controls/OrbitControls.js',
       './node_modules/three/examples/js/materials/ShadowMaterial.js',
       './node_modules/tween.js/src/Tween.js',
-      './src/js/config.js',
-      './src/js/app.js'
+      './node_modules/angular/angular.js',
+      './node_modules/angular-bootstrap-colorpicker/js/bootstrap-colorpicker-module.js'
     ])
     .pipe(sourcemaps.init())
-    .pipe(concat('scripts.min.js'))
+    .pipe(concat('libraries.min.js'))
     .pipe(uglify())
     .pipe(sourcemaps.write())
-    .pipe(gulp.dest('./build/js'));
+    .pipe(gulp.dest('./public/js'));
 });
 
 // Build css.
 gulp.task('build-css', function() {
   return gulp.src([
-      './src/css/style.css'
+      './node_modules/angular-bootstrap-colorpicker/css/colorpicker.css',
+      './public/css/styles.css'
     ])
-    .pipe(gulp.dest('./build/css'));
+    .pipe(sourcemaps.init())
+    .pipe(concat('styles.min.css'))
+    .pipe(cleanCSS())
+    .pipe(sourcemaps.write())
+    .pipe(gulp.dest('./public/css'));
 });
-
-// Watch changes.
-gulp.task('watch', function () {
-  watch('./src/**/*.{js,css}', batch(function(events, done) {
-    gulp.start('build', done);
-  }));
-});
-
-// Default task.
-gulp.task('default', ['build', 'watch']);

@@ -1,0 +1,17 @@
+/*configurator form*/
+#config-editor {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  padding: 10px 0 0 10px;
+  color: #fff;
+  background: rgba(0,0,0,.5);
+  border-bottom-right-radius: 3px;
+}
+#config-editor .field {
+  float: left;
+  margin: 0 10px 10px 0;
+}
+
+/*configurator view*/
+#configurator {}
