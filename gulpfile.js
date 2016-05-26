@@ -5,8 +5,6 @@ var gulp = require('gulp'),
     sourcemaps = require('gulp-sourcemaps');
     uglify = require('gulp-uglify');
     cleanCSS = require('gulp-clean-css');
-    watch = require('gulp-watch');
-    batch = require('gulp-batch');
 
 // Build task.
 gulp.task('build', ['build-js', 'build-css']);
@@ -32,6 +30,7 @@ gulp.task('build-js', function() {
 // Build css.
 gulp.task('build-css', function() {
   return gulp.src([
+      './node_modules/reset-css/reset.css',
       './node_modules/angular-bootstrap-colorpicker/css/colorpicker.css',
       './public/css/styles.css'
     ])

@@ -2,6 +2,8 @@
 // current.config to/from db
 // animate only on change / reduce cpu usage
 // browserify / require js
+// dynamic tire sizing
+// vioffroad decals
 
 // Initialize app.
 var app = angular.module('configurator', ['colorpicker.module']);
@@ -12,17 +14,13 @@ app.controller('config', function($scope) {
     // Load config options.
     $scope.config = config;
 
-    // $http.get('/js/config.json')
-    //   .success(function (data) {
-    //     $scope.config = data;
-    //   })
-    //   .error(function (data, status, headers, config) {
-    //     //  Do some error handling here
-    //   });
-
-
-    // Load default config.
+    // Set default config.
     $scope.current = current;
+
+    // Set camera controls
+    $scope.camera = {
+      'autoRotate': true,
+    }
 
     // Save config.
     $scope.save = function() {
@@ -32,7 +30,7 @@ app.controller('config', function($scope) {
 });
 
 // Add three js viewer
-app.directive('ngViewer', function () {
+app.directive('ngViewer', ['$window', function ($window) {
     return {
         restrict: 'A',
         link: function (scope, elem, attr) {
@@ -49,22 +47,22 @@ app.directive('ngViewer', function () {
             scope.init = function () {
 
               // Container dimensions.
-              var containerWidth = window.innerWidth,
-                  containerHeight = window.innerHeight;
+              scope.containerWidth = $window.innerWidth,
+              scope.containerHeight = $window.innerHeight;
 
               // Create scene.
               scene = new THREE.Scene;
 
               // Create renderer and set size.
               renderer = new THREE.WebGLRenderer({antialias:true, alpha: true});
-              renderer.setSize(containerWidth, containerHeight);
+              renderer.setSize($window.innerWidth, $window.innerHeight);
               renderer.shadowMap.enabled = true;
 
               // Add renderer to DOM.
               elem[0].appendChild(renderer.domElement);
 
               // Add camera.
-              camera = new THREE.PerspectiveCamera(24, containerWidth / containerHeight, .1, 500);
+              camera = new THREE.PerspectiveCamera(24, $window.innerWidth / $window.innerHeight, .1, 500);
               camera.position.x = 5; //
               camera.position.y = 2; // height
               camera.position.z = 5;
@@ -100,7 +98,15 @@ app.directive('ngViewer', function () {
 
               // Load ground.
               scope.loadGround();
-            }
+            };
+
+            // Window resize.
+            angular.element($window).bind('resize', function(){
+              // Set size and aspect.
+              camera.aspect = $window.innerWidth / $window.innerHeight;
+              camera.updateProjectionMatrix();
+              renderer.setSize($window.innerWidth, $window.innerHeight);
+            });
 
             // Animate.
             scope.animate = function () {
@@ -113,10 +119,12 @@ app.directive('ngViewer', function () {
               // Update camera controls.
               cameraControls.update();
               // Auto rotate camera.
-              var x = camera.position.x;
-              var z = camera.position.z;
-              camera.position.x = x * Math.cos(cameraRotSpeed) + z * Math.sin(cameraRotSpeed);
-              camera.position.z = z * Math.cos(cameraRotSpeed) - x * Math.sin(cameraRotSpeed);
+              if (scope.camera.autoRotate) {
+                var x = camera.position.x;
+                var z = camera.position.z;
+                camera.position.x = x * Math.cos(cameraRotSpeed) + z * Math.sin(cameraRotSpeed);
+                camera.position.z = z * Math.cos(cameraRotSpeed) - x * Math.sin(cameraRotSpeed);
+              }
               camera.lookAt(new THREE.Vector3(0, 0.75, 0));
               // Update TWEEN.
               TWEEN.update();
@@ -284,6 +292,12 @@ app.directive('ngViewer', function () {
                   material.reflectivity = 0.5;
                   material.color.setStyle(scope.current.vehicle.color);
                   break;
+                case 'chrome':
+                  material.envMap = textureCube;
+                  material.color.set(new THREE.Color(1, 1, 1));
+                  material.specular.set(new THREE.Color(1, 1, 1));
+                  material.reflectivity = 0.9;
+                  break;
                 case 'tint_light':
                 case 'tint_dark':
                 case 'glass_clear':
@@ -314,5 +328,5 @@ app.directive('ngViewer', function () {
 
         }
     }
-});
+}]);
 

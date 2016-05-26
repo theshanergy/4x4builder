@@ -5,8 +5,7 @@
         <meta http-equiv="x-ua-compatible" content="ie=edge">
         <title>Configurator</title>
         <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
         <link rel="stylesheet" href="./css/styles.min.css">
         <script src="./js/libraries.min.js"></script>
         <script src="./js/config.js"></script>
@@ -14,21 +13,22 @@
     </head>
     <body ng-app="configurator" ng-controller="config">
 
-        <div id="config-editor">
+        <div id="config-editor" class="form-container">
+
             <!-- Vehicle -->
             <div class="field field-vehicle">
-                Vehicle
+                <label>Vehicle</label>
                 <select ng-model="current.vehicle.id"
                         name="vehicle"
                         required="true"
-                        ng-options="optionId as option.name for (optionId, option) in config.vehicles"
+                        ng-options="optionId as option.name group by option.group for (optionId, option) in config.vehicles"
                         ng-change="loadVehicle()">
                 </select>
             </div>
 
             <!-- Wheels -->
             <div class="field field-wheels">
-                Wheels
+                <label>Wheels</label>
                 <select ng-model="current.wheel.id"
                         name="wheels"
                         required="true"
@@ -39,13 +39,18 @@
 
             <!-- Vehicle Color -->
             <div class="field field-vehicle-color">
-                Color
-                <input ng-model="current.vehicle.color" colorpicker="hex" type="text" ng-change="setVehicleColor()" />
+                <label>Color</label>
+                <button colorpicker
+                        colorpicker-size="200"
+                        type="button"
+                        ng-model="current.vehicle.color"
+                        ng-change="setVehicleColor()"
+                        style="background-color:{{current.vehicle.color}}">{{current.vehicle.color}}</button>
             </div>
 
             <!-- Vehicle Lift -->
             <div class="field field-vehicle-lift">
-                Lift
+                <label>Lift</label>
                 <select ng-model="current.vehicle.lift"
                         name="lift"
                         required="true"
@@ -57,7 +62,7 @@
 
             <!-- Addons -->
             <div class="field field-{{addonId}}" ng-repeat="(addonId, addon) in config.vehicles[current.vehicle.id].addons">
-                {{addon.name}}
+                <label>{{addon.name}}</label>
                 <select ng-model="current.vehicle.addons[addonId]"
                         name="{{addonId}}"
                         required="{{addon.required}}"
@@ -70,7 +75,28 @@
             <!-- <button ng-click="save()">Save</button> -->
         </div>
 
+        <div id="camera-controls" class="form-container">
+            <!-- Auto Rotate -->
+            <div class="field field-camera-autorotate">
+                <input ng-model="camera.autoRotate" type="checkbox" id="camera-autorotate" />
+                <label for="camera-autorotate">Auto Rotate</label>
+            </div>
+        </div>
+
         <div id="config-viewer" ng-viewer=""></div>
+
+
+        <script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
+        <script>
+          // Initialize Firebase
+          var firebaseConfig = {
+            apiKey: "AIzaSyCKr3INNC3yRuwnJbkUOcA7Bhv6N5_EYaY",
+            authDomain: "x4configurator.firebaseapp.com",
+            databaseURL: "https://x4configurator.firebaseio.com",
+            storageBucket: "",
+          };
+          firebase.initializeApp(firebaseConfig);
+        </script>
 
     </body>
 </html>

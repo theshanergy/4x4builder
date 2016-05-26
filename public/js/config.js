@@ -2,7 +2,7 @@ var current = {
   'vehicle': {
     'id': 'toyota_4runner_3',
     'lift': 2,
-    'color': 'red',
+    'color': '#CC0000',
     'addons': {
       'bumper_f': 'shrockworks',
       'sliders': 'steel',
@@ -18,6 +18,7 @@ var config = {
   'vehicles': {
     'toyota_4runner_3': {
       'name': '4Runner',
+      'group': 'Toyota',
       'model': 'assets/models/vehicles/toyota/4runner/3g/4runner.dae',
       'wheel_offset': 0.770,
       'axle_front': 1.45,
@@ -67,12 +68,40 @@ var config = {
     },
     'jeep_yj': {
       'name': 'Jeep YJ',
+      'group': 'Jeep',
       'model': 'assets/models/vehicles/jeep/yj/yj.dae',
       'wheel_offset': 0.770,
       'axle_front': 1.31,
       'axle_rear': -1.09,
       'addons': {},
     },
+    'jeep_jk': {
+      'name': 'Jeep JK',
+      'group': 'Jeep',
+      'model': 'assets/models/vehicles/jeep/jk/JK_Unlimited_5door_2012.dae',
+      'wheel_offset': 0.795,
+      'axle_front': 1.5,
+      'axle_rear': -1.26,
+      'addons': {},
+    },
+    'jeep_xj': {
+      'name': 'Jeep XJ',
+      'group': 'Jeep',
+      'model': 'assets/models/vehicles/jeep/xj/xj.dae',
+      'wheel_offset': 0.76,
+      'axle_front': 1.51,
+      'axle_rear': -1.24,
+      'addons': {},
+    },
+    // 'tacoma_dc_lb': {
+    //   'name': 'Tacoma (Double Cab)',
+    //   'group': 'Toyota',
+    //   'model': 'assets/models/vehicles/toyota/tacoma/Toyota_Tacoma_DoubleCab_LongBed_2011.dae',
+    //   'wheel_offset': 0.770,
+    //   'axle_front': 1.97,
+    //   'axle_rear': -1.59,
+    //   'addons': {},
+    // },
   },
   'wheels': {
     'stock_toyota': {
