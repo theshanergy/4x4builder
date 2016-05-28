@@ -5,8 +5,6 @@
   "main": "public/index.html",
   "dependencies": {},
   "devDependencies": {
-    "angular": "^1.5.5",
-    "angular-bootstrap-colorpicker": "^3.0.25",
     "gulp": "^3.9.1",
     "gulp-clean-css": "^2.0.7",
     "gulp-concat": "^2.6.0",

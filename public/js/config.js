@@ -9,8 +9,15 @@ var current = {
       'rack': 'whitson'
     }
   },
-  'wheel': {
-    'id': 'nitto_mud_grappler'
+  'wheels': {
+    'rim': 'level_8_strike_6',
+    'rim_size': 16,
+    'tire': 'nitto_mud_grappler',
+    'tire_size': 35,
+  },
+  'camera': {
+    'auto': true,
+    'speed': 0.001,
   }
 };
 
@@ -104,17 +111,22 @@ var config = {
     // },
   },
   'wheels': {
-    'stock_toyota': {
-      'name': 'Stock',
-      'model': 'assets/models/wheels/stock_toyota.dae',
-      'width': 0.256,
-      'diameter': 0.777,
+    'rims': {
+      'level_8_strike_6': {
+        'name': 'Level 8 Strike 6',
+        'model': 'assets/models/wheels/rims/level_8_strike_6.dae',
+        'width': 0.318,
+        'od': 0.488,
+      }
     },
-    'nitto_mud_grappler': {
-      'name': 'Nitto Mud Grappler',
-      'model': 'assets/models/wheels/mud_grappler.dae',
-      'width': 0.397,
-      'diameter': 0.883,
+    'tires': {
+      'nitto_mud_grappler': {
+        'name': 'Nitto Mud Grappler',
+        'model': 'assets/models/wheels/tires/nitto_mud_grappler.dae',
+        'width': 0.397,
+        'od': 0.883,
+        'id': 0.488,
+      },
     }
   }
 }

@@ -8,84 +8,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
         <link rel="stylesheet" href="./css/styles.min.css">
         <script src="./js/libraries.min.js"></script>
+        <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5/dat.gui.min.js"></script>
         <script src="./js/config.js"></script>
-        <script src="./js/app.js"></script>
     </head>
-    <body ng-app="configurator" ng-controller="config">
-
-        <div id="config-editor" class="form-container">
-
-            <!-- Vehicle -->
-            <div class="field field-vehicle">
-                <label>Vehicle</label>
-                <select ng-model="current.vehicle.id"
-                        name="vehicle"
-                        required="true"
-                        ng-options="optionId as option.name group by option.group for (optionId, option) in config.vehicles"
-                        ng-change="loadVehicle()">
-                </select>
-            </div>
-
-            <!-- Wheels -->
-            <div class="field field-wheels">
-                <label>Wheels</label>
-                <select ng-model="current.wheel.id"
-                        name="wheels"
-                        required="true"
-                        ng-options="optionId as option.name for (optionId, option) in config.wheels"
-                        ng-change="loadWheels()">
-                </select>
-            </div>
-
-            <!-- Vehicle Color -->
-            <div class="field field-vehicle-color">
-                <label>Color</label>
-                <button colorpicker
-                        colorpicker-size="200"
-                        type="button"
-                        ng-model="current.vehicle.color"
-                        ng-change="setVehicleColor()"
-                        style="background-color:{{current.vehicle.color}}">{{current.vehicle.color}}</button>
-            </div>
-
-            <!-- Vehicle Lift -->
-            <div class="field field-vehicle-lift">
-                <label>Lift</label>
-                <select ng-model="current.vehicle.lift"
-                        name="lift"
-                        required="true"
-                        ng-options="i as i + '&quot;' for i in [1,2,3,4,5,6]"
-                        ng-change="setVehicleHeight()">
-                    <option value="">None</option>
-                </select>
-            </div>
-
-            <!-- Addons -->
-            <div class="field field-{{addonId}}" ng-repeat="(addonId, addon) in config.vehicles[current.vehicle.id].addons">
-                <label>{{addon.name}}</label>
-                <select ng-model="current.vehicle.addons[addonId]"
-                        name="{{addonId}}"
-                        required="{{addon.required}}"
-                        ng-options="optionId as option.name for (optionId, option) in addon.options"
-                        ng-change="loadVehicleAddon(addonId)">
-                </select>
-            </div>
-
-            <!-- Save -->
-            <!-- <button ng-click="save()">Save</button> -->
-        </div>
-
-        <div id="camera-controls" class="form-container">
-            <!-- Auto Rotate -->
-            <div class="field field-camera-autorotate">
-                <input ng-model="camera.autoRotate" type="checkbox" id="camera-autorotate" />
-                <label for="camera-autorotate">Auto Rotate</label>
-            </div>
-        </div>
-
-        <div id="config-viewer" ng-viewer=""></div>
-
-
+    <body>
         <script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
         <script>
           // Initialize Firebase
@@ -97,6 +23,6 @@
           };
           firebase.initializeApp(firebaseConfig);
         </script>
-
+        <script src="./js/app.js"></script>
     </body>
 </html>
