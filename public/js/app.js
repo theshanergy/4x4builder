@@ -1,23 +1,99 @@
 // todo:
-// current.config to/from db
+// lights
+// lightbars & accessories
+// license plate
+// optional addons
+// spare tire (rear, roof)
+// mobile interface
+// axle width selector
+// tire width selector
 // animate only on change / reduce cpu usage
 // browserify / require js
-// dynamic tire sizing
-// vioffroad decals
-
-
-
+// decals (vioffroad, etc)
 
 
 // Set up global variables.
-var scene, camera, renderer, light,
-vehicle, wheels, wheelFR, wheelFL, wheelRR, wheelRL, tire = {};
+var scene, camera, renderer, loader, light, envMap, gui, guiAddons, session, loading,
+vehicle, wheel, tire = {};
+var wheels = new THREE.Object3D();
+var tires = new THREE.Object3D();
 
-// Collada loader.
-var loader = new THREE.ColladaLoader();
+
+// Start loading manager.
+loading = new THREE.LoadingManager();
+loading.onProgress = function (item, loaded, total) {
+  var loadingMessage = 'Loading';
+  var itemParts = item.split('/');
+  switch(itemParts[2]) {
+    case 'vehicles':
+      loadingMessage = 'Loading vehicle';
+      break;
+    case 'wheels':
+    loadingMessage = 'Loading wheels'
+      break;
+  }
+
+  // Update loading message.
+  document.getElementById('message').innerHTML = loadingMessage;
+
+  // Set loading bar width.
+  var barWidth = 250;
+  var barWidth = total ? Math.floor(barWidth * loaded / total) : barWidth;
+  document.getElementById('bar').style.width = barWidth + 'px';
+};
+loading.onLoad = function () {
+  document.getElementById('progress').style.display = 'none';
+};
+loading.onError = function () {
+  console.log('loading error');
+};
+
+// Start loader.
+document.getElementById('progress').style.display = 'block';
+
 
 // Initialization function.
 function init() {
+
+  // Initialize collada loader.
+  loader = new THREE.ColladaLoader(loading);
+
+  // Get default vehicle addons
+  current.vehicle.addons = config.vehicles[current.vehicle.id].default_addons;
+
+  // Get session
+  session = window.location.pathname.replace(/^\/([^\/]*).*$/, '$1');
+
+  // Existing session.
+  if(session) {
+    // Get default config from db.
+    firebase.database().ref('/configs/' + session).once('value').then(function(data) {
+      // If exists.
+      if(data.val() != null) {
+        // Overwrite current from response.
+        current = MergeRecursive(current, data.val());
+        // Load vehicle.
+        loadVehicle();
+        // Load gui.
+        loadGui();
+      }
+      else {
+        session = randomString(16);
+        // Load vehicle.
+        loadVehicle();
+        // Load gui.
+        loadGui();
+      }
+    });
+  }
+  else {
+    session = randomString(16);
+    // Load vehicle.
+    loadVehicle();
+    // Load gui.
+    loadGui();
+  }
+
 
   // Create scene.
   scene = new THREE.Scene;
@@ -34,9 +110,9 @@ function init() {
 
   // Add camera.
   camera = new THREE.PerspectiveCamera(24, window.innerWidth / window.innerHeight, .1, 500);
-  camera.position.x = 5; //
+  camera.position.x = 6; //
   camera.position.y = 2; // height
-  camera.position.z = 5;
+  camera.position.z = 6;
   scene.add(camera);
 
   // Camera controls.
@@ -61,21 +137,34 @@ function init() {
   // Environment map.
   var envMapURL = 'assets/images/envmap/envmap.jpg';
   var envMapURLS = [envMapURL, envMapURL, envMapURL, envMapURL, envMapURL, envMapURL];
-  textureCube = new THREE.CubeTextureLoader().load(envMapURLS);
-  textureCube.mapping = THREE.CubeReflectionMapping;
-
-  // Load vehicle.
-  loadVehicle();
+  envMap = new THREE.CubeTextureLoader().load(envMapURLS);
+  envMap.mapping = THREE.CubeReflectionMapping;
 
   // Load ground.
   loadGround();
 
-  // Load gui.
-  gui();
-
   // Bind window resize event
   window.addEventListener('resize', windowResize, false);
+
 };
+
+// Recursively merge objects.
+function MergeRecursive(obj1, obj2) {
+  for (var p in obj2) {
+    try {
+      // Property in destination object set; update its value.
+      if ( obj2[p].constructor == Object ) {
+        obj1[p] = MergeRecursive(obj1[p], obj2[p]);
+      } else {
+        obj1[p] = obj2[p];
+      }
+    } catch(e) {
+      // Property in destination object not set; create it and set its value.
+      obj1[p] = obj2[p];
+    }
+  }
+  return obj1;
+}
 
 // Window resize.
 function windowResize() {
@@ -86,9 +175,23 @@ function windowResize() {
 }
 
 // GUI.
-function gui() {
+function loadGui() {
+
   // // Add dat.gui
-  var gui = new dat.GUI();
+  gui = new dat.GUI();
+
+  // GUI actions.
+  var guiActions = {
+    // Save.
+    'save': function() {
+      // Store current config to db.
+      firebase.database().ref('/configs/' + session).set(current);
+      // push session string to url.
+      window.history.pushState({}, 'Save', '/' + session);
+      // Notify user.
+      swal("Vehicle saved!", "Please copy or bookmark this page. Anyone with this URL may edit the vehicle.", "success")
+    }
+  };
 
   // Vehicle folder.
   var guiVehicle = gui.addFolder('Vehicle');
@@ -101,6 +204,7 @@ function gui() {
   }
   // Vehicle selection.
   guiVehicle.add(current.vehicle, 'id', vehicleOptions).name('Vehicle').onChange(function(value){
+    // Load vehicle.
     loadVehicle();
   });
 
@@ -123,12 +227,20 @@ function gui() {
     wheelOptions[config.wheels.rims[wheelKey].name] = wheelKey;
   }
   // Wheel selection.
-  guiWheels.add(current.wheels, 'rim', wheelOptions).name('Wheel').onFinishChange(function(value){
+  guiWheels.add(current.wheels, 'rim', wheelOptions).name('Rims').onFinishChange(function(value){
     loadWheels();
   });
-
+  // Wheel Color.
+  guiWheels.add(current.wheels, 'rim_color', {'Chrome': 'chrome', 'Black': 'black', 'Silver': 'silver'}).name('Color').onFinishChange(function(value){
+    setWheelColor();
+  });
   // Wheel Size.
-  guiWheels.add(current.wheels, 'rim_size', 14, 20).step(1).name('Wheel Size').onFinishChange(function(value){
+  guiWheels.add(current.wheels, 'rim_size', 14, 20).step(1).name('Rim Size').onFinishChange(function(value){
+    setWheelSize();
+    setTireSize();
+  });
+  // Wheel Size.
+  guiWheels.add(current.wheels, 'rim_width', 7, 16).step(1).name('Rim Width').onFinishChange(function(value){
     setWheelSize();
     setTireSize();
   });
@@ -139,19 +251,34 @@ function gui() {
     tireOptions[config.wheels.tires[tireKey].name] = tireKey;
   }
   // Tire selection.
-  guiWheels.add(current.wheels, 'tire', tireOptions).name('Tire').onFinishChange(function(value){
+  guiWheels.add(current.wheels, 'tire', tireOptions).name('Tires').onFinishChange(function(value){
     loadTires();
   });
-
   // Tire Size.
   guiWheels.add(current.wheels, 'tire_size', 30, 40).step(1).name('Tire Size').onFinishChange(function(value){
     setWheelSize();
     setTireSize();
   });
 
-
   // Addons.
-  var guiAddons = gui.addFolder('Addons');
+  guiAddons = gui.addFolder('Addons');
+
+  // Scene.
+  var guiCamera = gui.addFolder('Scene');
+  guiCamera.add(current.camera, 'auto').name('Auto Rotate');
+
+  // Save.
+  gui.add(guiActions, 'save').name('Save Vehicle');
+}
+
+// Update GUI.
+function loadGuiAddons() {
+  // Remove current addon fields.
+  var addonCount = gui.__folders.Addons.__controllers.length;
+  for (var i = 0; i < addonCount; i++) {
+    gui.__folders.Addons.remove(gui.__folders.Addons.__controllers[0]);
+  }
+
   // Loop through addons
   for (var addonKey in config.vehicles[current.vehicle.id].addons) {
     var addonOptions = {};
@@ -160,17 +287,23 @@ function gui() {
       addonOptions[config.vehicles[current.vehicle.id].addons[addonKey].options[optionKey].name] = optionKey;
     }
     // Add field
-    guiAddons.add(current.vehicle.addons, addonKey, addonOptions)
-             .name(config.vehicles[current.vehicle.id].addons[addonKey].name)
-             .onChange(function() {
-                console.log(this);
-                loadVehicleAddon(this.property);
-             });
+    guiAddons
+    .add(current.vehicle.addons, addonKey, addonOptions)
+    .name(config.vehicles[current.vehicle.id].addons[addonKey].name)
+    .onChange(function() {
+      loadVehicleAddon(this.property);
+    });
   }
+}
 
-  // Scene folder
-  var guiCamera = gui.addFolder('Scene');
-  guiCamera.add(current.camera, 'auto').name('Auto Rotate');
+// Random string generator.
+function randomString(length) {
+  var text = "";
+  var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for(var i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 }
 
 // Animate.
@@ -199,8 +332,7 @@ function render() {
 
 // Load vehicle.
 function loadVehicle() {
-  var vehicle_name = current.vehicle.id;
-  loader.load(config.vehicles[vehicle_name]['model'], function(vehicleModel) {
+  loader.load(config.vehicles[current.vehicle.id]['model'], function(vehicleModel) {
     // Remove existing vehicle.
     if (typeof vehicle !== 'undefined') {
       scene.remove(vehicle);
@@ -208,7 +340,6 @@ function loadVehicle() {
     // Create object.
     vehicle = vehicleModel.scene;
     // Set name.
-    vehicle.name = vehicle_name;
     // Set height.
     var height = getVehicleHeight();
     vehicle.position.y = height + 0.1; // add a little extra for a 'drop in' effect.
@@ -220,8 +351,12 @@ function loadVehicle() {
     loadTires();
     // Add vehicle to scene.
     scene.add(vehicle);
+    // Get default addons.
+    current.vehicle.addons = config.vehicles[current.vehicle.id]['default_addons'];
     // Add addons
     loadVehicleAddons();
+    // Update GUI.
+    loadGuiAddons();
   });
 }
 
@@ -230,17 +365,14 @@ function loadWheels() {
   // Load new wheel.
   loader.load(config.wheels.rims[current.wheels.rim].model, function(wheelModel) {
     // Remove existing wheels.
-    if (typeof wheels !== 'undefined') {
-      scene.remove(wheels);
+    for ( var i = wheels.children.length - 1; i >= 0; i--) {
+      if (wheels.children.hasOwnProperty(i)) {
+        wheels.remove(wheels.children[i]);
+      }
     }
+
     // Create object.
     wheel = wheelModel.scene;
-    // Traverse children.
-    wheel.traverse(function(child) {
-      if (child instanceof THREE.Mesh) {
-        child.castShadow = true;
-      }
-    });
     // Wheel variables.
     var wheel_height = getWheelHeight();
     var wheel_offset = config.vehicles[current.vehicle.id]['wheel_offset'];
@@ -248,29 +380,32 @@ function loadWheels() {
     var axle_rear = config.vehicles[current.vehicle.id]['axle_rear'];
     var wheelRot = Math.PI * 90 / 180;
     var wheelSteer = Math.PI * -10 / 180;
-    // Create wheels object.
-    wheels = new THREE.Object3D();
 
     // FR
-    wheelFR = wheel.clone();
+    var wheelFR = wheel.clone();
     wheelFR.rotateZ(wheelRot + wheelSteer);
     wheelFR.position.set(wheel_offset, 0, axle_front);
     wheels.add(wheelFR);
     // FL
-    wheelFL = wheel.clone();
+    var wheelFL = wheel.clone();
     wheelFL.rotateZ(-wheelRot + wheelSteer);
     wheelFL.position.set(-wheel_offset, 0, axle_front);
     wheels.add(wheelFL);
     // RR
-    wheelRR = wheel.clone();
+    var wheelRR = wheel.clone();
     wheelRR.rotateZ(wheelRot);
     wheelRR.position.set(wheel_offset, 0, axle_rear);
     wheels.add(wheelRR);
     // RL
-    wheelRL = wheel.clone();
+    var wheelRL = wheel.clone();
     wheelRL.rotateZ(-wheelRot);
     wheelRL.position.set(-wheel_offset, 0, axle_rear);
     wheels.add(wheelRL);
+    // Spare
+    var wheelSpare = wheel.clone();
+    wheelSpare.rotateZ(Math.PI);
+    wheelSpare.position.set(0, 0.7, -2.45);
+    wheels.add(wheelSpare);
 
     // Set wheel height.
     wheels.position.set(0, wheel_height, 0);
@@ -280,6 +415,8 @@ function loadWheels() {
 
     // Update wheel size
     setWheelSize();
+    // Set wheel color
+    setWheelColor();
   });
 }
 
@@ -288,17 +425,22 @@ function loadTires() {
   // Load new tire.
   loader.load(config.wheels.tires[current.wheels.tire].model, function(tireModel) {
     // Remove existing tires.
-    if (typeof tires !== 'undefined') {
-      scene.remove(tires);
+    for ( var i = tires.children.length - 1; i >= 0; i--) {
+      if (tires.children.hasOwnProperty(i)) {
+        tires.remove(tires.children[i]);
+      }
     }
+
     // Create object.
     tire = tireModel.scene;
+
     // Traverse children.
     tire.traverse(function(child) {
       if (child instanceof THREE.Mesh) {
+        // Cast shadows.
         child.castShadow = true;
 
-        //
+        // Clone original geometry.
         child.origGeometry = child.geometry.clone();
       }
     });
@@ -309,29 +451,33 @@ function loadTires() {
     var axle_rear = config.vehicles[current.vehicle.id]['axle_rear'];
     var wheelRot = Math.PI * 90 / 180;
     var wheelSteer = Math.PI * -10 / 180;
-    // Create tires object.
-    tires = new THREE.Object3D();
 
     // FR
-    tireFR = tire.clone();
+    var tireFR = tire.clone();
     tireFR.rotateZ(wheelRot + wheelSteer);
     tireFR.position.set(wheel_offset, 0, axle_front);
     tires.add(tireFR);
     // FL
-    tireFL = tire.clone();
+    var tireFL = tire.clone();
     tireFL.rotateZ(-wheelRot + wheelSteer);
     tireFL.position.set(-wheel_offset, 0, axle_front);
     tires.add(tireFL);
     // RR
-    tireRR = tire.clone();
+    var tireRR = tire.clone();
     tireRR.rotateZ(wheelRot);
     tireRR.position.set(wheel_offset, 0, axle_rear);
     tires.add(tireRR);
     // RL
-    tireRL = tire.clone();
+    var tireRL = tire.clone();
     tireRL.rotateZ(-wheelRot);
     tireRL.position.set(-wheel_offset, 0, axle_rear);
     tires.add(tireRL);
+
+    // Spare
+    var tireSpare = tire.clone();
+    tireSpare.rotateZ(Math.PI);
+    tireSpare.position.set(0, 0.7, -2.45);
+    tires.add(tireSpare);
 
     // initial height
     tires.position.set(0, wheel_height, 0);
@@ -350,28 +496,27 @@ function loadTires() {
 // Set wheel size.
 function setWheelSize() {
   // determine wheel scale as a percentage of diameter
-  var wheel_od_new = (current.wheels.rim_size * 2.54) / 100;
-  var wheel_scale = (wheel_od_new + 0.03175) / config.wheels.rims[current.wheels.rim].od;
+  var wheel_od = (current.wheels.rim_size * 2.54) / 100;
+  var wheel_od_scale = (wheel_od + 0.03175) / config.wheels.rims[current.wheels.rim].od;
 
-  wheelFR.scale.setX(wheel_scale);
-  wheelFR.scale.setZ(wheel_scale);
+  var wheel_width = (current.wheels.rim_width * 2.54) / 100;
+  var wheel_width_scale = wheel_width / config.wheels.rims[current.wheels.rim].width;
 
-  wheelFL.scale.setX(wheel_scale);
-  wheelFL.scale.setZ(wheel_scale);
-
-  wheelRR.scale.setX(wheel_scale);
-  wheelRR.scale.setZ(wheel_scale);
-
-  wheelRL.scale.setX(wheel_scale);
-  wheelRL.scale.setZ(wheel_scale);
+  // Loop through wheels.
+  for ( var i = 0; i < wheels.children.length; i ++ ) {
+    if (wheels.children.hasOwnProperty(i)) {
+      // Set scale.
+      wheels.children[i].scale.set(wheel_od_scale, wheel_width_scale, wheel_od_scale);
+    }
+  }
 };
 
 
 // Set wheel size.
 function setTireSize() {
-  // determine wheel scale as a percentage of diameter
-  var wheel_od_new = (current.wheels.rim_size * 2.54) / 100;
-  var wheel_scale = (wheel_od_new + 0.03175) / config.wheels.rims[current.wheels.rim].od;
+  // determine y scale as a percentage of width
+  var wheel_width = (current.wheels.rim_width * 2.54) / 100;
+  var wheel_width_scale = wheel_width / config.wheels.tires[current.wheels.tire].width;
 
   var od = config.wheels.tires[current.wheels.tire].od / 2;
   var id = config.wheels.tires[current.wheels.tire].id / 2;
@@ -383,11 +528,11 @@ function setTireSize() {
   tire.traverse(function (child) {
     if (child instanceof THREE.Mesh) {
 
-      // scale to match wheel.
-      child.geometry.scale(wheel_scale, 1, wheel_scale);
-
       // reset geometry.
       child.geometry.copy(child.origGeometry);
+
+      // scale to match wheel.
+      child.geometry.scale(1, wheel_width_scale, 1);
 
       // loop through vertices.
       for ( var i = 0, l = child.geometry.attributes.position.array.length; i < l; i ++ ) {
@@ -454,7 +599,7 @@ function loadVehicleAddon(addon_name) {
   // Get new addon selection.
   var addon_selection = current.vehicle.addons[addon_name];
   // Load new addon.
-  loader.load(config.vehicles[vehicle.name]['addons'][addon_name]['options'][addon_selection]['model'], function(addonModel) {
+  loader.load(config.vehicles[current.vehicle.id]['addons'][addon_name]['options'][addon_selection]['model'], function(addonModel) {
     // Create object.
     addon = addonModel.scene;
     addon.name = addon_name;
@@ -497,8 +642,23 @@ function setVehicleHeight() {
 function setVehicleColor() {
   // Traverse object
   vehicle.traverse(function (child) {
-    // Cast shadows from mesh.
     if (child instanceof THREE.Mesh) {
+      // Cast shadows from mesh.
+      child.castShadow = true;
+      // Set material.
+      if (child.material.type === 'MeshPhongMaterial') {
+        setMaterials(child.material);
+      }
+    }
+  });
+}
+
+// Set wheel color.
+function setWheelColor() {
+  // Traverse object
+  wheel.traverse(function (child) {
+    if (child instanceof THREE.Mesh) {
+      // Cast shadows from mesh.
       child.castShadow = true;
       // Set material.
       if (child.material.type === 'MeshPhongMaterial') {
@@ -510,24 +670,45 @@ function setVehicleColor() {
 
 // Update materials.
 function setMaterials(material) {
+  var silver = new THREE.Color(0.8, 0.8, 0.8);
+  var white = new THREE.Color(1, 1, 1);
+  var black = new THREE.Color(0.2, 0.2, 0.2);
   // Switch materials.
   switch (material.name) {
     // Body paint.
     case 'body':
-      material.envMap = textureCube;
+      material.envMap = envMap;
       material.reflectivity = 0.5;
       material.color.setStyle(current.vehicle.color);
       break;
     case 'chrome':
-      material.envMap = textureCube;
-      material.color.set(new THREE.Color(1, 1, 1));
-      material.specular.set(new THREE.Color(1, 1, 1));
+      material.envMap = envMap;
+      material.color.set(white);
+      material.specular.set(white);
       material.reflectivity = 0.9;
       break;
     case 'tint_light':
     case 'tint_dark':
     case 'glass_clear':
-      material.envMap = textureCube;
+      material.envMap = envMap;
+      break;
+    case 'rim':
+      material.envMap = envMap;
+      material.reflectivity = 0.5;
+      switch (current.wheels.rim_color) {
+        case 'silver':
+          material.color.set(silver);
+          material.specular.set(silver);
+          break;
+        case 'chrome':
+          material.envMap = envMap;
+          material.color.set(white);
+          material.specular.set(white);
+          material.reflectivity = 0.9;
+          break;
+        default:
+          material.color.set(black);
+      }
       break;
   }
 }

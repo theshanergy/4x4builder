@@ -1,4 +1,10 @@
 {
-  ".read": true,
-  ".write": true
+  ".read":false,
+  ".write":false,
+  "configs":{
+    "$config":{
+      ".read":true,
+      ".write":true
+    }
+  }
 }

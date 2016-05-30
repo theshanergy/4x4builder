@@ -1,5 +1,5 @@
 # configurator
 
-'node server.js' to start server.
+Vehicle configurator.
 
 'gulp build' to rebuild assets.
