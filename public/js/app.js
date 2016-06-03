@@ -14,86 +14,36 @@
 
 // Set up global variables.
 var scene, camera, renderer, loader, light, envMap, gui, guiAddons, session, loading,
-vehicle, wheel, tire = {};
-var wheels = new THREE.Object3D();
+vehicle, rim, tire = {};
+var rims = new THREE.Object3D();
 var tires = new THREE.Object3D();
 
 
 // Start loading manager.
-loading = new THREE.LoadingManager();
-loading.onProgress = function (item, loaded, total) {
-  var loadingMessage = 'Loading';
-  var itemParts = item.split('/');
-  switch(itemParts[2]) {
-    case 'vehicles':
-      loadingMessage = 'Loading vehicle';
-      break;
-    case 'wheels':
-    loadingMessage = 'Loading wheels'
-      break;
-  }
-
-  // Update loading message.
-  document.getElementById('message').innerHTML = loadingMessage;
-
-  // Set loading bar width.
-  var barWidth = 250;
-  var barWidth = total ? Math.floor(barWidth * loaded / total) : barWidth;
-  document.getElementById('bar').style.width = barWidth + 'px';
+loadingManager = new THREE.LoadingManager();
+loadingManager.onProgress = function (item, loaded, total) {
+  // loading progress.
 };
-loading.onLoad = function () {
-  document.getElementById('progress').style.display = 'none';
+loadingManager.onLoad = function () {
+  hideLoader();
 };
-loading.onError = function () {
+loadingManager.onError = function () {
   console.log('loading error');
 };
 
-// Start loader.
-document.getElementById('progress').style.display = 'block';
+// Show loader.
+function showLoader() {
+  document.getElementById('loader').style.display = 'table';
+}
+
+// Hide loader.
+function hideLoader() {
+  document.getElementById('loader').style.display = 'none';
+}
 
 
 // Initialization function.
 function init() {
-
-  // Initialize collada loader.
-  loader = new THREE.ColladaLoader(loading);
-
-  // Get default vehicle addons
-  current.vehicle.addons = config.vehicles[current.vehicle.id].default_addons;
-
-  // Get session
-  session = window.location.pathname.replace(/^\/([^\/]*).*$/, '$1');
-
-  // Existing session.
-  if(session) {
-    // Get default config from db.
-    firebase.database().ref('/configs/' + session).once('value').then(function(data) {
-      // If exists.
-      if(data.val() != null) {
-        // Overwrite current from response.
-        current = MergeRecursive(current, data.val());
-        // Load vehicle.
-        loadVehicle();
-        // Load gui.
-        loadGui();
-      }
-      else {
-        session = randomString(16);
-        // Load vehicle.
-        loadVehicle();
-        // Load gui.
-        loadGui();
-      }
-    });
-  }
-  else {
-    session = randomString(16);
-    // Load vehicle.
-    loadVehicle();
-    // Load gui.
-    loadGui();
-  }
-
 
   // Create scene.
   scene = new THREE.Scene;
@@ -143,28 +93,49 @@ function init() {
   // Load ground.
   loadGround();
 
+  // Get default vehicle addons
+  current.vehicle.addons = config.vehicles[current.vehicle.id].default_addons;
+
+  // Initialize collada loader.
+  colladaLoader = new THREE.ColladaLoader(loadingManager);
+
+  // Get session
+  session = window.location.pathname.replace(/^\/([^\/]*).*$/, '$1');
+
+  // Existing session.
+  if(session) {
+    // Get default config from db.
+    firebase.database().ref('/configs/' + session).once('value').then(function(data) {
+      // If exists.
+      if(data.val() != null) {
+        // Overwrite current from response.
+        current = MergeRecursive(current, data.val());
+        // Load vehicle.
+        loadVehicle();
+        // Load gui.
+        loadGui();
+      }
+      else {
+        session = randomString(16);
+        // Load vehicle.
+        loadVehicle();
+        // Load gui.
+        loadGui();
+      }
+    });
+  }
+  else {
+    session = randomString(16);
+    // Load vehicle.
+    loadVehicle();
+    // Load gui.
+    loadGui();
+  }
+
   // Bind window resize event
   window.addEventListener('resize', windowResize, false);
 
 };
-
-// Recursively merge objects.
-function MergeRecursive(obj1, obj2) {
-  for (var p in obj2) {
-    try {
-      // Property in destination object set; update its value.
-      if ( obj2[p].constructor == Object ) {
-        obj1[p] = MergeRecursive(obj1[p], obj2[p]);
-      } else {
-        obj1[p] = obj2[p];
-      }
-    } catch(e) {
-      // Property in destination object not set; create it and set its value.
-      obj1[p] = obj2[p];
-    }
-  }
-  return obj1;
-}
 
 // Window resize.
 function windowResize() {
@@ -221,27 +192,27 @@ function loadGui() {
   // Wheels folder.
   var guiWheels = gui.addFolder('Wheels');
 
-  // Build wheel options.
-  var wheelOptions = {};
-  for (var wheelKey in config.wheels.rims) {
-    wheelOptions[config.wheels.rims[wheelKey].name] = wheelKey;
+  // Build rim options.
+  var rimOptions = {};
+  for (var rimKey in config.wheels.rims) {
+    rimOptions[config.wheels.rims[rimKey].name] = rimKey;
   }
-  // Wheel selection.
-  guiWheels.add(current.wheels, 'rim', wheelOptions).name('Rims').onFinishChange(function(value){
-    loadWheels();
+  // Rim selection.
+  guiWheels.add(current.wheels, 'rim', rimOptions).name('Rims').onFinishChange(function(value){
+    loadRims();
   });
-  // Wheel Color.
+  // Rim Color.
   guiWheels.add(current.wheels, 'rim_color', {'Chrome': 'chrome', 'Black': 'black', 'Silver': 'silver'}).name('Color').onFinishChange(function(value){
-    setWheelColor();
+    setRimColor();
   });
-  // Wheel Size.
+  // Rim Size.
   guiWheels.add(current.wheels, 'rim_size', 14, 20).step(1).name('Rim Size').onFinishChange(function(value){
-    setWheelSize();
+    setRimSize();
     setTireSize();
   });
-  // Wheel Size.
+  // Rim width.
   guiWheels.add(current.wheels, 'rim_width', 7, 16).step(1).name('Rim Width').onFinishChange(function(value){
-    setWheelSize();
+    setRimSize();
     setTireSize();
   });
 
@@ -256,7 +227,7 @@ function loadGui() {
   });
   // Tire Size.
   guiWheels.add(current.wheels, 'tire_size', 30, 40).step(1).name('Tire Size').onFinishChange(function(value){
-    setWheelSize();
+    setRimSize();
     setTireSize();
   });
 
@@ -332,7 +303,10 @@ function render() {
 
 // Load vehicle.
 function loadVehicle() {
-  loader.load(config.vehicles[current.vehicle.id]['model'], function(vehicleModel) {
+  // Show loader.
+  showLoader();
+  // Load vehicle model.
+  colladaLoader.load(config.vehicles[current.vehicle.id]['model'], function(vehicleModel) {
     // Remove existing vehicle.
     if (typeof vehicle !== 'undefined') {
       scene.remove(vehicle);
@@ -345,8 +319,8 @@ function loadVehicle() {
     vehicle.position.y = height + 0.1; // add a little extra for a 'drop in' effect.
     // Update shadows & materials.
     setVehicleColor();
-    // Load wheels.
-    loadWheels();
+    // Load rims.
+    loadRims();
     // Load tires.
     loadTires();
     // Add vehicle to scene.
@@ -360,70 +334,76 @@ function loadVehicle() {
   });
 }
 
-// Load wheels.
-function loadWheels() {
-  // Load new wheel.
-  loader.load(config.wheels.rims[current.wheels.rim].model, function(wheelModel) {
-    // Remove existing wheels.
-    for ( var i = wheels.children.length - 1; i >= 0; i--) {
-      if (wheels.children.hasOwnProperty(i)) {
-        wheels.remove(wheels.children[i]);
+// Load rims.
+function loadRims() {
+  // Show loader.
+  showLoader();
+  // Load rim model.
+  colladaLoader.load(config.wheels.rims[current.wheels.rim].model, function(rimModel) {
+    // Remove existing rims.
+    for ( var i = rims.children.length - 1; i >= 0; i--) {
+      if (rims.children.hasOwnProperty(i)) {
+        rims.remove(rims.children[i]);
       }
     }
 
     // Create object.
-    wheel = wheelModel.scene;
-    // Wheel variables.
-    var wheel_height = getWheelHeight();
-    var wheel_offset = config.vehicles[current.vehicle.id]['wheel_offset'];
-    var axle_front = config.vehicles[current.vehicle.id]['axle_front'];
-    var axle_rear = config.vehicles[current.vehicle.id]['axle_rear'];
+    rim = rimModel.scene;
+
+    // rim variables.
+    var height = getWheelHeight();
+    var offset = config.vehicles[current.vehicle.id]['wheel_offset'];
+    var axleFront = config.vehicles[current.vehicle.id]['axle_front'];
+    var axleRear = config.vehicles[current.vehicle.id]['axle_rear'];
     var wheelRot = Math.PI * 90 / 180;
     var wheelSteer = Math.PI * -10 / 180;
 
     // FR
-    var wheelFR = wheel.clone();
-    wheelFR.rotateZ(wheelRot + wheelSteer);
-    wheelFR.position.set(wheel_offset, 0, axle_front);
-    wheels.add(wheelFR);
+    var rimFR = rim.clone();
+    rimFR.rotateZ(wheelRot + wheelSteer);
+    rimFR.position.set(offset, 0, axleFront);
+    rims.add(rimFR);
     // FL
-    var wheelFL = wheel.clone();
-    wheelFL.rotateZ(-wheelRot + wheelSteer);
-    wheelFL.position.set(-wheel_offset, 0, axle_front);
-    wheels.add(wheelFL);
+    var rimFL = rim.clone();
+    rimFL.rotateZ(-wheelRot + wheelSteer);
+    rimFL.position.set(-offset, 0, axleFront);
+    rims.add(rimFL);
     // RR
-    var wheelRR = wheel.clone();
-    wheelRR.rotateZ(wheelRot);
-    wheelRR.position.set(wheel_offset, 0, axle_rear);
-    wheels.add(wheelRR);
+    var rimRR = rim.clone();
+    rimRR.rotateZ(wheelRot);
+    rimRR.position.set(offset, 0, axleRear);
+    rims.add(rimRR);
     // RL
-    var wheelRL = wheel.clone();
-    wheelRL.rotateZ(-wheelRot);
-    wheelRL.position.set(-wheel_offset, 0, axle_rear);
-    wheels.add(wheelRL);
+    var rimRL = rim.clone();
+    rimRL.rotateZ(-wheelRot);
+    rimRL.position.set(-offset, 0, axleRear);
+    rims.add(rimRL);
     // Spare
-    var wheelSpare = wheel.clone();
-    wheelSpare.rotateZ(Math.PI);
-    wheelSpare.position.set(0, 0.7, -2.45);
-    wheels.add(wheelSpare);
+    var rimSpare = rim.clone();
+    rimSpare.rotateZ(Math.PI);
+    rimSpare.position.set(0, 0.7, -2.45);
+    rims.add(rimSpare);
 
-    // Set wheel height.
-    wheels.position.set(0, wheel_height, 0);
+    // Set rim height.
+    rims.position.set(0, height, 0);
 
-    // Add wheels to scene.
-    scene.add(wheels);
+    // Add rims to scene.
+    scene.add(rims);
 
-    // Update wheel size
-    setWheelSize();
-    // Set wheel color
-    setWheelColor();
+    // Update rim size
+    setRimSize();
+
+    // Set rim color
+    setRimColor();
   });
 }
 
 // Load tires.
 function loadTires() {
-  // Load new tire.
-  loader.load(config.wheels.tires[current.wheels.tire].model, function(tireModel) {
+  // Show loader.
+  showLoader();
+  // Load tire model.
+  colladaLoader.load(config.wheels.tires[current.wheels.tire].model, function(tireModel) {
     // Remove existing tires.
     for ( var i = tires.children.length - 1; i >= 0; i--) {
       if (tires.children.hasOwnProperty(i)) {
@@ -445,32 +425,32 @@ function loadTires() {
       }
     });
     // Wheel variables.
-    var wheel_height = getWheelHeight();
-    var wheel_offset = config.vehicles[current.vehicle.id]['wheel_offset'];
-    var axle_front = config.vehicles[current.vehicle.id]['axle_front'];
-    var axle_rear = config.vehicles[current.vehicle.id]['axle_rear'];
+    var height = getWheelHeight();
+    var offset = config.vehicles[current.vehicle.id]['wheel_offset'];
+    var axleFront = config.vehicles[current.vehicle.id]['axle_front'];
+    var axleRear = config.vehicles[current.vehicle.id]['axle_rear'];
     var wheelRot = Math.PI * 90 / 180;
     var wheelSteer = Math.PI * -10 / 180;
 
     // FR
     var tireFR = tire.clone();
     tireFR.rotateZ(wheelRot + wheelSteer);
-    tireFR.position.set(wheel_offset, 0, axle_front);
+    tireFR.position.set(offset, 0, axleFront);
     tires.add(tireFR);
     // FL
     var tireFL = tire.clone();
     tireFL.rotateZ(-wheelRot + wheelSteer);
-    tireFL.position.set(-wheel_offset, 0, axle_front);
+    tireFL.position.set(-offset, 0, axleFront);
     tires.add(tireFL);
     // RR
     var tireRR = tire.clone();
     tireRR.rotateZ(wheelRot);
-    tireRR.position.set(wheel_offset, 0, axle_rear);
+    tireRR.position.set(offset, 0, axleRear);
     tires.add(tireRR);
     // RL
     var tireRL = tire.clone();
     tireRL.rotateZ(-wheelRot);
-    tireRL.position.set(-wheel_offset, 0, axle_rear);
+    tireRL.position.set(-offset, 0, axleRear);
     tires.add(tireRL);
 
     // Spare
@@ -480,9 +460,9 @@ function loadTires() {
     tires.add(tireSpare);
 
     // initial height
-    tires.position.set(0, wheel_height, 0);
+    tires.position.set(0, height, 0);
 
-    // Add wheels to scene.
+    // Add tires to scene.
     scene.add(tires);
     // Set size.
     setTireSize();
@@ -493,26 +473,26 @@ function loadTires() {
   });
 }
 
-// Set wheel size.
-function setWheelSize() {
-  // determine wheel scale as a percentage of diameter
-  var wheel_od = (current.wheels.rim_size * 2.54) / 100;
-  var wheel_od_scale = (wheel_od + 0.03175) / config.wheels.rims[current.wheels.rim].od;
+// Set rim size.
+function setRimSize() {
+  // determine rim scale as a percentage of diameter
+  var od = (current.wheels.rim_size * 2.54) / 100;
+  var od_scale = (od + 0.03175) / config.wheels.rims[current.wheels.rim].od;
 
-  var wheel_width = (current.wheels.rim_width * 2.54) / 100;
-  var wheel_width_scale = wheel_width / config.wheels.rims[current.wheels.rim].width;
+  var width = (current.wheels.rim_width * 2.54) / 100;
+  var width_scale = width / config.wheels.rims[current.wheels.rim].width;
 
-  // Loop through wheels.
-  for ( var i = 0; i < wheels.children.length; i ++ ) {
-    if (wheels.children.hasOwnProperty(i)) {
+  // Loop through rims.
+  for ( var i = 0; i < rims.children.length; i ++ ) {
+    if (rims.children.hasOwnProperty(i)) {
       // Set scale.
-      wheels.children[i].scale.set(wheel_od_scale, wheel_width_scale, wheel_od_scale);
+      rims.children[i].scale.set(od_scale, width_scale, od_scale);
     }
   }
 };
 
 
-// Set wheel size.
+// Set tire size.
 function setTireSize() {
   // determine y scale as a percentage of width
   var wheel_width = (current.wheels.rim_width * 2.54) / 100;
@@ -598,8 +578,10 @@ function loadVehicleAddon(addon_name) {
   vehicle.remove(old_addon);
   // Get new addon selection.
   var addon_selection = current.vehicle.addons[addon_name];
+  // Show loader.
+  showLoader();
   // Load new addon.
-  loader.load(config.vehicles[current.vehicle.id]['addons'][addon_name]['options'][addon_selection]['model'], function(addonModel) {
+  colladaLoader.load(config.vehicles[current.vehicle.id]['addons'][addon_name]['options'][addon_selection]['model'], function(addonModel) {
     // Create object.
     addon = addonModel.scene;
     addon.name = addon_name;
@@ -620,7 +602,7 @@ function getWheelHeight() {
 // Set wheel height.
 function setWheelHeight() {
   var height = getWheelHeight();
-  wheels.position.set(0, height, 0);
+  rims.position.set(0, height, 0);
   tires.position.set(0, height, 0);
 }
 
@@ -654,9 +636,9 @@ function setVehicleColor() {
 }
 
 // Set wheel color.
-function setWheelColor() {
+function setRimColor() {
   // Traverse object
-  wheel.traverse(function (child) {
+  rim.traverse(function (child) {
     if (child instanceof THREE.Mesh) {
       // Cast shadows from mesh.
       child.castShadow = true;
@@ -722,6 +704,25 @@ function loadGround() {
   ground.position.y = 0;
   ground.receiveShadow = true;
   scene.add(ground);
+}
+
+
+// Recursively merge objects.
+function MergeRecursive(obj1, obj2) {
+  for (var p in obj2) {
+    try {
+      // Property in destination object set; update its value.
+      if ( obj2[p].constructor == Object ) {
+        obj1[p] = MergeRecursive(obj1[p], obj2[p]);
+      } else {
+        obj1[p] = obj2[p];
+      }
+    } catch(e) {
+      // Property in destination object not set; create it and set its value.
+      obj1[p] = obj2[p];
+    }
+  }
+  return obj1;
 }
 
 // Init scene.

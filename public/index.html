@@ -10,43 +10,22 @@
         <script src="./js/libraries.min.js"></script>
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5.1/dat.gui.min.js"></script>
         <script src="./js/config.js"></script>
-
-        <style>
-            #progress {
-                color: red;
-                top: 50%;
-                width: 100%;
-                font-weight: bold;
-                position: absolute;
-                z-index: 100;
-                text-align: center;
-                display: none;
-            }
-            #progressbar {
-                margin: 0 auto;
-                width: 250px;
-                height: 10px;
-                background: #333;
-            }
-            #bar {
-                width: 0;
-                height: 100%;
-                background: #d00;
-                -webkit-transition: width 0.1s ease-in-out;
-                -moz-transition: width 0.1s ease-in-out;
-                -o-transition: width 0.1s ease-in-out;
-                transition: width 0.1s ease-in-out;
-            }
-        </style>
-
     </head>
     <body>
 
-        <div id="progress">
-            <span id="message">Loading ...</span>
-            <div id="progressbar"><div id="bar"></div></div>
+        <div id="loader">
+          <div class="spinner">
+            <div class="cube">
+              <div class="face front"></div>
+              <div class="face back"></div>
+              <div class="face left"></div>
+              <div class="face right"></div>
+              <div class="face top"></div>
+              <div class="face bottom"></div>
+            </div>
+            <div id="message" class="text">Loading</div>
+          </div>
         </div>
-
 
         <script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
         <script>

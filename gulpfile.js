@@ -12,7 +12,7 @@ gulp.task('build', ['build-js', 'build-css']);
 // Build js.
 gulp.task('build-js', function() {
   return gulp.src([
-      './node_modules/three/three.js',
+      './node_modules/three/build/three.js',
       './node_modules/three/examples/js/loaders/ColladaLoader2.js',
       './node_modules/three/examples/js/controls/OrbitControls.js',
       './node_modules/three/examples/js/materials/ShadowMaterial.js',
