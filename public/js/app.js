@@ -1,4 +1,5 @@
 // todo:
+// fullscreen
 // lights
 // lightbars & accessories
 // license plate
@@ -14,10 +15,7 @@
 
 // Set up global variables.
 var scene, camera, renderer, loader, light, envMap, gui, guiAddons, session, loading,
-vehicle, rim, tire = {};
-var rims = new THREE.Object3D();
-var tires = new THREE.Object3D();
-
+vehicle, rims, rim, rimSpare, tires, tire, tireSpare = {};
 
 // Start loading manager.
 loadingManager = new THREE.LoadingManager();
@@ -93,8 +91,15 @@ function init() {
   // Load ground.
   loadGround();
 
-  // Get default vehicle addons
-  current.vehicle.addons = config.vehicles[current.vehicle.id].default_addons;
+  // Set up wheels.
+  rims = new THREE.Object3D();
+  scene.add(rims);
+
+  tires = new THREE.Object3D();
+  scene.add(tires);
+
+  setWheelHeight();
+
 
   // Initialize collada loader.
   colladaLoader = new THREE.ColladaLoader(loadingManager);
@@ -143,138 +148,6 @@ function windowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-// GUI.
-function loadGui() {
-
-  // // Add dat.gui
-  gui = new dat.GUI();
-
-  // GUI actions.
-  var guiActions = {
-    // Save.
-    'save': function() {
-      // Store current config to db.
-      firebase.database().ref('/configs/' + session).set(current);
-      // push session string to url.
-      window.history.pushState({}, 'Save', '/' + session);
-      // Notify user.
-      swal("Vehicle saved!", "Please copy or bookmark this page. Anyone with this URL may edit the vehicle.", "success")
-    }
-  };
-
-  // Vehicle folder.
-  var guiVehicle = gui.addFolder('Vehicle');
-  guiVehicle.open();
-
-  // Build vehicle options.
-  var vehicleOptions = {};
-  for (var vehicleKey in config.vehicles) {
-    vehicleOptions[config.vehicles[vehicleKey].name] = vehicleKey;
-  }
-  // Vehicle selection.
-  guiVehicle.add(current.vehicle, 'id', vehicleOptions).name('Vehicle').onChange(function(value){
-    // Load vehicle.
-    loadVehicle();
-  });
-
-  // Vehicle Color.
-  guiVehicle.addColor(current.vehicle, 'color').name('Color').onChange(function(value){
-    setVehicleColor();
-  });
-
-  // Lift.
-  guiVehicle.add(current.vehicle, 'lift', -2, 8).step(1).name('Lift').onChange(function(value){
-    setVehicleHeight();
-  });
-
-  // Wheels folder.
-  var guiWheels = gui.addFolder('Wheels');
-
-  // Build rim options.
-  var rimOptions = {};
-  for (var rimKey in config.wheels.rims) {
-    rimOptions[config.wheels.rims[rimKey].name] = rimKey;
-  }
-  // Rim selection.
-  guiWheels.add(current.wheels, 'rim', rimOptions).name('Rims').onFinishChange(function(value){
-    loadRims();
-  });
-  // Rim Color.
-  guiWheels.add(current.wheels, 'rim_color', {'Chrome': 'chrome', 'Black': 'black', 'Silver': 'silver'}).name('Color').onFinishChange(function(value){
-    setRimColor();
-  });
-  // Rim Size.
-  guiWheels.add(current.wheels, 'rim_size', 14, 20).step(1).name('Rim Size').onFinishChange(function(value){
-    setRimSize();
-    setTireSize();
-  });
-  // Rim width.
-  guiWheels.add(current.wheels, 'rim_width', 7, 16).step(1).name('Rim Width').onFinishChange(function(value){
-    setRimSize();
-    setTireSize();
-  });
-
-  // Build tire options.
-  var tireOptions = {};
-  for (var tireKey in config.wheels.tires) {
-    tireOptions[config.wheels.tires[tireKey].name] = tireKey;
-  }
-  // Tire selection.
-  guiWheels.add(current.wheels, 'tire', tireOptions).name('Tires').onFinishChange(function(value){
-    loadTires();
-  });
-  // Tire Size.
-  guiWheels.add(current.wheels, 'tire_size', 30, 40).step(1).name('Tire Size').onFinishChange(function(value){
-    setRimSize();
-    setTireSize();
-  });
-
-  // Addons.
-  guiAddons = gui.addFolder('Addons');
-
-  // Scene.
-  var guiCamera = gui.addFolder('Scene');
-  guiCamera.add(current.camera, 'auto').name('Auto Rotate');
-
-  // Save.
-  gui.add(guiActions, 'save').name('Save Vehicle');
-}
-
-// Update GUI.
-function loadGuiAddons() {
-  // Remove current addon fields.
-  var addonCount = gui.__folders.Addons.__controllers.length;
-  for (var i = 0; i < addonCount; i++) {
-    gui.__folders.Addons.remove(gui.__folders.Addons.__controllers[0]);
-  }
-
-  // Loop through addons
-  for (var addonKey in config.vehicles[current.vehicle.id].addons) {
-    var addonOptions = {};
-    // Loop through addon options
-    for (var optionKey in config.vehicles[current.vehicle.id].addons[addonKey].options) {
-      addonOptions[config.vehicles[current.vehicle.id].addons[addonKey].options[optionKey].name] = optionKey;
-    }
-    // Add field
-    guiAddons
-    .add(current.vehicle.addons, addonKey, addonOptions)
-    .name(config.vehicles[current.vehicle.id].addons[addonKey].name)
-    .onChange(function() {
-      loadVehicleAddon(this.property);
-    });
-  }
-}
-
-// Random string generator.
-function randomString(length) {
-  var text = "";
-  var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for(var i = 0; i < length; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }
 
 // Animate.
@@ -326,7 +199,7 @@ function loadVehicle() {
     // Add vehicle to scene.
     scene.add(vehicle);
     // Get default addons.
-    current.vehicle.addons = config.vehicles[current.vehicle.id]['default_addons'];
+    current.vehicle.addons = config.vehicles[current.vehicle.id].default_addons;
     // Add addons
     loadVehicleAddons();
     // Update GUI.
@@ -351,7 +224,6 @@ function loadRims() {
     rim = rimModel.scene;
 
     // rim variables.
-    var height = getWheelHeight();
     var offset = config.vehicles[current.vehicle.id]['wheel_offset'];
     var axleFront = config.vehicles[current.vehicle.id]['axle_front'];
     var axleRear = config.vehicles[current.vehicle.id]['axle_rear'];
@@ -379,16 +251,11 @@ function loadRims() {
     rimRL.position.set(-offset, 0, axleRear);
     rims.add(rimRL);
     // Spare
-    var rimSpare = rim.clone();
-    rimSpare.rotateZ(Math.PI);
-    rimSpare.position.set(0, 0.7, -2.45);
-    rims.add(rimSpare);
-
-    // Set rim height.
-    rims.position.set(0, height, 0);
-
-    // Add rims to scene.
-    scene.add(rims);
+    // rimSpare = rim.clone();
+    // rimSpare.visibility = false;
+    // rimSpare.rotateZ(Math.PI);
+    // rimSpare.position.set(0, 0.7, -2.45);
+    // rims.add(rimSpare);
 
     // Update rim size
     setRimSize();
@@ -425,7 +292,6 @@ function loadTires() {
       }
     });
     // Wheel variables.
-    var height = getWheelHeight();
     var offset = config.vehicles[current.vehicle.id]['wheel_offset'];
     var axleFront = config.vehicles[current.vehicle.id]['axle_front'];
     var axleRear = config.vehicles[current.vehicle.id]['axle_rear'];
@@ -454,16 +320,12 @@ function loadTires() {
     tires.add(tireRL);
 
     // Spare
-    var tireSpare = tire.clone();
-    tireSpare.rotateZ(Math.PI);
-    tireSpare.position.set(0, 0.7, -2.45);
-    tires.add(tireSpare);
+    // tireSpare = tire.clone();
+    // tireSpare.visibility = false;
+    // tireSpare.rotateZ(Math.PI);
+    // tireSpare.position.set(0, 0.7, -2.45);
+    // tires.add(tireSpare);
 
-    // initial height
-    tires.position.set(0, height, 0);
-
-    // Add tires to scene.
-    scene.add(tires);
     // Set size.
     setTireSize();
     // Update vehicle height.
@@ -554,12 +416,6 @@ function setTireSize() {
   });
 }
 
-// Calculate point on line (a to b, at length).
-function linePoint(a, b, length) {
-  var dir = b.clone().sub(a).normalize().multiplyScalar(length);
-  return a.clone().add(dir);
-}
-
 // Load vehicle addons.
 function loadVehicleAddons() {
   var addons = current.vehicle.addons;
@@ -591,6 +447,12 @@ function loadVehicleAddon(addon_name) {
     // Update colors.
     setVehicleColor();
   });
+}
+
+// Toggle spare visibility.
+function toggleSpareWheel() {
+  rimSpare.visible = current.wheels.spare;
+  tireSpare.visible = current.wheels.spare;
 }
 
 // Get wheel (axle) height.
@@ -660,7 +522,7 @@ function setMaterials(material) {
     // Body paint.
     case 'body':
       material.envMap = envMap;
-      material.reflectivity = 0.5;
+      material.reflectivity = current.vehicle.reflectivity;
       material.color.setStyle(current.vehicle.color);
       break;
     case 'chrome':
@@ -706,6 +568,11 @@ function loadGround() {
   scene.add(ground);
 }
 
+// Calculate point on line (a to b, at length).
+function linePoint(a, b, length) {
+  var dir = b.clone().sub(a).normalize().multiplyScalar(length);
+  return a.clone().add(dir);
+}
 
 // Recursively merge objects.
 function MergeRecursive(obj1, obj2) {
@@ -723,6 +590,16 @@ function MergeRecursive(obj1, obj2) {
     }
   }
   return obj1;
+}
+
+// Random string generator.
+function randomString(length) {
+  var text = "";
+  var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for(var i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
 }
 
 // Init scene.

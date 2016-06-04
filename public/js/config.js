@@ -3,15 +3,17 @@ var current = {
     'id': 'toyota_4runner_3',
     'lift': 0,
     'color': '#CC0000',
+    'reflectivity': 0.5,
     'addons': {}
   },
   'wheels': {
     'rim': 'cragar_soft_8',
-    'rim_color': 'black',
+    'rim_color': 'silver',
     'rim_size': 16,
     'rim_width': 10,
     'tire': 'bfg_at',
-    'tire_size': 35,
+    'tire_size': 32,
+    'spare': false,
   },
   'camera': {
     'auto': true,
@@ -22,8 +24,8 @@ var current = {
 var config = {
   'vehicles': {
     'toyota_4runner_3': {
-      'name': '4Runner',
-      'group': 'Toyota',
+      'name': 'Toyota 4Runner',
+      'make': 'Toyota',
       'model': 'assets/models/vehicles/toyota/4runner/3g/4runner.dae',
       'wheel_offset': 0.770,
       'axle_front': 1.45,
@@ -79,9 +81,28 @@ var config = {
         },
       }
     },
+    'toyota_j80': {
+      'name': 'Toyota Land Cruiser (J80)',
+      'make': 'Toyota',
+      'model': 'assets/models/vehicles/toyota/land_cruiser/j80/j80.dae',
+      'wheel_offset': 0.78,
+      'axle_front': 1.545,
+      'axle_rear': -1.31,
+      'default_addons': {},
+      'addons': {},
+    },
+    'tacoma_dc_lb': {
+      'name': 'Toyota Tacoma (Double Cab)',
+      'make': 'Toyota',
+      'model': 'assets/models/vehicles/toyota/tacoma/tacoma_2011_lb_dc.dae',
+      'wheel_offset': 0.81,
+      'axle_front': 1.97,
+      'axle_rear': -1.59,
+      'addons': {},
+    },
     'jeep_yj': {
       'name': 'Jeep YJ',
-      'group': 'Jeep',
+      'make': 'Jeep',
       'model': 'assets/models/vehicles/jeep/yj/yj.dae',
       'wheel_offset': 0.770,
       'axle_front': 1.31,
@@ -91,7 +112,7 @@ var config = {
     },
     'jeep_jk': {
       'name': 'Jeep JK',
-      'group': 'Jeep',
+      'make': 'Jeep',
       'model': 'assets/models/vehicles/jeep/jk/JK_Unlimited_5door_2012.dae',
       'wheel_offset': 0.795,
       'axle_front': 1.45,
@@ -101,7 +122,7 @@ var config = {
     },
     'jeep_xj': {
       'name': 'Jeep XJ',
-      'group': 'Jeep',
+      'make': 'Jeep',
       'model': 'assets/models/vehicles/jeep/xj/xj.dae',
       'wheel_offset': 0.76,
       'axle_front': 1.51,
@@ -109,15 +130,6 @@ var config = {
       'default_addons': {},
       'addons': {},
     },
-    // 'tacoma_dc_lb': {
-    //   'name': 'Tacoma (Double Cab)',
-    //   'group': 'Toyota',
-    //   'model': 'assets/models/vehicles/toyota/tacoma/Toyota_Tacoma_DoubleCab_LongBed_2011.dae',
-    //   'wheel_offset': 0.770,
-    //   'axle_front': 1.97,
-    //   'axle_rear': -1.59,
-    //   'addons': {},
-    // },
   },
   'wheels': {
     'rims': {
