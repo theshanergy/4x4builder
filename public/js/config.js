@@ -3,7 +3,7 @@ var current = {
     'id': 'toyota_4runner_3',
     'lift': 0,
     'color': '#CC0000',
-    'reflectivity': 0.5,
+    'reflectivity': '0.5',
     'addons': {}
   },
   'wheels': {
@@ -55,6 +55,7 @@ var config = {
         },
         'sliders': {
           'name': 'Sliders',
+          'required': false,
           'options': {
             'stock': {
               'name': 'Stock',
@@ -68,6 +69,7 @@ var config = {
         },
         'rack': {
           'name': 'Rack',
+          'required': false,
           'options': {
             'stock': {
               'name': 'Stock',

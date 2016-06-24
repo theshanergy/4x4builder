@@ -7,11 +7,11 @@
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
         <link rel="stylesheet" href="./css/styles.min.css">
+        <link rel="stylesheet" href="./css/styles.css">
         <script src="./js/libraries.min.js"></script>
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5.1/dat.gui.min.js"></script>
         <script src="./js/config.js"></script>
     </head>
-    <body>
+    <body ng-app="configurator" ng-controller="config" ng-class="{'editor-visible': editor.visible}">
 
         <div id="loader">
           <div class="spinner">
@@ -26,6 +26,196 @@
             <div id="message" class="text">Loading</div>
           </div>
         </div>
+
+        <div id="page">
+
+          <div id="editor">
+
+            <div class="editor-container">
+
+              <!-- Vehicle -->
+              <div class="section" ng-class="{active:section.vehicle}" ng-init="section.vehicle=true">
+                <div class="section-header" ng-click="section.vehicle=!section.vehicle"><span class="icon icon-vehicle"></span>Vehicle<span class="icon icon-chevron"></span></div>
+                <div class="section-content">
+
+                  <!-- Vehicle -->
+                  <div class="field field-vehicle">
+                    <label>Vehicle</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.vehicle.id"
+                              ng-options="optionId as option.name group by option.group for (optionId, option) in config.vehicles"
+                              ng-change="loadVehicle()">
+                      </select>
+                    </span>
+                  </div>
+
+                  <!-- Vehicle Color -->
+                  <div class="field field-vehicle-color">
+                    <label>Paint</label>
+                    <button colorpicker
+                            colorpicker-size="200"
+                            type="button"
+                            ng-model="current.vehicle.color"
+                            ng-change="setVehicleColor()"
+                            style="background-color:{{current.vehicle.color}}">{{current.vehicle.color}}</button>
+                  </div>
+
+                  <!-- Vehicle Shininess -->
+                  <div class="field field-vehicle-shininess">
+                    <span class="select-wrapper">
+                      <select ng-model="current.vehicle.reflectivity"
+                              ng-change="setVehicleColor()">
+                        <option value="0.2">Matte</option>
+                        <option value="0.5">Semi Gloss</option>
+                        <option value="0.8">High Gloss</option>
+                      </select>
+                    </span>
+                  </div>
+
+                  <!-- Vehicle Lift -->
+                  <div class="field field-vehicle-lift">
+                    <label>Lift</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.vehicle.lift"
+                              ng-options="i as i + '&quot;' for i in [0,1,2,3,4,5,6,7,8]"
+                              ng-change="setVehicleHeight()">
+                      </select>
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Wheels -->
+              <div class="section" ng-class="{active:section.wheels}">
+                <div class="section-header" ng-click="section.wheels=!section.wheels"><span class="icon icon-tire"></span>Wheels<span class="icon icon-chevron"></span></div>
+                <div class="section-content">
+
+                  <!-- Rim -->
+                  <div class="field field-rim">
+                    <label>Rims</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.wheels.rim"
+                              ng-options="optionId as option.name for (optionId, option) in config.wheels.rims"
+                              ng-change="loadRims()">
+                      </select>
+                    </span>
+                  </div>
+
+                  <!-- Rim Color -->
+                  <div class="field field-rim-color">
+                    <label>Rim Color</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.wheels.rim_color"
+                              ng-options="i as i for i in ['black', 'silver', 'chrome']"
+                              ng-change="setRimColor()">
+                      </select>
+                    </span>
+                  </div>
+
+                  <!-- Rim Size -->
+                  <div class="field field-rim-size">
+                    <label>Rim Size</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.wheels.rim_size"
+                              ng-options="i as i + '&quot;' for i in [14,15,16,17,18,19,20,21,22,23,24]"
+                              ng-change="setWheelSize()">
+                      </select>
+                    </span>
+                  </div>
+
+                  <!-- Rim Width -->
+                  <div class="field field-rim-width">
+                    <label>Rim Width</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.wheels.rim_width"
+                              ng-options="i as i + '&quot;' for i in [8,9,10,11,12,13,14,15,16]"
+                              ng-change="setWheelSize()">
+                      </select>
+                    </span>
+                  </div>
+
+                  <!-- Tire -->
+                  <div class="field field-tire">
+                    <label>Tires</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.wheels.tire"
+                              ng-options="optionId as option.name for (optionId, option) in config.wheels.tires"
+                              ng-change="loadTires()">
+                      </select>
+                    </span>
+                  </div>
+
+                  <!-- Tire Size -->
+                  <div class="field field-tire-size">
+                    <label>Tire Size</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.wheels.tire_size"
+                              ng-options="i as i + '&quot;' for i in [30,31,32,33,34,35,36,37,38,39,40]"
+                              ng-change="setWheelSize()">
+                      </select>
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Addons -->
+              <div class="section ng-hide" ng-class="{active:section.addons}" ng-show="adddonsExist()">
+                <div class="section-header" ng-click="section.addons=!section.addons"><span class="icon icon-wrench"></span>Addons<span class="icon icon-chevron"></span></div>
+                <div class="section-content">
+
+                  <!-- Addons -->
+                  <div class="field field-{{addonId}}" ng-repeat="(addonId, addon) in config.vehicles[current.vehicle.id].addons">
+                    <label>{{addon.name}}</label>
+                    <span class="select-wrapper">
+                      <select ng-model="current.vehicle.addons[addonId]"
+                              ng-options="optionId as option.name for (optionId, option) in addon.options"
+                              ng-change="loadVehicleAddon(addonId)">
+                        <option value="" ng-if="!addon.required">None</option>
+                      </select>
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Scene -->
+              <div class="section" ng-class="{active:section.scene}">
+                <div class="section-header" ng-click="section.scene=!section.scene"><span class="icon icon-gear"></span>Options<span class="icon icon-chevron"></span></div>
+                <div class="section-content">
+
+                  <!-- Auto Rotate -->
+                  <div class="field field-camera-autorotate">
+                    <input ng-model="camera.autoRotate" type="checkbox" id="camera-autorotate" />
+                    <label for="camera-autorotate">Auto Rotate</label>
+                  </div>
+
+                  <div class="field field-editor-request">
+                    <button ng-click="editor.request()">Request New Part or Vehicle</button>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          <div id="header">
+            <h1><span class="icon icon-truck"></span><strong>4x4</strong>builder</h1>
+
+            <button id="editor-toggle" class="icon icon-hamburger" ng-click="editor.toggle()"><span>Editor</span></button>
+
+            <div class="actions">
+              <button ng-click="editor.save()">Save</button>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div id="viewer" ng-viewer=""></div>
 
         <script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
         <script>
@@ -44,7 +234,6 @@
 
 
         </script>
-        <script src="./js/gui.js"></script>
         <script src="./js/app.js"></script>
     </body>
 </html>

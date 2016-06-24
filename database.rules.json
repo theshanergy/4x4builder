@@ -6,5 +6,11 @@
       ".read":true,
       ".write":true
     }
+  },
+  "requests":{
+    "$request":{
+      ".read":false,
+      ".write":true
+    }
   }
 }
