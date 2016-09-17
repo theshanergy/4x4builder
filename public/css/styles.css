@@ -271,13 +271,14 @@ button[colorpicker] {
   left: -240px;
   bottom: 0;
   background: #333;
+  background: rgba(0,0,0,0.8);
   color: #ccc;
   box-shadow: 0 0 1px #aaa;
   -webkit-box-shadow: 0 0 1px #aaa;
   transition: 0.5s;
   overflow: hidden;
 }
-.editor-visible #editor {
+#editor.visible {
   left: 0;
 }
 #editor .editor-container {
@@ -301,11 +302,13 @@ button[colorpicker] {
 }
 #editor .editor-container .section.active .section-header {
   background: #1a1a1a;
+  background: rgba(0,0,0,0.6);
   color: #fff;
 }
 #editor .editor-container .section .section-content {
   display: none;
   background: #2a2a2a;
+  background: rgba(0,0,0,.4);
   padding: 0 30px 0 10px;
   overflow: hidden;
 }
@@ -345,7 +348,7 @@ button[colorpicker] {
   font-weight: 300;
   line-height: 60px;
   background: #1c1a1a;
-  color: #CC0000;
+  color: #fff;
   box-sizing: border-box;
 }
 #header h1 .icon {
@@ -363,7 +366,7 @@ button[colorpicker] {
 
 /* toggle */
 #header #editor-toggle {
-  float: left;
+  float: right;
   margin: 0;
   position: relative;
   height: 60px;
@@ -390,6 +393,13 @@ button[colorpicker] {
 /*actions*/
 #header .actions {
   float: right;
+}
+
+/*save button*/
+#actions {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
 }
 
 /*viewer*/

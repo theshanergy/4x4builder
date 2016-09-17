@@ -14,7 +14,7 @@
 var app = angular.module('configurator', ['colorpicker.module']);
 
 // Add config controller
-app.controller('config', function($scope) {
+app.controller('ui', function($scope) {
 
   // Config options.
   $scope.config = config;
@@ -25,6 +25,12 @@ app.controller('config', function($scope) {
   // Camera controls.
   $scope.camera = {
     'autoRotate': true,
+  }
+
+  // Take screenshot.
+  $scope.camera.takeScreenshot = function() {
+    $scope.camera.screenshot = true;
+    // image will be saved to $scope.camera.screenshotData.
   }
 
   // Editor.
@@ -138,6 +144,8 @@ app.directive('ngViewer', ['$window', function ($window) {
 
         // Camera controls.
         cameraControls = new THREE.OrbitControls(camera, renderer.domElement);
+        cameraControls.minDistance = 4;
+        cameraControls.maxDistance = 12;
         cameraControls.maxPolarAngle = Math.PI/2 - 0.05;
 
         // lights
@@ -181,12 +189,12 @@ app.directive('ngViewer', ['$window', function ($window) {
         colladaLoader = new THREE.ColladaLoader(loadingManager);
 
         // Get session
-        session = window.location.pathname.replace(/^\/([^\/]*).*$/, '$1');
+        scope.session = window.location.pathname.replace(/^\/([^\/]*).*$/, '$1');
 
         // Existing session.
-        if(session) {
+        if(scope.session) {
           // Get default config from db.
-          firebase.database().ref('/configs/' + session).once('value').then(function(data) {
+          firebase.database().ref('/configs/' + scope.session).once('value').then(function(data) {
             // If exists.
             if(data.val() != null) {
               // Update angular digest.
@@ -199,7 +207,7 @@ app.directive('ngViewer', ['$window', function ($window) {
             }
             else {
               // Set new session.
-              session = randomString(16);
+              scope.session = randomString(16);
               // Load vehicle.
               scope.loadVehicle();
             }
@@ -207,7 +215,7 @@ app.directive('ngViewer', ['$window', function ($window) {
         }
         else {
           // Set new session.
-          session = randomString(16);
+          scope.session = randomString(16);
           // Load vehicle.
           scope.loadVehicle();
         }
@@ -244,6 +252,11 @@ app.directive('ngViewer', ['$window', function ($window) {
         TWEEN.update();
         // Render scene.
         renderer.render(scene, camera);
+        // Screenshot.
+        if (scope.camera.screenshot == true) {
+          scope.camera.screenshotData = renderer.domElement.toDataURL();
+          scope.camera.screenshot = false;
+        }
       };
 
       // Load vehicle.
