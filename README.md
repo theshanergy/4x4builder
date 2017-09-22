@@ -1,5 +1,7 @@
-# configurator
+# Vehicle configurator
 
-Vehicle configurator.
+Vehicle configurator as seen at https://www.4x4builder.com/
 
-'gulp build' to rebuild assets.
+# Installation
+
+'gulp build' to build assets.
