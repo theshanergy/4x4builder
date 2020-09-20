@@ -3,6 +3,7 @@ import swal from 'sweetalert'
 import './App.css'
 
 import vehicleConfigs from 'vehicleConfigs'
+import Header from './Header'
 import Editor from './Editor'
 import Canvas from './Canvas'
 
@@ -112,15 +113,7 @@ function App(props) {
 
   return (
     <div className="App">
-      <div id="header">
-        <h1>
-          <span className="icon icon-truck"></span>
-          <strong>4x4</strong>builder
-        </h1>
-        <button id="editor-toggle" className="icon icon-hamburger" onClick={toggleEditor}>
-          <span>Editor</span>
-        </button>
-      </div>
+      <Header toggleEditor={toggleEditor} />
 
       <div id="container">
         <Editor visible={editorVisible} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} requestForm={requestForm} />
