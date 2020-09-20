@@ -36,23 +36,8 @@ function App(props) {
     }
   }, [])
 
-  // Default vehicle config.
-  const defaultVehicle = {
-    id: vehicleConfigs.defaults.id,
-    lift: vehicleConfigs.defaults.lift,
-    color: vehicleConfigs.defaults.color,
-    reflectivity: vehicleConfigs.defaults.reflectivity,
-    addons: vehicleConfigs.defaults.addons,
-    rim: vehicleConfigs.defaults.rim,
-    rim_color: vehicleConfigs.defaults.rim_color,
-    rim_diameter: vehicleConfigs.defaults.rim_diameter,
-    rim_width: vehicleConfigs.defaults.rim_width,
-    tire: vehicleConfigs.defaults.tire,
-    tire_diameter: vehicleConfigs.defaults.tire_diameter,
-  }
-
   // Current vehicle config.
-  const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), defaultVehicle)
+  const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), vehicleConfigs.defaults)
 
   // Camera rotation.
   const [cameraAutoRotate, setCameraAutoRotate] = useState(true)
