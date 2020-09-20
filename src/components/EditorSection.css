@@ -1,0 +1,28 @@
+.section .section-header {
+  padding: 15px 10px;
+  cursor: pointer;
+}
+.section .section-header .icon {
+  margin: 0 10px 0 0;
+  font-size: 14px;
+  vertical-align: bottom;
+}
+.section .section-header:hover {
+  background: #222;
+  color: #fff;
+}
+.section.active .section-header {
+  background: #1a1a1a;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+.section .section-content {
+  display: none;
+  background: #2a2a2a;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0 30px 0 10px;
+  overflow: hidden;
+}
+.section.active .section-content {
+  display: block;
+}
