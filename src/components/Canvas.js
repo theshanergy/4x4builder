@@ -32,7 +32,7 @@ class VehicleCanvas extends Component {
     }
     // Paint.
     if (prevProps.vehicle.color !== this.props.vehicle.color || prevProps.vehicle.reflectivity !== this.props.vehicle.reflectivity) {
-      this.setVehicleColor()
+      this.setObjectColor(this.vehicle)
     }
     // Lift height.
     if (prevProps.vehicle.lift !== this.props.vehicle.lift) {
@@ -44,7 +44,7 @@ class VehicleCanvas extends Component {
     }
     // Rim paint.
     if (prevProps.vehicle.rim_color !== this.props.vehicle.rim_color) {
-      this.setRimColor()
+      this.setObjectColor(this.rim)
     }
     // Tires.
     if (prevProps.vehicle.tire !== this.props.vehicle.tire) {
@@ -244,7 +244,7 @@ class VehicleCanvas extends Component {
       this.setVehiclePosY()
 
       // Update shadows & materials.
-      this.setVehicleColor()
+      this.setObjectColor(this.vehicle)
 
       // Set wheel position.
       this.setWheelPos()
@@ -282,7 +282,7 @@ class VehicleCanvas extends Component {
       this.setRimSize()
 
       // Set rim color.
-      this.setRimColor()
+      this.setObjectColor(this.rim)
     })
   }
 
@@ -485,41 +485,22 @@ class VehicleCanvas extends Component {
         // Add to vehicle.
         this.vehicle.add(addon)
         // Update colors.
-        this.setVehicleColor()
+        this.setObjectColor(this.vehicle)
       })
     }
   }
 
-  // Set vehicle color.
-  setVehicleColor = () => {
-    // Traverse object
-    this.vehicle.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        // Cast shadows from mesh.
-        child.castShadow = true
-        // Multiple materials
-        if (Array.isArray(child.material)) {
-          child.material.forEach(material => this.setMaterials(material));
-        }
-        // Single material.
-        else if (child.material.type === 'MeshPhongMaterial') {
-          this.setMaterials(child.material)
-        }
-      }
-    })
-  }
-
-  // Set wheel color.
-  setRimColor = () => {
-    // Traverse object
-    this.rim.traverse((child) => {
+  // Set object color.
+  setObjectColor = (object) => {
+    // Traverse object.
+    object.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         // Cast shadows from mesh.
         child.castShadow = true
 
-        // Multiple materials
+        // Multiple materials.
         if (Array.isArray(child.material)) {
-          child.material.forEach(material => this.setMaterials(material));
+          child.material.forEach((material) => this.setMaterials(material))
         }
         // Single material.
         else if (child.material.type === 'MeshPhongMaterial') {
