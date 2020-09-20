@@ -145,7 +145,6 @@ class VehicleCanvas extends Component {
 
     // Set up vehicle
     this.vehicle = new THREE.Object3D()
-    this.scene.add(this.vehicle)
 
     // Set up wheel.
     this.wheels = new THREE.Object3D()
@@ -498,8 +497,12 @@ class VehicleCanvas extends Component {
       if (child instanceof THREE.Mesh) {
         // Cast shadows from mesh.
         child.castShadow = true
-        // Set material.
-        if (child.material.type === 'MeshPhongMaterial') {
+        // Multiple materials
+        if (Array.isArray(child.material)) {
+          child.material.forEach(material => this.setMaterials(material));
+        }
+        // Single material.
+        else if (child.material.type === 'MeshPhongMaterial') {
           this.setMaterials(child.material)
         }
       }
@@ -513,8 +516,13 @@ class VehicleCanvas extends Component {
       if (child instanceof THREE.Mesh) {
         // Cast shadows from mesh.
         child.castShadow = true
-        // Set material.
-        if (child.material.type === 'MeshPhongMaterial') {
+
+        // Multiple materials
+        if (Array.isArray(child.material)) {
+          child.material.forEach(material => this.setMaterials(material));
+        }
+        // Single material.
+        else if (child.material.type === 'MeshPhongMaterial') {
           this.setMaterials(child.material)
         }
       }
