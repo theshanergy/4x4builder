@@ -8,33 +8,27 @@ import Editor from './Editor'
 import Canvas from './Canvas'
 
 function App(props) {
-  // Get session.
-  const [session, setSession] = useState(window.location.pathname.replace(/^\/([^/]*).*$/, '$1'))
-
   // Run once.
   useEffect(() => {
+    let session = window.location.pathname.replace(/^\/([^/]*).*$/, '$1')
     // Existing session.
     if (session) {
-      // Get default config from db.
+      // Get config from URL.
       props.database
         .ref('/configs/' + session)
         .once('value')
         .then(function (data) {
           let value = data.val()
-          // If exists.
+          // If vehicle exists.
           if (value != null) {
-            // Overwrite current from response.
+            // Overwrite current vehicle from response.
             setVehicle(value)
           } else {
-            // Set new session.
-            setSession(randomString(16))
+            console.log('No saved vehicle at this URL')
           }
         })
-    } else {
-      // Set new session.
-      setSession(randomString(16))
     }
-  }, [])
+  }, [props.database])
 
   // Current vehicle config.
   const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), vehicleConfigs.defaults)
@@ -52,12 +46,14 @@ function App(props) {
 
   // Save current config.
   function saveVehicle() {
+    // Set new session.
+    let session = randomString(16)
     // Store current config to db.
     props.database.ref('/configs/' + session).set(currentVehicle)
     // push session string to url.
     window.history.pushState({}, 'Save', '/' + session)
     // Notify user.
-    swal('Vehicle saved!', 'Please copy or bookmark this page. Anyone with this URL may edit the vehicle.', 'success')
+    swal('New Vehicle Saved!', 'Please copy or bookmark this page URL.', 'success')
   }
 
   // Request new part.
