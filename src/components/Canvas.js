@@ -31,7 +31,7 @@ class VehicleCanvas extends Component {
       this.loadVehicle()
     }
     // Paint.
-    if (prevProps.vehicle.color !== this.props.vehicle.color || prevProps.vehicle.reflectivity !== this.props.vehicle.reflectivity) {
+    if (prevProps.vehicle.color !== this.props.vehicle.color || prevProps.vehicle.roughness !== this.props.vehicle.roughness) {
       this.setObjectColor(this.vehicle)
     }
     // Lift height.
@@ -523,8 +523,8 @@ class VehicleCanvas extends Component {
       case 'body':
         material.envMap = this.envMap
         material.color.setStyle(this.props.vehicle.color)
-        material.metalness = 0.3
-        material.roughness = this.props.vehicle.reflectivity
+        material.metalness = 0.4
+        material.roughness = this.props.vehicle.roughness
         break
       case 'chrome':
         material.envMap = this.envMap
@@ -541,7 +541,6 @@ class VehicleCanvas extends Component {
         break
       case 'rim':
         material.envMap = this.envMap
-        material.reflectivity = 0.5
         switch (this.props.vehicle.rim_color) {
           case 'silver':
             material.metalness = 0.6

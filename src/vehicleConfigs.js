@@ -3,7 +3,7 @@ let vehicleConfigs = {
     id: 'jeep_jku',
     lift: 2,
     color: '#62c520',
-    reflectivity: '0.1',
+    roughness: 0,
     addons: {},
     rim: 'cragar_soft_8',
     rim_color: 'black',

@@ -35,10 +35,10 @@ function Editor(props) {
             <input type="color" value={props.currentVehicle.color} onChange={(e) => props.setVehicle({ color: e.target.value })} />
           </div>
 
-          {/* Vehicle reflectivity */}
-          <div className="field field-vehicle-reflectivity">
+          {/* Vehicle roughness */}
+          <div className="field field-vehicle-roughness">
             <span className="select-wrapper">
-              <select value={props.currentVehicle.reflectivity} onChange={(e) => props.setVehicle({ reflectivity: e.target.value })}>
+              <select value={props.currentVehicle.roughness} onChange={(e) => props.setVehicle({ roughness: e.target.value })}>
                 <option value="1">Matte</option>
                 <option value="0.5">Semi Gloss</option>
                 <option value="0">High Gloss</option>
