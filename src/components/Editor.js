@@ -174,7 +174,7 @@ function Editor(props) {
               <div key={addon} className={`field field-${addon}`}>
                 <label>{vehicleConfigs.vehicles[props.currentVehicle.id].addons[addon].name}</label>
                 <span className="select-wrapper">
-                  <select required onChange={(e) => props.setVehicle({ addons: { ...props.currentVehicle.addons, [addon]: e.target.value } })}>
+                  <select value={props.currentVehicle.addons[addon]} required onChange={(e) => props.setVehicle({ addons: { ...props.currentVehicle.addons, [addon]: e.target.value } })}>
                     {!vehicleConfigs.vehicles[props.currentVehicle.id].addons[addon].required && <option value="">None</option>}
                     {Object.keys(vehicleConfigs.vehicles[props.currentVehicle.id].addons[addon].options).map((option) => (
                       <option key={option} value={option}>

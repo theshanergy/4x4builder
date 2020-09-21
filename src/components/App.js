@@ -102,7 +102,7 @@ function App(props) {
 
       <div id="container">
         <Editor visible={editorVisible} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} requestForm={requestForm} />
-        <Canvas vehicle={currentVehicle} cameraAutoRotate={cameraAutoRotate} />
+        <Canvas vehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} />
       </div>
 
       <div id="actions">

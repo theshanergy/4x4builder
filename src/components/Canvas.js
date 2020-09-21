@@ -181,9 +181,6 @@ class VehicleCanvas extends Component {
     // Initialize loader.
     this.loader = new GLTFLoader()
 
-    // Default addons.
-    this.props.vehicle.addons = vehicleConfigs.vehicles[this.props.vehicle.id].default_addons
-
     // Load vehicle.
     this.loadVehicle()
 
@@ -254,10 +251,9 @@ class VehicleCanvas extends Component {
       // Add vehicle to scene.
       this.scene.add(this.vehicle)
 
-      // Get default addons.
-      this.props.vehicle.addons = vehicleConfigs.vehicles[this.props.vehicle.id].default_addons
-      // Add addons
-      this.loadVehicleAddons()
+      // Set default addons.
+      this.props.setVehicle({ addons: vehicleConfigs.vehicles[this.props.vehicle.id].default_addons })
+
     })
   }
 
@@ -486,7 +482,7 @@ class VehicleCanvas extends Component {
         // Create object.
         let addon = addonModel.scene
         addon.name = addon_name
-        addon.rotation.x = 0
+        //addon.rotation.x = 0
         // Add to vehicle.
         this.vehicle.add(addon)
         // Update colors.
