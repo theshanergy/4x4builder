@@ -167,6 +167,12 @@ let vehicleConfigs = {
         width: 0.244,
         od: 0.448,
       },
+      toyota_4runner_5thgen: {
+        name: 'Toyota 4Runner 5th gen',
+        model: 'assets/models/wheels/rims/4runner_5thgen.glb',
+        width: 0.281996,
+        od: 0.491841,
+      },
     },
     tires: {
       nitto_mud_grappler: {
