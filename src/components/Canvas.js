@@ -323,6 +323,9 @@ class VehicleCanvas extends Component {
 
       // Update vehicle height.
       this.setVehiclePosY()
+
+      // Set tire color.
+      this.setObjectColor(this.tire)
     })
   }
 
@@ -516,7 +519,7 @@ class VehicleCanvas extends Component {
   setMaterials = (material) => {
     let silver = new THREE.Color(0.8, 0.8, 0.8)
     let white = new THREE.Color(1, 1, 1)
-    let black = new THREE.Color(0.15, 0.15, 0.15)
+    let black = new THREE.Color(0.1, 0.1, 0.1)
     // Switch materials.
     switch (material.name) {
       // Body paint.
@@ -548,16 +551,31 @@ class VehicleCanvas extends Component {
             material.color.set(silver)
             break
           case 'chrome':
-            material.envMap = this.envMap
             material.metalness = 0.8
             material.roughness = 0
             material.color.set(white)
             break
-          default:
+          case 'gloss_black':
+            material.metalness = 0.8
+            material.roughness = 0
             material.color.set(black)
+            break
+          case 'flat_black':
+            material.metalness = 0.5
+            material.roughness = 1
+            material.color.set(black)
+            break
+          default:
         }
         break
+      case 'rubber':
+        material.metalness = 0
+        material.roughness = 0.4
+        material.color.set(black)
+        break
       case 'black':
+        material.metalness = 0
+        material.roughness = 0.5
         material.color.set(black)
         break
       default:

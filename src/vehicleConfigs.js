@@ -6,7 +6,7 @@ let vehicleConfigs = {
     roughness: 0,
     addons: {},
     rim: 'cragar_soft_8',
-    rim_color: 'black',
+    rim_color: 'silver',
     rim_diameter: 17,
     rim_width: 12,
     tire: 'bfg_at',

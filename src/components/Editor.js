@@ -86,7 +86,8 @@ function Editor(props) {
             <label>Rim Color</label>
             <span className="select-wrapper">
               <select value={props.currentVehicle.rim_color} onChange={(e) => props.setVehicle({ rim_color: e.target.value })}>
-                <option value="black">Black</option>
+                <option value="flat_black">Flat Black</option>
+                <option value="gloss_black">Gloss Black</option>
                 <option value="silver">Silver</option>
                 <option value="chrome">Chrome</option>
               </select>
