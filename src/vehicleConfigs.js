@@ -15,7 +15,7 @@ let vehicleConfigs = {
   },
   vehicles: {
     toyota_4runner_3: {
-      name: 'Toyota 4Runner',
+      name: 'Toyota 4Runner 3rd gen',
       make: 'Toyota',
       model: 'assets/models/vehicles/toyota/4runner/3g/4runner.glb',
       wheel_offset: 0.77,
@@ -74,6 +74,16 @@ let vehicleConfigs = {
         },
       },
     },
+    toyota_4runner_5: {
+      name: 'Toyota 4Runner 5th gen',
+      make: 'Toyota',
+      model: 'assets/models/vehicles/toyota/4runner/5g/4runner.glb',
+      wheel_offset: 0.77,
+      axle_front: 1.4,
+      axle_rear: -1.23,
+      default_addons: {},
+      addons: {},
+    },
     toyota_j80: {
       name: 'Toyota Land Cruiser (J80)',
       make: 'Toyota',
@@ -91,6 +101,7 @@ let vehicleConfigs = {
       wheel_offset: 0.81,
       axle_front: 1.97,
       axle_rear: -1.59,
+      default_addons: {},
       addons: {},
     },
     jeep_yj: {
