@@ -39,9 +39,9 @@ function Editor(props) {
           <div className="field field-vehicle-reflectivity">
             <span className="select-wrapper">
               <select value={props.currentVehicle.reflectivity} onChange={(e) => props.setVehicle({ reflectivity: e.target.value })}>
-                <option value="0.2">Matte</option>
+                <option value="1">Matte</option>
                 <option value="0.5">Semi Gloss</option>
-                <option value="0.8">High Gloss</option>
+                <option value="0">High Gloss</option>
               </select>
             </span>
           </div>

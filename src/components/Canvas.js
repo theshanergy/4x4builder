@@ -2,7 +2,7 @@ import React, { Component } from 'react'
 import * as THREE from 'three'
 import Loader from './Loader'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
-import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import vehicleConfigs from 'vehicleConfigs'
 import TWEEN from 'tween.js'
 
@@ -131,6 +131,8 @@ class VehicleCanvas extends Component {
     // Environment map.
     let envMapURL = 'assets/images/envmap/envmap.jpg'
     let envMapURLS = [envMapURL, envMapURL, envMapURL, envMapURL, envMapURL, envMapURL]
+    // let envMapURL = 'assets/images/envmap/'
+    // let envMapURLS = [envMapURL + 'px.jpg', envMapURL + 'nx.jpg', envMapURL + 'py.jpg', envMapURL + 'ny.jpg', envMapURL + 'pz.jpg', envMapURL + 'nz.jpg']
     this.envMap = new THREE.CubeTextureLoader().load(envMapURLS)
     this.envMap.mapping = THREE.CubeReflectionMapping
 
@@ -176,8 +178,8 @@ class VehicleCanvas extends Component {
     this.wheels.add(this.wheelRL)
     this.wheels.add(this.wheelRR)
 
-    // Initialize collada loader.
-    this.colladaLoader = new ColladaLoader()
+    // Initialize loader.
+    this.loader = new GLTFLoader()
 
     // Default addons.
     this.props.vehicle.addons = vehicleConfigs.vehicles[this.props.vehicle.id].default_addons
@@ -228,7 +230,7 @@ class VehicleCanvas extends Component {
   // Load vehicle.
   loadVehicle = () => {
     // Load vehicle model.
-    this.colladaLoader.load(vehicleConfigs.vehicles[this.props.vehicle.id].model, (vehicleModel) => {
+    this.loader.load(vehicleConfigs.vehicles[this.props.vehicle.id].model, (vehicleModel) => {
       // Remove existing vehicle.
       if (typeof this.vehicle !== 'undefined') {
         this.scene.remove(this.vehicle)
@@ -262,7 +264,7 @@ class VehicleCanvas extends Component {
   // Load rims.
   loadRims = () => {
     // Load rim model.
-    this.colladaLoader.load(vehicleConfigs.wheels.rims[this.props.vehicle.rim].model, (rimModel) => {
+    this.loader.load(vehicleConfigs.wheels.rims[this.props.vehicle.rim].model, (rimModel) => {
       // Set rim object.
       this.rim = rimModel.scene.children[0].clone()
       this.rim.name = vehicleConfigs.wheels.rims[this.props.vehicle.rim].name
@@ -289,7 +291,7 @@ class VehicleCanvas extends Component {
   // Load tires.
   loadTires = () => {
     // Load tire model.
-    this.colladaLoader.load(vehicleConfigs.wheels.tires[this.props.vehicle.tire].model, (tireModel) => {
+    this.loader.load(vehicleConfigs.wheels.tires[this.props.vehicle.tire].model, (tireModel) => {
       // Set tire object.
       this.tire = tireModel.scene.children[0].clone()
       this.tire.name = vehicleConfigs.wheels.tires[this.props.vehicle.tire].name
@@ -357,19 +359,19 @@ class VehicleCanvas extends Component {
     let height = this.getWheelPosY()
 
     // FL
-    this.wheelFL.rotation.set(0, steering, rotation)
+    this.wheelFL.rotation.set(0, rotation + steering, 0)
     this.wheelFL.position.set(offset, height, axleFront)
 
     // FR
-    this.wheelFR.rotation.set(0, steering, -rotation)
+    this.wheelFR.rotation.set(0, -rotation + steering, 0)
     this.wheelFR.position.set(-offset, height, axleFront)
 
     // RL
-    this.wheelRL.rotation.set(0, 0, rotation)
+    this.wheelRL.rotation.set(0, rotation, 0)
     this.wheelRL.position.set(offset, height, axleRear)
 
     // RR
-    this.wheelRR.rotation.set(0, 0, -rotation)
+    this.wheelRR.rotation.set(0, -rotation, 0)
     this.wheelRR.position.set(-offset, height, axleRear)
   }
 
@@ -392,7 +394,7 @@ class VehicleCanvas extends Component {
     for (let i = 0; i < this.wheels.children.length; i++) {
       // Get rim container.
       let rimContainer = this.wheels.children[i].getObjectByName('Rim')
-      rimContainer.scale.set(od_scale, width_scale, od_scale)
+      rimContainer.scale.set(od_scale, od_scale, width_scale)
     }
   }
 
@@ -415,7 +417,7 @@ class VehicleCanvas extends Component {
         child.geometry.copy(child.origGeometry)
 
         // Scale to match wheel.
-        child.geometry.scale(1, wheel_width_scale, 1)
+        child.geometry.scale(1, 1, wheel_width_scale)
 
         // Loop through vertices.
         for (var i = 0, l = child.geometry.attributes.position.count; i < l; i++) {
@@ -423,7 +425,7 @@ class VehicleCanvas extends Component {
           let startVector = new THREE.Vector3().fromBufferAttribute(child.geometry.getAttribute('position'), i)
 
           // Center vector.
-          let centerVector = new THREE.Vector3(0, startVector.y, 0)
+          let centerVector = new THREE.Vector3(0, 0, startVector.z)
 
           // Distance from center.
           let centerDist = centerVector.distanceTo(startVector)
@@ -442,7 +444,7 @@ class VehicleCanvas extends Component {
 
           // Set x,y
           child.geometry.attributes.position.setX(i, setVector.x)
-          child.geometry.attributes.position.setZ(i, setVector.z)
+          child.geometry.attributes.position.setY(i, setVector.y)
         }
 
         // Update geometry.
@@ -477,7 +479,7 @@ class VehicleCanvas extends Component {
 
     if (addon_selection) {
       // Load new addon.
-      this.colladaLoader.load(vehicleConfigs.vehicles[this.props.vehicle.id]['addons'][addon_name]['options'][addon_selection]['model'], (addonModel) => {
+      this.loader.load(vehicleConfigs.vehicles[this.props.vehicle.id]['addons'][addon_name]['options'][addon_selection]['model'], (addonModel) => {
         // Create object.
         let addon = addonModel.scene
         addon.name = addon_name
@@ -503,7 +505,7 @@ class VehicleCanvas extends Component {
           child.material.forEach((material) => this.setMaterials(material))
         }
         // Single material.
-        else if (child.material.type === 'MeshPhongMaterial') {
+        else {
           this.setMaterials(child.material)
         }
       }
@@ -514,46 +516,52 @@ class VehicleCanvas extends Component {
   setMaterials = (material) => {
     let silver = new THREE.Color(0.8, 0.8, 0.8)
     let white = new THREE.Color(1, 1, 1)
-    let black = new THREE.Color(0.2, 0.2, 0.2)
+    let black = new THREE.Color(0.15, 0.15, 0.15)
     // Switch materials.
     switch (material.name) {
       // Body paint.
       case 'body':
         material.envMap = this.envMap
         material.color.setStyle(this.props.vehicle.color)
-        material.reflectivity = this.props.vehicle.reflectivity
+        material.metalness = 0.3
+        material.roughness = this.props.vehicle.reflectivity
         break
       case 'chrome':
         material.envMap = this.envMap
         material.color.set(white)
-        material.specular.set(white)
-        material.reflectivity = 0.9
+        material.metalness = 1
         break
+      case 'glass_clear':
       case 'tint_light':
       case 'tint_dark':
-      case 'glass_clear':
         material.envMap = this.envMap
+        material.transparent = true
+        material.metalness = 1
+        material.roughness = 0
         break
       case 'rim':
         material.envMap = this.envMap
         material.reflectivity = 0.5
         switch (this.props.vehicle.rim_color) {
           case 'silver':
+            material.metalness = 0.6
+            material.roughness = 0.2
             material.color.set(silver)
-            material.specular.set(silver)
             break
           case 'chrome':
             material.envMap = this.envMap
+            material.metalness = 0.8
+            material.roughness = 0
             material.color.set(white)
-            material.specular.set(white)
-            material.reflectivity = 0.9
             break
           default:
             material.color.set(black)
         }
         break
-      default:
+      case 'black':
         material.color.set(black)
+        break
+      default:
     }
   }
 
