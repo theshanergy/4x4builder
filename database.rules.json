@@ -1,0 +1,18 @@
+{
+  "rules": {
+    ".read":false,
+    ".write":false,
+    "configs":{
+      "$config":{
+        ".read":true,
+        ".write":true
+      }
+    },
+    "requests":{
+      "$request":{
+        ".read":false,
+        ".write":true
+      }
+    }
+  }
+}
