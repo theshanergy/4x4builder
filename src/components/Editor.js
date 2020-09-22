@@ -60,9 +60,15 @@ function Editor(props) {
 
         {/* Wheels */}
         <EditorSection title="Wheels">
+          {/* Wheel Offset */}
+          <div className="field field-wheel-offset">
+            <label>Wheel Offset</label>
+            <input type="range" min="0" max="0.1" step="0.01" value={props.currentVehicle.wheel_offset} onChange={(e) => props.setVehicle({ wheel_offset: e.target.value })} />
+          </div>
+
           {/* Rim */}
           <div className="field field-rim">
-            <label>Rims</label>
+            <label>Rim Type</label>
             <select value={props.currentVehicle.rim} onChange={(e) => props.setVehicle({ rim: e.target.value })}>
               {Object.keys(vehicleConfigs.wheels.rims).map((id) => (
                 <option key={id} value={id}>
@@ -119,7 +125,7 @@ function Editor(props) {
 
           {/* Tire */}
           <div className="field field-tire">
-            <label>Tires</label>
+            <label>Tire Type</label>
             <select value={props.currentVehicle.tire} onChange={(e) => props.setVehicle({ tire: e.target.value })}>
               {Object.keys(vehicleConfigs.wheels.tires).map((id) => (
                 <option key={id} value={id}>

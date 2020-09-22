@@ -181,7 +181,7 @@ input[type="color"]::-webkit-color-swatch {
   overflow: auto;
 }
 #editor .editor-container .field {
-  margin: 15px 0;
+  margin: 20px 0;
   overflow: hidden;
 }
 #editor .editor-container .field label {

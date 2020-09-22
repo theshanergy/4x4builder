@@ -38,6 +38,10 @@ class VehicleCanvas extends Component {
     if (prevProps.vehicle.lift !== this.props.vehicle.lift) {
       this.setVehiclePosY()
     }
+    // Wheel offset.
+    if (prevProps.vehicle.wheel_offset !== this.props.vehicle.wheel_offset) {
+      this.setWheelPos()
+    }
     // Rims.
     if (prevProps.vehicle.rim !== this.props.vehicle.rim) {
       this.loadRims()
@@ -253,7 +257,6 @@ class VehicleCanvas extends Component {
 
       // Set default addons.
       this.props.setVehicle({ addons: vehicleConfigs.vehicles[this.props.vehicle.id].default_addons })
-
     })
   }
 
@@ -350,7 +353,7 @@ class VehicleCanvas extends Component {
   // Set wheel position.
   setWheelPos = () => {
     // Wheel variables.
-    let offset = vehicleConfigs.vehicles[this.props.vehicle.id]['wheel_offset']
+    let offset = vehicleConfigs.vehicles[this.props.vehicle.id]['wheel_offset'] + parseFloat(this.props.vehicle.wheel_offset)
     let axleFront = vehicleConfigs.vehicles[this.props.vehicle.id]['axle_front']
     let axleRear = vehicleConfigs.vehicles[this.props.vehicle.id]['axle_rear']
     let rotation = (Math.PI * 90) / 180
