@@ -60,6 +60,8 @@ button:hover {
 /* icons */
 .icon {
   display: inline-block;
+  width: 24px;
+  height: auto;
 }
 
 /*colorpicker*/
@@ -114,8 +116,10 @@ input[type="color"]::-webkit-color-swatch {
 }
 #header h1 .icon {
   margin: 0 8px 0 0;
-  font-size: 28px;
+  width: 28px;
+  height: auto;
   vertical-align: text-bottom;
+  fill: #fff;
 }
 #header h1 strong {
   font-weight: 500;

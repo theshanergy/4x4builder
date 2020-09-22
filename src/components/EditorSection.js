@@ -11,7 +11,7 @@ const EditorSection = (props) => {
   return (
     <div className={'section' + (isActive ? ' active' : '')}>
       <div className="section-header" onClick={toggleActive}>
-        <span className="icon icon-vehicle"></span>
+        {props.icon}
         {props.title}
       </div>
       <div className="section-content">{props.children}</div>

@@ -3,6 +3,11 @@ import React from 'react'
 import vehicleConfigs from 'vehicleConfigs'
 import EditorSection from './EditorSection'
 
+import VehicleIcon from './icons/Vehicle'
+import WheelIcon from './icons/Wheel'
+import ToolIcon from './icons/Tool'
+import GearIcon from './icons/Gear'
+
 function Editor(props) {
   // Only show addons section if options exist.
   function addonsExist() {
@@ -13,10 +18,10 @@ function Editor(props) {
     <div id="editor" className={props.visible ? 'visible' : ''}>
       <div className="editor-container">
         {/* Vehicle */}
-        <EditorSection title="Vehicle" defaultActive={true}>
+        <EditorSection title="Vehicle" icon={<VehicleIcon />} defaultActive={true}>
           {/* Vehicle */}
           <div className="field field-vehicle">
-            <label>Vehicle</label>
+            <label>Model</label>
             <select value={props.currentVehicle.id} onChange={(e) => props.setVehicle({ id: e.target.value })}>
               {Object.keys(vehicleConfigs.vehicles).map((id) => (
                 <option key={id} value={id}>
@@ -59,7 +64,7 @@ function Editor(props) {
         </EditorSection>
 
         {/* Wheels */}
-        <EditorSection title="Wheels">
+        <EditorSection title="Wheels" icon={<WheelIcon />}>
           {/* Wheel Offset */}
           <div className="field field-wheel-offset">
             <label>Wheel Offset</label>
@@ -156,7 +161,7 @@ function Editor(props) {
 
         {/* Addons */}
         {addonsExist() && (
-          <EditorSection title="Addons">
+          <EditorSection title="Addons" icon={<ToolIcon />}>
             {Object.keys(vehicleConfigs.vehicles[props.currentVehicle.id].addons).map((addon) => (
               <div key={addon} className={`field field-${addon}`}>
                 <label>{vehicleConfigs.vehicles[props.currentVehicle.id].addons[addon].name}</label>
@@ -174,7 +179,7 @@ function Editor(props) {
         )}
 
         {/* Scene */}
-        <EditorSection title="Options">
+        <EditorSection title="Options" icon={<GearIcon />}>
           {/* Auto Rotate */}
           <div className="field field-camera-autorotate">
             <input type="checkbox" id="camera-autorotate" checked={props.cameraAutoRotate} onChange={(e) => props.setCameraAutoRotate(e.target.checked)} />

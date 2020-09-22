@@ -4,8 +4,9 @@
 }
 .section .section-header .icon {
   margin: 0 10px 0 0;
-  font-size: 14px;
+  width: 16px;
   vertical-align: bottom;
+  fill: #fff;
 }
 .section .section-header:hover {
   background: #222;
