@@ -23,6 +23,7 @@ input[type='checkbox'] {
 select {
   display: inline-block;
   padding: 6px;
+  max-width: 100%;
   border: 1px solid;
   border-color: #111 #0a0a0a black;
   background: #444;

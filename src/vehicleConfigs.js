@@ -14,8 +14,8 @@ let vehicleConfigs = {
     spare: false,
   },
   vehicles: {
-    toyota_4runner_3: {
-      name: 'Toyota 4Runner 3rd gen',
+    toyota_4runner_3g: {
+      name: 'Toyota 4Runner (3rd gen)',
       make: 'Toyota',
       model: 'assets/models/vehicles/toyota/4runner/3g/4runner.glb',
       wheel_offset: 0.77,
@@ -75,7 +75,7 @@ let vehicleConfigs = {
       },
     },
     toyota_4runner_5: {
-      name: 'Toyota 4Runner 5th gen',
+      name: 'Toyota 4Runner (5th gen)',
       make: 'Toyota',
       model: 'assets/models/vehicles/toyota/4runner/5g/4runner.glb',
       wheel_offset: 0.77,
@@ -95,7 +95,7 @@ let vehicleConfigs = {
       addons: {},
     },
     tacoma_dc_lb: {
-      name: 'Toyota Tacoma (Double Cab)',
+      name: 'Toyota Tacoma (2nd gen, Double Cab)',
       make: 'Toyota',
       model: 'assets/models/vehicles/toyota/tacoma/2g/tacoma.glb',
       wheel_offset: 0.81,
