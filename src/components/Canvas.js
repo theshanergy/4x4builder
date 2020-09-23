@@ -133,10 +133,8 @@ class VehicleCanvas extends Component {
     this.scene.add(light)
 
     // Environment map.
-    let envMapURL = 'assets/images/envmap/envmap.jpg'
-    let envMapURLS = [envMapURL, envMapURL, envMapURL, envMapURL, envMapURL, envMapURL]
-    // let envMapURL = 'assets/images/envmap/'
-    // let envMapURLS = [envMapURL + 'px.jpg', envMapURL + 'nx.jpg', envMapURL + 'py.jpg', envMapURL + 'ny.jpg', envMapURL + 'pz.jpg', envMapURL + 'nz.jpg']
+    let envMapURL = 'assets/images/envmap/'
+    let envMapURLS = [envMapURL + 'px.png', envMapURL + 'nx.png', envMapURL + 'py.png', envMapURL + 'ny.png', envMapURL + 'pz.png', envMapURL + 'nz.png']
     this.envMap = new THREE.CubeTextureLoader().load(envMapURLS)
     this.envMap.mapping = THREE.CubeReflectionMapping
 
