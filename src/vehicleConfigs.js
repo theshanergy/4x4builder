@@ -190,9 +190,16 @@ let vehicleConfigs = {
         od: 0.895,
         id: 0.43,
       },
+      bfg_km3: {
+        name: 'BFGoodrich KM3',
+        model: 'assets/models/wheels/tires/bfg_km3.glb',
+        width: 0.267,
+        od: 0.849,
+        id: 0.48,
+      },
       bfg_km2: {
         name: 'BFGoodrich KM2',
-        model: 'assets/models/wheels/tires/km2.glb',
+        model: 'assets/models/wheels/tires/bfg_km2.glb',
         width: 0.245,
         od: 0.837,
         id: 0.44,
@@ -200,9 +207,9 @@ let vehicleConfigs = {
       maxxis_trepador: {
         name: 'Maxxis Trepador',
         model: 'assets/models/wheels/tires/maxxis_trepador.glb',
-        width: 0.35,
+        width: 0.34,
         od: 0.92,
-        id: 0.4446,
+        id: 0.445,
       },
       interco_thornbird: {
         name: 'Interco TSL Thornbird',
