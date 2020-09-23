@@ -11,7 +11,7 @@ import GearIcon from './icons/Gear'
 function Editor(props) {
   // Only show addons section if options exist.
   function addonsExist() {
-    return Object.keys(vehicleConfigs.vehicles[props.currentVehicle.id].addons).length > 0 ? true : false
+    return (props.currentVehicle.id && Object.keys(vehicleConfigs.vehicles[props.currentVehicle.id].addons).length > 0) ? true : false
   }
 
   return (

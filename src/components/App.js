@@ -27,11 +27,13 @@ function App(props) {
             console.log('No saved vehicle at this URL')
           }
         })
+    } else {
+      setVehicle(vehicleConfigs.defaults)
     }
   }, [props.database])
 
   // Current vehicle config.
-  const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), vehicleConfigs.defaults)
+  const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), {id: null})
 
   // Camera rotation.
   const [cameraAutoRotate, setCameraAutoRotate] = useState(true)

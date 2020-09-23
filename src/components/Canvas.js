@@ -182,15 +182,6 @@ class VehicleCanvas extends Component {
 
     // Initialize loader.
     this.loader = new GLTFLoader()
-
-    // Load vehicle.
-    this.loadVehicle()
-
-    // Load rims.
-    this.loadRims()
-
-    // Load tires.
-    this.loadTires()
   }
 
   // Animation loop.
