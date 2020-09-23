@@ -1,17 +1,17 @@
 let vehicleConfigs = {
   defaults: {
-    id: 'jeep_jku',
-    lift: 2,
-    color: '#62c520',
+    id: 'toyota_4runner_5',
+    lift: 0,
+    color: '#B91818',
     roughness: 0,
     addons: {},
     wheel_offset: 0,
-    rim: 'cragar_soft_8',
+    rim: 'toyota_4runner_5thgen',
     rim_color: 'silver',
     rim_diameter: 17,
-    rim_width: 12,
+    rim_width: 10,
     tire: 'bfg_at',
-    tire_diameter: 37,
+    tire_diameter: 31,
     spare: false,
   },
   vehicles: {

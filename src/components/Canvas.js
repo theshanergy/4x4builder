@@ -530,8 +530,9 @@ class VehicleCanvas extends Component {
         break
       case 'chrome':
         material.envMap = this.envMap
-        material.color.set(white)
         material.metalness = 1
+        material.roughness = 0
+        material.color.set(white)
         break
       case 'glass_clear':
       case 'tint_light':
