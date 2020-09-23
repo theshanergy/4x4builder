@@ -139,9 +139,9 @@ class VehicleCanvas extends Component {
     this.envMap.mapping = THREE.CubeReflectionMapping
 
     // Ground.
-    let transparentmaterial = new THREE.ShadowMaterial()
-    transparentmaterial.opacity = 0.5
-    let ground = new THREE.Mesh(new THREE.PlaneBufferGeometry(10, 10), transparentmaterial)
+    let groundMaterial = new THREE.ShadowMaterial()
+    groundMaterial.opacity = 0.5
+    let ground = new THREE.Mesh(new THREE.PlaneBufferGeometry(10, 10), groundMaterial)
     ground.rotation.x = -Math.PI / 2
     ground.position.y = 0
     ground.receiveShadow = true
