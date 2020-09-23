@@ -15,6 +15,16 @@ let vehicleConfigs = {
     spare: false,
   },
   vehicles: {
+    toyota_4runner_5: {
+      name: 'Toyota 4Runner (5th gen)',
+      make: 'Toyota',
+      model: 'assets/models/vehicles/toyota/4runner/5g/4runner.glb',
+      wheel_offset: 0.7,
+      axle_front: 1.4,
+      axle_rear: -1.23,
+      default_addons: {},
+      addons: {},
+    },
     toyota_4runner_3g: {
       name: 'Toyota 4Runner (3rd gen)',
       make: 'Toyota',
@@ -74,16 +84,6 @@ let vehicleConfigs = {
           },
         },
       },
-    },
-    toyota_4runner_5: {
-      name: 'Toyota 4Runner (5th gen)',
-      make: 'Toyota',
-      model: 'assets/models/vehicles/toyota/4runner/5g/4runner.glb',
-      wheel_offset: 0.7,
-      axle_front: 1.4,
-      axle_rear: -1.23,
-      default_addons: {},
-      addons: {},
     },
     tacoma_dc_lb: {
       name: 'Toyota Tacoma (2nd gen)',
@@ -190,14 +190,21 @@ let vehicleConfigs = {
         od: 0.895,
         id: 0.43,
       },
-      km2: {
+      bfg_km2: {
         name: 'BFGoodrich KM2',
         model: 'assets/models/wheels/tires/km2.glb',
         width: 0.245,
         od: 0.837,
         id: 0.44,
       },
-      thornbird: {
+      maxxis_trepador: {
+        name: 'Maxxis Trepador',
+        model: 'assets/models/wheels/tires/maxxis_trepador.glb',
+        width: 0.35,
+        od: 0.92,
+        id: 0.4446,
+      },
+      interco_thornbird: {
         name: 'Interco TSL Thornbird',
         model: 'assets/models/wheels/tires/thornbird.glb',
         width: 0.26,

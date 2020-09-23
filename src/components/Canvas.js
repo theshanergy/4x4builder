@@ -527,18 +527,35 @@ class VehicleCanvas extends Component {
         material.roughness = this.props.vehicle.roughness
         break
       case 'chrome':
+      case 'mirror':
         material.envMap = this.envMap
         material.metalness = 1
         material.roughness = 0
         material.color.set(white)
         break
-      case 'glass_clear':
-      case 'tint_light':
-      case 'tint_dark':
+      case 'glass':
         material.envMap = this.envMap
         material.transparent = true
         material.metalness = 1
         material.roughness = 0
+        material.opacity = 0.2
+        material.color.set(new THREE.Color(0.8, 0.8, 0.8))
+        break
+      case 'glass_tint':
+        material.envMap = this.envMap
+        material.transparent = true
+        material.metalness = 1
+        material.roughness = 0
+        material.opacity = 0.4
+        material.color.set(new THREE.Color(0.6, 0.6, 0.6))
+        break
+      case 'glass_dark':
+        material.envMap = this.envMap
+        material.transparent = true
+        material.metalness = 1
+        material.roughness = 0
+        material.opacity = 0.8
+        material.color.set(new THREE.Color(0.2, 0.2, 0.2))
         break
       case 'rim':
         material.envMap = this.envMap
