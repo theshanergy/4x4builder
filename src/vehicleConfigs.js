@@ -138,6 +138,12 @@ let vehicleConfigs = {
   },
   wheels: {
     rims: {
+      xd_grenade: {
+        name: 'XD Series Grenade',
+        model: 'assets/models/wheels/rims/xd_grenade.glb',
+        width: 0.274,
+        od: 0.529,
+      },
       level_8_strike_6: {
         name: 'Level 8 Strike 6',
         model: 'assets/models/wheels/rims/level_8_strike_6.glb',
