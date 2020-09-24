@@ -139,42 +139,49 @@ let vehicleConfigs = {
   wheels: {
     rims: {
       xd_grenade: {
+        make: 'XD Wheels',
         name: 'XD Series Grenade',
         model: 'assets/models/wheels/rims/xd_grenade.glb',
         width: 0.274,
         od: 0.529,
       },
       level_8_strike_6: {
+        make: 'Level 8',
         name: 'Level 8 Strike 6',
         model: 'assets/models/wheels/rims/level_8_strike_6.glb',
         width: 0.318,
         od: 0.488,
       },
       konig_countersteer: {
+        make: 'Konig',
         name: 'Konig Countersteer',
         model: 'assets/models/wheels/rims/konig_countersteer.glb',
         width: 0.256,
         od: 0.47,
       },
       cragar_soft_8: {
+        make: 'Crager',
         name: 'Cragar Soft 8',
         model: 'assets/models/wheels/rims/cragar_soft_8.glb',
         width: 0.247,
         od: 0.442,
       },
       moto_metal_mO951: {
+        make: 'Moto Metal',
         name: 'Moto Metal MO951',
         model: 'assets/models/wheels/rims/moto_metal_mO951.glb',
         width: 0.242,
         od: 0.407,
       },
       ar_mojave: {
+        make: 'American Racing',
         name: 'American Racing Mojave',
         model: 'assets/models/wheels/rims/ar_mojave.glb',
         width: 0.244,
         od: 0.448,
       },
       toyota_4runner_5thgen: {
+        make: 'Toyota',
         name: 'Toyota 4Runner 5th gen',
         model: 'assets/models/wheels/rims/4runner_5thgen.glb',
         width: 0.281996,
@@ -183,6 +190,7 @@ let vehicleConfigs = {
     },
     tires: {
       nitto_mud_grappler: {
+        make: 'Nitto',
         name: 'Nitto Mud Grappler',
         model: 'assets/models/wheels/tires/mud_grappler.glb',
         width: 0.32,
@@ -190,6 +198,7 @@ let vehicleConfigs = {
         id: 0.48,
       },
       bfg_at: {
+        make: 'BFGoodrich',
         name: 'BFGoodrich A/T',
         model: 'assets/models/wheels/tires/bfg_at.glb',
         width: 0.26,
@@ -197,6 +206,7 @@ let vehicleConfigs = {
         id: 0.43,
       },
       bfg_km3: {
+        make: 'BFGoodrich',
         name: 'BFGoodrich KM3',
         model: 'assets/models/wheels/tires/bfg_km3.glb',
         width: 0.267,
@@ -204,6 +214,7 @@ let vehicleConfigs = {
         id: 0.48,
       },
       bfg_km2: {
+        make: 'BFGoodrich',
         name: 'BFGoodrich KM2',
         model: 'assets/models/wheels/tires/bfg_km2.glb',
         width: 0.245,
@@ -211,6 +222,7 @@ let vehicleConfigs = {
         id: 0.44,
       },
       maxxis_trepador: {
+        make: 'Maxxis',
         name: 'Maxxis Trepador',
         model: 'assets/models/wheels/tires/maxxis_trepador.glb',
         width: 0.34,
@@ -218,6 +230,7 @@ let vehicleConfigs = {
         id: 0.445,
       },
       interco_thornbird: {
+        make: 'Interco',
         name: 'Interco TSL Thornbird',
         model: 'assets/models/wheels/tires/thornbird.glb',
         width: 0.26,

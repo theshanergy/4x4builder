@@ -17,6 +17,59 @@ function Editor(props) {
     return currentVehicle.id && Object.keys(vehicleConfigs.vehicles[currentVehicle.id].addons).length > 0 ? true : false
   }
 
+  // Group object by key.
+  const groupObjectByKey = (object, key) => {
+    const groups = {}
+    // Loop through object keys.
+    for (const id of Object.keys(object)) {
+      const type = object[id][key]
+      // Create group key if doesnt exist.
+      if (!groups[type]) groups[type] = []
+      // Push item to group.
+      groups[type].push(id)
+    }
+    return groups
+  }
+
+  // Select list grouped by provided type.
+  const GroupedSelect = ({ value, itemList, groupBy, ...restProps }) => {
+    // Get list sorted by type.
+    const groupedList = groupObjectByKey(itemList, groupBy)
+
+    return (
+      <select value={value || ''} {...restProps}>
+        {Object.keys(groupedList).map((type) => (
+          <optgroup key={type} label={type}>
+            {groupedList[type].map((id) => (
+              <option key={id} value={id}>
+                {itemList[id].name}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    )
+  }
+
+  // Select list of different ranges in inches.
+  const InchRangeSelect = ({ value, min, max, ...restProps }) => {
+    let elements = []
+    // Build options.
+    for (let i = min; i <= max; i++) {
+      elements.push(
+        <option key={i} value={i}>
+          {i}"
+        </option>
+      )
+    }
+
+    return (
+      <select value={value || 0} {...restProps}>
+        {elements}
+      </select>
+    )
+  }
+
   return (
     <div id="editor" className={isActive ? 'visible' : ''}>
       <div className="editor-container">
@@ -25,13 +78,7 @@ function Editor(props) {
           {/* Vehicle */}
           <div className="field field-vehicle">
             <label>Model</label>
-            <select value={currentVehicle.id || ''} onChange={(e) => setVehicle({ id: e.target.value })}>
-              {Object.keys(vehicleConfigs.vehicles).map((id) => (
-                <option key={id} value={id}>
-                  {vehicleConfigs.vehicles[id].name}
-                </option>
-              ))}
-            </select>
+            <GroupedSelect value={currentVehicle.id} itemList={vehicleConfigs.vehicles} groupBy={'make'} onChange={(e) => setVehicle({ id: e.target.value })} />
           </div>
 
           {/* Vehicle Color */}
@@ -52,19 +99,7 @@ function Editor(props) {
           {/* Vehicle Lift */}
           <div className="field field-vehicle-lift">
             <label>Lift</label>
-            <select value={currentVehicle.lift || 0} onChange={(e) => setVehicle({ lift: e.target.value })}>
-              <option value="-2">-2"</option>
-              <option value="-1">-1"</option>
-              <option value="0">0"</option>
-              <option value="1">1"</option>
-              <option value="2">2"</option>
-              <option value="3">3"</option>
-              <option value="4">4"</option>
-              <option value="5">5"</option>
-              <option value="6">6"</option>
-              <option value="7">7"</option>
-              <option value="8">8"</option>
-            </select>
+            <InchRangeSelect value={currentVehicle.lift} min={-2} max={8} onChange={(e) => setVehicle({ lift: e.target.value })} />
           </div>
         </EditorSection>
 
@@ -79,13 +114,7 @@ function Editor(props) {
           {/* Rim */}
           <div className="field field-rim">
             <label>Rim Type</label>
-            <select value={currentVehicle.rim || ''} onChange={(e) => setVehicle({ rim: e.target.value })}>
-              {Object.keys(vehicleConfigs.wheels.rims).map((id) => (
-                <option key={id} value={id}>
-                  {vehicleConfigs.wheels.rims[id].name}
-                </option>
-              ))}
-            </select>
+            <GroupedSelect value={currentVehicle.rim} itemList={vehicleConfigs.wheels.rims} groupBy={'make'} onChange={(e) => setVehicle({ rim: e.target.value })} />
           </div>
 
           {/* Rim Color */}
@@ -102,65 +131,25 @@ function Editor(props) {
           {/* Rim Size */}
           <div className="field field-rim-size">
             <label>Rim Size</label>
-            <select value={currentVehicle.rim_diameter || ''} onChange={(e) => setVehicle({ rim_diameter: e.target.value })}>
-              <option value="14">14"</option>
-              <option value="15">15"</option>
-              <option value="16">16"</option>
-              <option value="17">17"</option>
-              <option value="18">18"</option>
-              <option value="19">19"</option>
-              <option value="20">20"</option>
-              <option value="21">21"</option>
-              <option value="22">22"</option>
-              <option value="23">23"</option>
-              <option value="24">24"</option>
-            </select>
+            <InchRangeSelect value={currentVehicle.rim_diameter} min={14} max={24} onChange={(e) => setVehicle({ rim_diameter: e.target.value })} />
           </div>
 
           {/* Rim Width */}
           <div className="field field-rim-width">
             <label>Rim Width</label>
-            <select value={currentVehicle.rim_width || ''} onChange={(e) => setVehicle({ rim_width: e.target.value })}>
-              <option value="8">8"</option>
-              <option value="9">9"</option>
-              <option value="10">10"</option>
-              <option value="11">11"</option>
-              <option value="12">12"</option>
-              <option value="13">13"</option>
-              <option value="14">14"</option>
-              <option value="15">15"</option>
-              <option value="16">16"</option>
-            </select>
+            <InchRangeSelect value={currentVehicle.rim_width} min={8} max={16} onChange={(e) => setVehicle({ rim_width: e.target.value })} />
           </div>
 
           {/* Tire */}
           <div className="field field-tire">
             <label>Tire Type</label>
-            <select value={currentVehicle.tire} onChange={(e) => setVehicle({ tire: e.target.value })}>
-              {Object.keys(vehicleConfigs.wheels.tires).map((id) => (
-                <option key={id} value={id}>
-                  {vehicleConfigs.wheels.tires[id].name}
-                </option>
-              ))}
-            </select>
+            <GroupedSelect value={currentVehicle.tire} itemList={vehicleConfigs.wheels.tires} groupBy={'make'} onChange={(e) => setVehicle({ tire: e.target.value })} />
           </div>
 
           {/* Tire Size */}
           <div className="field field-tire-size">
             <label>Tire Size</label>
-            <select value={currentVehicle.tire_diameter} onChange={(e) => setVehicle({ tire_diameter: e.target.value })}>
-              <option value="30">30"</option>
-              <option value="31">31"</option>
-              <option value="32">32"</option>
-              <option value="33">33"</option>
-              <option value="34">34"</option>
-              <option value="35">35"</option>
-              <option value="36">36"</option>
-              <option value="37">37"</option>
-              <option value="38">38"</option>
-              <option value="39">39"</option>
-              <option value="40">40"</option>
-            </select>
+            <InchRangeSelect value={currentVehicle.tire_diameter} min={30} max={40} onChange={(e) => setVehicle({ tire_diameter: e.target.value })} />
           </div>
         </EditorSection>
 
