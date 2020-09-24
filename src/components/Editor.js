@@ -53,6 +53,8 @@ function Editor(props) {
           <div className="field field-vehicle-lift">
             <label>Lift</label>
             <select value={currentVehicle.lift || 0} onChange={(e) => setVehicle({ lift: e.target.value })}>
+              <option value="-2">-2"</option>
+              <option value="-1">-1"</option>
               <option value="0">0"</option>
               <option value="1">1"</option>
               <option value="2">2"</option>
