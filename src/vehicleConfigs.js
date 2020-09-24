@@ -29,9 +29,9 @@ let vehicleConfigs = {
       name: 'Toyota 4Runner (3rd gen)',
       make: 'Toyota',
       model: 'assets/models/vehicles/toyota/4runner/3g/4runner.glb',
-      wheel_offset: 0.7,
-      axle_front: 1.45,
-      axle_rear: -1.24,
+      wheel_offset: 0.74,
+      axle_front: 1.41,
+      axle_rear: -1.237,
       placement: {
         spare_tire: { x: 0, y: 0.7, z: -2.45 },
       },
