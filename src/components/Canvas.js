@@ -28,11 +28,21 @@ class VehicleCanvas extends Component {
   handleConfigChange = (prevProps) => {
     // Model.
     if (prevProps.vehicle.id !== this.props.vehicle.id) {
+      // If switching vehicles (ie not first load).
+      if (prevProps.vehicle.id) {
+        // Clear all existing addons.
+        for (var i = this.addons.children.length - 1; i >= 0; i--) {
+          this.addons.remove(this.addons.children[i])
+        }
+        // Set default addons.
+        this.props.setVehicle({ addons: vehicleConfigs.vehicles[this.props.vehicle.id].default_addons })
+      }
+      // Load vehicle.
       this.loadVehicle()
     }
     // Paint.
     if (prevProps.vehicle.color !== this.props.vehicle.color || prevProps.vehicle.roughness !== this.props.vehicle.roughness) {
-      this.setObjectColor(this.vehicle)
+      this.setObjectColor(this.vehicleContainer)
     }
     // Lift height.
     if (prevProps.vehicle.lift !== this.props.vehicle.lift) {
@@ -58,6 +68,7 @@ class VehicleCanvas extends Component {
     if (prevProps.vehicle.rim_diameter !== this.props.vehicle.rim_diameter || prevProps.vehicle.rim_width !== this.props.vehicle.rim_width || prevProps.vehicle.tire_diameter !== this.props.vehicle.tire_diameter) {
       this.setWheelSize()
     }
+
     // Addons.
     if (prevProps.vehicle.addons !== this.props.vehicle.addons) {
       for (const addon of Object.keys(this.props.vehicle.addons)) {
@@ -149,6 +160,14 @@ class VehicleCanvas extends Component {
 
     // Set up vehicle
     this.vehicle = new THREE.Object3D()
+    this.vehicleContainer = new THREE.Object3D()
+    this.vehicleContainer.name = 'Vehicle'
+    this.scene.add(this.vehicleContainer)
+
+    // Set up addons.
+    this.addons = new THREE.Object3D()
+    this.addons.name = 'Addons'
+    this.vehicleContainer.add(this.addons)
 
     // Set up wheel.
     this.wheels = new THREE.Object3D()
@@ -223,7 +242,7 @@ class VehicleCanvas extends Component {
     this.loader.load(vehicleConfigs.vehicles[this.props.vehicle.id].model, (vehicleModel) => {
       // Remove existing vehicle.
       if (typeof this.vehicle !== 'undefined') {
-        this.scene.remove(this.vehicle)
+        this.vehicleContainer.remove(this.vehicle)
       }
 
       // Create object.
@@ -232,7 +251,7 @@ class VehicleCanvas extends Component {
 
       // Set height.
       let height = this.getVehiclePosY()
-      this.vehicle.position.y = height + 0.1 // add a little extra for a 'drop in' effect.
+      this.vehicleContainer.position.y = height + 0.1 // add a little extra for a 'drop in' effect.
       this.setVehiclePosY()
 
       // Update shadows & materials.
@@ -242,10 +261,7 @@ class VehicleCanvas extends Component {
       this.setWheelPos()
 
       // Add vehicle to scene.
-      this.scene.add(this.vehicle)
-
-      // Set default addons.
-      this.props.setVehicle({ addons: vehicleConfigs.vehicles[this.props.vehicle.id].default_addons })
+      this.vehicleContainer.add(this.vehicle)
     })
   }
 
@@ -335,7 +351,7 @@ class VehicleCanvas extends Component {
   setVehiclePosY = () => {
     if (typeof this.vehicle !== 'undefined') {
       let posY = this.getVehiclePosY()
-      new TWEEN.Tween(this.vehicle.position).to({ y: posY }, 1000).easing(TWEEN.Easing.Elastic.Out).start()
+      new TWEEN.Tween(this.vehicleContainer.position).to({ y: posY }, 1000).easing(TWEEN.Easing.Elastic.Out).start()
     }
   }
 
@@ -450,21 +466,11 @@ class VehicleCanvas extends Component {
     })
   }
 
-  // Load vehicle addons.
-  loadVehicleAddons = () => {
-    for (let addon in this.props.vehicle.addons) {
-      // Skip loop if the property is from prototype.
-      if (!this.props.vehicle.addons.hasOwnProperty(addon)) continue
-      // Load addon.
-      this.loadVehicleAddon(addon)
-    }
-  }
-
   // Load vehicle addon.
   loadVehicleAddon = (addon_name) => {
     // Remove old addon.
-    let old_addon = this.vehicle.getObjectByName(addon_name)
-    this.vehicle.remove(old_addon)
+    let old_addon = this.addons.getObjectByName(addon_name)
+    this.addons.remove(old_addon)
     // Get new addon selection.
     let addon_selection = this.props.vehicle.addons[addon_name]
 
@@ -474,11 +480,10 @@ class VehicleCanvas extends Component {
         // Create object.
         let addon = addonModel.scene
         addon.name = addon_name
-        //addon.rotation.x = 0
         // Add to vehicle.
-        this.vehicle.add(addon)
+        this.addons.add(addon)
         // Update colors.
-        this.setObjectColor(this.vehicle)
+        this.setObjectColor(addon)
       })
     }
   }
@@ -619,6 +624,10 @@ class VehicleCanvas extends Component {
       </div>
     )
   }
+}
+// Set default props
+VehicleCanvas.defaultProps = {
+  vehicle: { id: null, addons: {} },
 }
 
 export default VehicleCanvas

@@ -33,17 +33,17 @@ function App(props) {
   }, [props.database])
 
   // Current vehicle config.
-  const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), {id: null})
+  const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }))
 
   // Camera rotation.
   const [cameraAutoRotate, setCameraAutoRotate] = useState(true)
 
   // Editor visibility.
-  const [editorVisible, setEditorVisible] = useState(true)
+  const [editorActive, setEditorActive] = useState(true)
 
   // Toggle editor.
   function toggleEditor() {
-    setEditorVisible(!editorVisible)
+    setEditorActive(!editorActive)
   }
 
   // Save current config.
@@ -99,7 +99,7 @@ function App(props) {
       <Header toggleEditor={toggleEditor} />
 
       <div id="container">
-        <Editor visible={editorVisible} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} requestForm={requestForm} />
+        <Editor isActive={editorActive} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} requestForm={requestForm} />
         <Canvas vehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} />
       </div>
 

@@ -9,20 +9,23 @@ import ToolIcon from './icons/Tool'
 import GearIcon from './icons/Gear'
 
 function Editor(props) {
-  // Only show addons section if options exist.
+  // Get props.
+  const { isActive, currentVehicle = { id: null }, setVehicle, cameraAutoRotate, setCameraAutoRotate, requestForm } = props
+
+  // Check if current vehicle has addons.
   function addonsExist() {
-    return (props.currentVehicle.id && Object.keys(vehicleConfigs.vehicles[props.currentVehicle.id].addons).length > 0) ? true : false
+    return currentVehicle.id && Object.keys(vehicleConfigs.vehicles[currentVehicle.id].addons).length > 0 ? true : false
   }
 
   return (
-    <div id="editor" className={props.visible ? 'visible' : ''}>
+    <div id="editor" className={isActive ? 'visible' : ''}>
       <div className="editor-container">
         {/* Vehicle */}
         <EditorSection title="Vehicle" icon={<VehicleIcon />} defaultActive={true}>
           {/* Vehicle */}
           <div className="field field-vehicle">
             <label>Model</label>
-            <select value={props.currentVehicle.id} onChange={(e) => props.setVehicle({ id: e.target.value })}>
+            <select value={currentVehicle.id || ''} onChange={(e) => setVehicle({ id: e.target.value })}>
               {Object.keys(vehicleConfigs.vehicles).map((id) => (
                 <option key={id} value={id}>
                   {vehicleConfigs.vehicles[id].name}
@@ -34,12 +37,12 @@ function Editor(props) {
           {/* Vehicle Color */}
           <div className="field field-vehicle-color">
             <label>Paint</label>
-            <input type="color" value={props.currentVehicle.color} onChange={(e) => props.setVehicle({ color: e.target.value })} />
+            <input type="color" value={currentVehicle.color || ''} onChange={(e) => setVehicle({ color: e.target.value })} />
           </div>
 
           {/* Vehicle roughness */}
           <div className="field field-vehicle-roughness">
-            <select value={props.currentVehicle.roughness} onChange={(e) => props.setVehicle({ roughness: e.target.value })}>
+            <select value={currentVehicle.roughness || 0} onChange={(e) => setVehicle({ roughness: e.target.value })}>
               <option value="1">Matte</option>
               <option value="0.5">Semi Gloss</option>
               <option value="0">High Gloss</option>
@@ -49,7 +52,7 @@ function Editor(props) {
           {/* Vehicle Lift */}
           <div className="field field-vehicle-lift">
             <label>Lift</label>
-            <select value={props.currentVehicle.lift} onChange={(e) => props.setVehicle({ lift: e.target.value })}>
+            <select value={currentVehicle.lift || 0} onChange={(e) => setVehicle({ lift: e.target.value })}>
               <option value="0">0"</option>
               <option value="1">1"</option>
               <option value="2">2"</option>
@@ -68,13 +71,13 @@ function Editor(props) {
           {/* Wheel Offset */}
           <div className="field field-wheel-offset">
             <label>Wheel Offset</label>
-            <input type="range" min="0" max="0.1" step="0.01" value={props.currentVehicle.wheel_offset} onChange={(e) => props.setVehicle({ wheel_offset: e.target.value })} />
+            <input type="range" min="0" max="0.1" step="0.01" value={currentVehicle.wheel_offset || 0} onChange={(e) => setVehicle({ wheel_offset: e.target.value })} />
           </div>
 
           {/* Rim */}
           <div className="field field-rim">
             <label>Rim Type</label>
-            <select value={props.currentVehicle.rim} onChange={(e) => props.setVehicle({ rim: e.target.value })}>
+            <select value={currentVehicle.rim || ''} onChange={(e) => setVehicle({ rim: e.target.value })}>
               {Object.keys(vehicleConfigs.wheels.rims).map((id) => (
                 <option key={id} value={id}>
                   {vehicleConfigs.wheels.rims[id].name}
@@ -86,7 +89,7 @@ function Editor(props) {
           {/* Rim Color */}
           <div className="field field-rim-color">
             <label>Rim Color</label>
-            <select value={props.currentVehicle.rim_color} onChange={(e) => props.setVehicle({ rim_color: e.target.value })}>
+            <select value={currentVehicle.rim_color || ''} onChange={(e) => setVehicle({ rim_color: e.target.value })}>
               <option value="flat_black">Flat Black</option>
               <option value="gloss_black">Gloss Black</option>
               <option value="silver">Silver</option>
@@ -97,7 +100,7 @@ function Editor(props) {
           {/* Rim Size */}
           <div className="field field-rim-size">
             <label>Rim Size</label>
-            <select value={props.currentVehicle.rim_diameter} onChange={(e) => props.setVehicle({ rim_diameter: e.target.value })}>
+            <select value={currentVehicle.rim_diameter || ''} onChange={(e) => setVehicle({ rim_diameter: e.target.value })}>
               <option value="14">14"</option>
               <option value="15">15"</option>
               <option value="16">16"</option>
@@ -115,7 +118,7 @@ function Editor(props) {
           {/* Rim Width */}
           <div className="field field-rim-width">
             <label>Rim Width</label>
-            <select value={props.currentVehicle.rim_width} onChange={(e) => props.setVehicle({ rim_width: e.target.value })}>
+            <select value={currentVehicle.rim_width || ''} onChange={(e) => setVehicle({ rim_width: e.target.value })}>
               <option value="8">8"</option>
               <option value="9">9"</option>
               <option value="10">10"</option>
@@ -131,7 +134,7 @@ function Editor(props) {
           {/* Tire */}
           <div className="field field-tire">
             <label>Tire Type</label>
-            <select value={props.currentVehicle.tire} onChange={(e) => props.setVehicle({ tire: e.target.value })}>
+            <select value={currentVehicle.tire} onChange={(e) => setVehicle({ tire: e.target.value })}>
               {Object.keys(vehicleConfigs.wheels.tires).map((id) => (
                 <option key={id} value={id}>
                   {vehicleConfigs.wheels.tires[id].name}
@@ -143,7 +146,7 @@ function Editor(props) {
           {/* Tire Size */}
           <div className="field field-tire-size">
             <label>Tire Size</label>
-            <select value={props.currentVehicle.tire_diameter} onChange={(e) => props.setVehicle({ tire_diameter: e.target.value })}>
+            <select value={currentVehicle.tire_diameter} onChange={(e) => setVehicle({ tire_diameter: e.target.value })}>
               <option value="30">30"</option>
               <option value="31">31"</option>
               <option value="32">32"</option>
@@ -162,14 +165,14 @@ function Editor(props) {
         {/* Addons */}
         {addonsExist() && (
           <EditorSection title="Addons" icon={<ToolIcon />}>
-            {Object.keys(vehicleConfigs.vehicles[props.currentVehicle.id].addons).map((addon) => (
+            {Object.keys(vehicleConfigs.vehicles[currentVehicle.id].addons).map((addon) => (
               <div key={addon} className={`field field-${addon}`}>
-                <label>{vehicleConfigs.vehicles[props.currentVehicle.id].addons[addon].name}</label>
-                <select value={props.currentVehicle.addons[addon]} required onChange={(e) => props.setVehicle({ addons: { ...props.currentVehicle.addons, [addon]: e.target.value } })}>
-                  {!vehicleConfigs.vehicles[props.currentVehicle.id].addons[addon].required && <option value="">None</option>}
-                  {Object.keys(vehicleConfigs.vehicles[props.currentVehicle.id].addons[addon].options).map((option) => (
+                <label>{vehicleConfigs.vehicles[currentVehicle.id].addons[addon].name}</label>
+                <select value={currentVehicle.addons[addon]} required onChange={(e) => setVehicle({ addons: { ...currentVehicle.addons, [addon]: e.target.value } })}>
+                  {!vehicleConfigs.vehicles[currentVehicle.id].addons[addon].required && <option value="">None</option>}
+                  {Object.keys(vehicleConfigs.vehicles[currentVehicle.id].addons[addon].options).map((option) => (
                     <option key={option} value={option}>
-                      {vehicleConfigs.vehicles[props.currentVehicle.id].addons[addon].options[option].name}
+                      {vehicleConfigs.vehicles[currentVehicle.id].addons[addon].options[option].name}
                     </option>
                   ))}
                 </select>
@@ -182,12 +185,12 @@ function Editor(props) {
         <EditorSection title="Options" icon={<GearIcon />}>
           {/* Auto Rotate */}
           <div className="field field-camera-autorotate">
-            <input type="checkbox" id="camera-autorotate" checked={props.cameraAutoRotate} onChange={(e) => props.setCameraAutoRotate(e.target.checked)} />
+            <input type="checkbox" id="camera-autorotate" checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} />
             <label htmlFor="camera-autorotate">Auto Rotate</label>
           </div>
 
           <div className="field field-editor-request">
-            <button onClick={props.requestForm}>Request New Part or Vehicle</button>
+            <button onClick={requestForm}>Request New Part or Vehicle</button>
           </div>
         </EditorSection>
       </div>
