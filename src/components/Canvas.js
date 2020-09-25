@@ -3,6 +3,8 @@ import * as THREE from 'three'
 import Loader from './Loader'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
+
 import vehicleConfigs from 'vehicleConfigs'
 import TWEEN from 'tween.js'
 
@@ -128,7 +130,7 @@ class VehicleCanvas extends Component {
     this.cameraControls.maxDistance = 12
     this.cameraControls.maxPolarAngle = Math.PI / 2 - 0.05
 
-    // lights
+    // Lighting.
     this.scene.add(new THREE.AmbientLight(0xffffff))
     let light = new THREE.DirectionalLight(0xffffff, 0.5)
     light.position.set(0, 20, 0)
@@ -149,10 +151,44 @@ class VehicleCanvas extends Component {
     this.envMap = new THREE.CubeTextureLoader().load(envMapURLS)
     this.envMap.mapping = THREE.CubeReflectionMapping
 
+    // Sky.
+    var skyGeometry = new THREE.BoxGeometry(256, 256, 256)
+    var skyMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.BackSide,
+    })
+    var skyMesh = new THREE.Mesh(skyGeometry, skyMaterial)
+    skyMesh.name = 'Sky'
+    this.scene.add(skyMesh)
+
+    // Fog
+    this.scene.fog = new THREE.Fog(0xffffff, 10, 100)
+
     // Ground.
-    let groundMaterial = new THREE.ShadowMaterial()
-    groundMaterial.opacity = 0.5
-    let ground = new THREE.Mesh(new THREE.PlaneBufferGeometry(10, 10), groundMaterial)
+    let groundGeometry = new THREE.CircleBufferGeometry(96, 96)
+
+    let groundMirror = new Reflector(groundGeometry, {
+      textureWidth: 2048,
+      textureHeight: 2048,
+      color: 0x808080,
+    })
+    groundMirror.position.y = -0.001
+    groundMirror.rotateX(-Math.PI / 2)
+    this.scene.add(groundMirror)
+
+    let groundTexture = new THREE.TextureLoader().load('assets/images/ground/ground_tile.png')
+    groundTexture.wrapS = THREE.RepeatWrapping
+    groundTexture.wrapT = THREE.RepeatWrapping
+    groundTexture.repeat.set(228, 228)
+
+    let groundMaterial = new THREE.MeshLambertMaterial({
+      map: groundTexture,
+      color: 0x999999,
+      opacity: 0.8,
+      transparent: true,
+    })
+
+    let ground = new THREE.Mesh(groundGeometry, groundMaterial)
     ground.rotation.x = -Math.PI / 2
     ground.position.y = 0
     ground.receiveShadow = true
