@@ -1,13 +1,20 @@
 @import-normalize;
 
+html {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
 body {
   margin: 0px;
+  overflow: hidden;
   background: #2a2a2a;
   font-size: 15px;
   font-weight: 400;
   line-height: normal;
   color: #222;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, 'Helvetica Neue', sans-serif;
+  -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -129,7 +136,7 @@ input[type='color']::-webkit-color-swatch {
 #header #editor-toggle {
   display: none;
 }
-@media only screen and (min-width: 768px) {
+@media (orientation: landscape) {
   #header #editor-toggle {
     display: block;
     float: right;
@@ -164,11 +171,21 @@ input[type='color']::-webkit-color-swatch {
 
 /* editor */
 #editor {
-  height: 50vh;
-  overflow: auto;
+  position: absolute;
+  top: 50%;
+  bottom: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: #333;
   color: #ccc;
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
+#editor::-webkit-scrollbar {
+  display: none;
+}
+
 #editor .field {
   margin: 20px 0;
   overflow: hidden;
@@ -202,28 +219,19 @@ input[type='color']::-webkit-color-swatch {
   display: block;
 }
 
-@media only screen and (min-width: 768px) {
+@media (orientation: landscape) {
   #editor {
     width: 240px;
-    height: auto;
-    position: fixed;
     top: 60px;
     left: -240px;
-    bottom: 0;
     background: rgba(0, 0, 0, 0.8);
     box-shadow: 0 0 1px #aaa;
     -webkit-box-shadow: 0 0 1px #aaa;
     transition: 0.5s;
-    overflow: hidden;
     z-index: 9;
   }
   #editor.visible {
     left: 0;
-  }
-  #editor .editor-container {
-    width: 255px;
-    max-height: 100%;
-    overflow: auto;
   }
   #editor .section-header {
     background: rgba(0, 0, 0, 0.6);
@@ -244,15 +252,18 @@ input[type='color']::-webkit-color-swatch {
 
 /* vehicle */
 #vehicle {
-  position: relative;
-  height: 100vh;
-  height: calc(50vh - 60px);
+  position: absolute;
+  top: 60px;
+  bottom: 50%;
   width: 100%;
   overflow: hidden;
 }
-@media only screen and (min-width: 768px) {
+#vehicle canvas {
+  outline: none !important;
+}
+@media (orientation: landscape) {
   #vehicle {
-    height: calc(100vh - 60px);
+    bottom: 0;
   }
 }
 

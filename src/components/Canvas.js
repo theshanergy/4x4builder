@@ -110,8 +110,9 @@ class VehicleCanvas extends Component {
     this.scene = new THREE.Scene()
 
     // Create renderer and set size.
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setSize(this.mount.offsetWidth, this.mount.offsetHeight)
+    this.renderer.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1)
     this.renderer.shadowMap.enabled = true
 
     // Attach three canvas.
@@ -119,9 +120,9 @@ class VehicleCanvas extends Component {
 
     // Add camera.
     this.camera = new THREE.PerspectiveCamera(24, this.mount.offsetWidth / this.mount.offsetHeight, 0.1, 500)
-    this.camera.position.x = 6 //
+    this.camera.position.x = 5 //
     this.camera.position.y = 2 // height
-    this.camera.position.z = 6
+    this.camera.position.z = 5
     this.scene.add(this.camera)
 
     // Camera controls.
@@ -180,6 +181,7 @@ class VehicleCanvas extends Component {
     groundTexture.wrapS = THREE.RepeatWrapping
     groundTexture.wrapT = THREE.RepeatWrapping
     groundTexture.repeat.set(228, 228)
+    groundTexture.anisotropy = this.renderer.capabilities.getMaxAnisotropy()
 
     let groundMaterial = new THREE.MeshLambertMaterial({
       map: groundTexture,
