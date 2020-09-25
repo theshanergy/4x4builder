@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import Loader from './Loader'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
+import { isMobileOnly } from 'react-device-detect'
 
 import vehicleConfigs from 'vehicleConfigs'
 import TWEEN from 'tween.js'
@@ -130,6 +130,7 @@ class VehicleCanvas extends Component {
     this.cameraControls.minDistance = 4
     this.cameraControls.maxDistance = 12
     this.cameraControls.maxPolarAngle = Math.PI / 2 - 0.05
+    this.cameraControls.enableDamping = true
 
     // Lighting.
     this.scene.add(new THREE.AmbientLight(0xffffff))
@@ -168,14 +169,20 @@ class VehicleCanvas extends Component {
     // Ground.
     let groundGeometry = new THREE.CircleBufferGeometry(96, 96)
 
-    let groundMirror = new Reflector(groundGeometry, {
-      textureWidth: 2048,
-      textureHeight: 2048,
-      color: 0x808080,
-    })
-    groundMirror.position.y = -0.001
-    groundMirror.rotateX(-Math.PI / 2)
-    this.scene.add(groundMirror)
+    // Ground reflection for desktop devices.
+    if (!isMobileOnly) {
+      // Import reflector class.
+      import('three/examples/jsm/objects/Reflector.js').then(({ Reflector }) => {
+        let groundMirror = new Reflector(groundGeometry, {
+          textureWidth: 2048,
+          textureHeight: 2048,
+          color: 0x808080,
+        })
+        groundMirror.position.y = -0.001
+        groundMirror.rotateX(-Math.PI / 2)
+        this.scene.add(groundMirror)
+      })
+    }
 
     let groundTexture = new THREE.TextureLoader().load('assets/images/ground/ground_tile.png')
     groundTexture.wrapS = THREE.RepeatWrapping
