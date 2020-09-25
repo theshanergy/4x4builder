@@ -2,8 +2,7 @@
 
 body {
   margin: 0px;
-  overflow: hidden;
-  background: #f5f6f7;
+  background: #2a2a2a;
   font-size: 15px;
   font-weight: 400;
   line-height: normal;
@@ -65,7 +64,7 @@ button:hover {
 }
 
 /*colorpicker*/
-input[type="color"] {
+input[type='color'] {
   -webkit-appearance: none !important;
   height: 28px;
   width: 100%;
@@ -80,19 +79,16 @@ input[type="color"] {
   cursor: pointer;
   outline: none !important;
 }
-input[type="color"]::-webkit-color-swatch-wrapper {
-	padding: 0;
+input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
 }
-input[type="color"]::-webkit-color-swatch {
-	border: none;
+input[type='color']::-webkit-color-swatch {
+  border: none;
 }
 
 /*header*/
 #header {
-  position: fixed;
-  top: 0;
-  right: 0;
-  left: 0;
+  position: relative;
   height: 60px;
   border: none;
   z-index: 999;
@@ -131,28 +127,34 @@ input[type="color"]::-webkit-color-swatch {
 
 /* toggle */
 #header #editor-toggle {
-  float: right;
-  margin: 0;
-  position: relative;
-  height: 60px;
-  width: 64px;
-  background: transparent;
-  box-shadow: none;
-  border: 0 none;
-  cursor: pointer;
-}
-#header #editor-toggle:before {
-  content: '';
-  position: absolute;
-  left: 22px;
-  top: 24px;
-  width: 18px;
-  height: 2px;
-  background: #757575;
-  box-shadow: 0 5px 0 0 #757575, 0 10px 0 0 #757575;
-}
-#header #editor-toggle span {
   display: none;
+}
+@media only screen and (min-width: 768px) {
+  #header #editor-toggle {
+    display: block;
+    float: right;
+    margin: 0;
+    position: relative;
+    height: 60px;
+    width: 64px;
+    background: transparent;
+    box-shadow: none;
+    border: 0 none;
+    cursor: pointer;
+  }
+  #header #editor-toggle:before {
+    content: '';
+    position: absolute;
+    left: 22px;
+    top: 24px;
+    width: 18px;
+    height: 2px;
+    background: #757575;
+    box-shadow: 0 5px 0 0 #757575, 0 10px 0 0 #757575;
+  }
+  #header #editor-toggle span {
+    display: none;
+  }
 }
 
 /*actions*/
@@ -162,53 +164,101 @@ input[type="color"]::-webkit-color-swatch {
 
 /* editor */
 #editor {
-  width: 240px;
-  position: fixed;
-  top: 60px;
-  left: -240px;
-  bottom: 0;
-  background: #333;
-  background: rgba(0, 0, 0, 0.8);
-  color: #ccc;
-  box-shadow: 0 0 1px #aaa;
-  -webkit-box-shadow: 0 0 1px #aaa;
-  transition: 0.5s;
-  overflow: hidden;
-  z-index: 9;
-}
-#editor.visible {
-  left: 0;
-}
-#editor .editor-container {
-  width: 255px;
-  max-height: 100%;
+  height: 50vh;
   overflow: auto;
+  background: #333;
+  color: #ccc;
 }
-#editor .editor-container .field {
+#editor .field {
   margin: 20px 0;
   overflow: hidden;
 }
-#editor .editor-container .field label {
+#editor .field label {
   display: block;
   margin: 0 0 5px 0;
+}
+
+#editor .section-header {
+  padding: 15px 10px;
+  background: #1a1a1a;
+  cursor: pointer;
+}
+#editor .section-header .icon {
+  margin: 0 10px 0 0;
+  vertical-align: middle;
+  fill: #fff;
+}
+#editor .section-content {
+  display: none;
+  padding: 10px 20px;
+  background: #2a2a2a;
+  overflow: hidden;
+}
+
+#editor .section.active .section-header {
+  color: #fff;
+}
+#editor .section.active .section-content {
+  display: block;
+}
+
+@media only screen and (min-width: 768px) {
+  #editor {
+    width: 240px;
+    height: auto;
+    position: fixed;
+    top: 60px;
+    left: -240px;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 1px #aaa;
+    -webkit-box-shadow: 0 0 1px #aaa;
+    transition: 0.5s;
+    overflow: hidden;
+    z-index: 9;
+  }
+  #editor.visible {
+    left: 0;
+  }
+  #editor .editor-container {
+    width: 255px;
+    max-height: 100%;
+    overflow: auto;
+  }
+  #editor .section-header {
+    background: rgba(0, 0, 0, 0.6);
+  }
+  #editor .section-header .icon {
+    width: 18px;
+    vertical-align: bottom;
+  }
+  #editor .section-header:hover {
+    background: #222;
+    color: #fff;
+  }
+  #editor .section-content {
+    padding: 0 30px 0 10px;
+    background: rgba(0, 0, 0, 0.4);
+  }
 }
 
 /* vehicle */
 #vehicle {
   position: relative;
-  height: 100%;
+  height: 100vh;
+  height: calc(50vh - 60px);
   width: 100%;
+  overflow: hidden;
 }
-
+@media only screen and (min-width: 768px) {
+  #vehicle {
+    height: calc(100vh - 60px);
+  }
+}
 
 /*save button*/
 #actions {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
-}
-
-/*viewer*/
-#viewer {
-  margin-top: 60px;
+  bottom: 20px;
+  right: 20px;
 }

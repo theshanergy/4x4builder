@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import './EditorSection.css'
 
 const EditorSection = (props) => {
   const [isActive, setActiveState] = useState(props.defaultActive)

@@ -111,14 +111,14 @@ class VehicleCanvas extends Component {
 
     // Create renderer and set size.
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.renderer.setSize(this.mount.offsetWidth, this.mount.offsetHeight)
     this.renderer.shadowMap.enabled = true
 
     // Attach three canvas.
     this.mount.appendChild(this.renderer.domElement)
 
     // Add camera.
-    this.camera = new THREE.PerspectiveCamera(24, window.innerWidth / window.innerHeight, 0.1, 500)
+    this.camera = new THREE.PerspectiveCamera(24, this.mount.offsetWidth / this.mount.offsetHeight, 0.1, 500)
     this.camera.position.x = 6 //
     this.camera.position.y = 2 // height
     this.camera.position.z = 6
@@ -267,9 +267,9 @@ class VehicleCanvas extends Component {
   // Handle window resizing.
   handleWindowResize = () => {
     // Set size and aspect.
-    this.camera.aspect = window.innerWidth / window.innerHeight
+    this.camera.aspect = this.mount.offsetWidth / this.mount.offsetHeight
     this.camera.updateProjectionMatrix()
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.renderer.setSize(this.mount.offsetWidth, this.mount.offsetHeight)
   }
 
   // Load vehicle.
@@ -657,6 +657,11 @@ class VehicleCanvas extends Component {
     return (
       <div id="vehicle" ref={(ref) => (this.mount = ref)}>
         {this.state.loading && <Loader loadingMessage={this.state.loadingMessage} />}
+        <div id="actions">
+          <button id="save-button" onClick={this.props.saveVehicle}>
+            Save
+          </button>
+        </div>
       </div>
     )
   }

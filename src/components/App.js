@@ -97,17 +97,8 @@ function App(props) {
   return (
     <div className="App">
       <Header toggleEditor={toggleEditor} />
-
-      <div id="container">
-        <Editor isActive={editorActive} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} requestForm={requestForm} />
-        <Canvas vehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} />
-      </div>
-
-      <div id="actions">
-        <button id="save-button" onClick={saveVehicle}>
-          Save
-        </button>
-      </div>
+      <Canvas vehicle={currentVehicle} setVehicle={setVehicle} saveVehicle={saveVehicle} cameraAutoRotate={cameraAutoRotate} />
+      <Editor isActive={editorActive} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} requestForm={requestForm} />
     </div>
   )
 }
