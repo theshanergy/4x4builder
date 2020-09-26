@@ -38,14 +38,6 @@ function App(props) {
   // Camera rotation.
   const [cameraAutoRotate, setCameraAutoRotate] = useState(true)
 
-  // Editor visibility.
-  const [editorActive, setEditorActive] = useState(true)
-
-  // Toggle editor.
-  function toggleEditor() {
-    setEditorActive(!editorActive)
-  }
-
   // Save current config.
   function saveVehicle() {
     // Set new session.
@@ -96,9 +88,9 @@ function App(props) {
 
   return (
     <div className="App">
-      <Header toggleEditor={toggleEditor} />
+      <Header requestForm={requestForm} />
       <Canvas vehicle={currentVehicle} setVehicle={setVehicle} saveVehicle={saveVehicle} cameraAutoRotate={cameraAutoRotate} />
-      <Editor isActive={editorActive} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} requestForm={requestForm} />
+      <Editor isActive={true} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} />
     </div>
   )
 }

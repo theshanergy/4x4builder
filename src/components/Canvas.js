@@ -120,9 +120,9 @@ class VehicleCanvas extends Component {
 
     // Add camera.
     this.camera = new THREE.PerspectiveCamera(24, this.mount.offsetWidth / this.mount.offsetHeight, 0.1, 500)
-    this.camera.position.x = 5 //
+    this.camera.position.x = 6 //
     this.camera.position.y = 2 // height
-    this.camera.position.z = 5
+    this.camera.position.z = 6
     this.scene.add(this.camera)
 
     // Camera controls.

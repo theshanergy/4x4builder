@@ -11,7 +11,7 @@ import GearIcon from './icons/Gear'
 
 function Editor(props) {
   // Get props.
-  const { isActive, currentVehicle = { id: null }, setVehicle, cameraAutoRotate, setCameraAutoRotate, requestForm } = props
+  const { isActive, currentVehicle = { id: null }, setVehicle, cameraAutoRotate, setCameraAutoRotate } = props
 
   // Check if current vehicle has addons.
   function addonsExist() {
@@ -190,10 +190,6 @@ function Editor(props) {
         <div className="field field-camera-autorotate">
           <input type="checkbox" id="camera-autorotate" checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} />
           <label htmlFor="camera-autorotate">Auto Rotate</label>
-        </div>
-
-        <div className="field field-editor-request">
-          <button onClick={requestForm}>Request New Part or Vehicle</button>
         </div>
       </EditorSection>
     </div>
