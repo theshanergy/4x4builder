@@ -12,7 +12,7 @@ function App({ auth, database }) {
   const [userAuthenticated, setUserAuthenticated] = useState(false)
 
   // Current vehicle config.
-  const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }))
+  const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), { id: null, addons: {} })
 
   // Camera rotation.
   const [cameraAutoRotate, setCameraAutoRotate] = useState(true)
@@ -24,7 +24,7 @@ function App({ auth, database }) {
     // Existing session.
     if (session) {
       // Get config from URL.
-      database()
+      database
         .ref('/configs/' + session)
         .once('value')
         .then(function (data) {
@@ -53,16 +53,15 @@ function App({ auth, database }) {
 
   // Save current config.
   const saveVehicle = () => {
-    // Set new session.
-    let session = randomString(16)
+    // Generate new object key / url.
+    let newVehicleConfig = database.ref().child('configs').push()
     // Store current config to db.
-    database()
-      .ref('/configs/' + session)
-      .set(currentVehicle)
-    // push session string to url.
-    window.history.pushState({}, 'Save', '/' + session)
-    // Notify user.
-    swal('New Vehicle Saved!', 'Please copy or bookmark this page URL.', 'success')
+    newVehicleConfig.set(currentVehicle).then(() => {
+      // Push newly created object id to url.
+      window.history.pushState({}, 'Save', '/' + newVehicleConfig.key)
+      // Notify user.
+      swal('New Vehicle Saved!', 'Please copy or bookmark this page URL.', 'success')
+    })
   }
 
   // Request new part.
@@ -89,16 +88,6 @@ function App({ auth, database }) {
         swal('Awesome!', "Thanks for the suggestion! We'll add it to the list.", 'success')
       }
     })
-  }
-
-  // Random string generator.
-  function randomString(length) {
-    let text = ''
-    let possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-    for (let i = 0; i < length; i++) {
-      text += possible.charAt(Math.floor(Math.random() * possible.length))
-    }
-    return text
   }
 
   return (

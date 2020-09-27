@@ -675,9 +675,5 @@ class VehicleCanvas extends Component {
     )
   }
 }
-// Set default props
-VehicleCanvas.defaultProps = {
-  vehicle: { id: null, addons: {} },
-}
 
 export default VehicleCanvas
