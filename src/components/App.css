@@ -153,7 +153,7 @@ input[type='color']::-webkit-color-swatch {
 #header h1 strong {
   font-weight: 500;
 }
-@media (orientation: landscape) {
+@media (min-aspect-ratio: 5/4) {
   #header {
     background: #fff;
     box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.2);
@@ -285,7 +285,7 @@ ul.menu li:hover {
   display: block;
 }
 
-@media (orientation: landscape) {
+@media (min-aspect-ratio: 5/4) {
   #editor {
     width: 240px;
     top: 60px;
@@ -312,7 +312,7 @@ ul.menu li:hover {
 #vehicle canvas {
   outline: none !important;
 }
-@media (orientation: landscape) {
+@media (min-aspect-ratio: 5/4) {
   #vehicle {
     bottom: 0;
   }
