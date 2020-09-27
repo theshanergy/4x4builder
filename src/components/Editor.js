@@ -99,18 +99,16 @@ function Editor(props) {
           </div>
         </div>
 
-        {/* Suspension */}
-        <div className="field field-suspension">
-          {/* Vehicle Lift */}
-          <div className="field field-vehicle-lift">
-            <label>Lift</label>
-            <InchRangeSelect value={currentVehicle.lift} min={-2} max={8} onChange={(e) => setVehicle({ lift: e.target.value })} />
-          </div>
-          {/* Wheel Offset */}
-          <div className="field field-wheel-offset">
-            <label>Offset</label>
-            <input type="range" min="0" max="0.1" step="0.01" value={currentVehicle.wheel_offset || 0} onChange={(e) => setVehicle({ wheel_offset: e.target.value })} />
-          </div>
+        {/* Vehicle Lift */}
+        <div className="field field-vehicle-lift">
+          <label>Lift</label>
+          <InchRangeSelect value={currentVehicle.lift} min={-2} max={8} onChange={(e) => setVehicle({ lift: e.target.value })} />
+        </div>
+        
+        {/* Wheel Offset */}
+        <div className="field field-wheel-offset">
+          <label>Offset</label>
+          <input type="range" min="0" max="0.1" step="0.01" value={currentVehicle.wheel_offset || 0} onChange={(e) => setVehicle({ wheel_offset: e.target.value })} />
         </div>
       </EditorSection>
 

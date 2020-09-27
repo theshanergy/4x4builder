@@ -24,6 +24,39 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.small {
+  font-size: 0.813em;
+}
+
+/* forms */
+.field {
+  margin: 20px 0;
+  overflow: hidden;
+}
+.field .field {
+  display: inline-block;
+  margin: 0 20px 0 0;
+}
+.field label {
+  display: block;
+  margin: 0 0 10px 0;
+}
+
+/* defaults */
+input,
+button,
+select {
+  margin: 0;
+  padding: 6px 8px;
+  max-width: 100%;
+  border: 1px solid;
+  border-color: #111 #0a0a0a #000;
+  border-radius: 3px;
+  outline: 0 none !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1), 0 1px 1px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
 /*checkboxes*/
 input[type='checkbox'] {
   float: left;
@@ -32,19 +65,9 @@ input[type='checkbox'] {
 
 /*selects*/
 select {
-  display: inline-block;
-  padding: 6px;
-  max-width: 100%;
-  border: 1px solid;
-  border-color: #111 #0a0a0a black;
   background: #444;
   background-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.4));
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1), 0 1px 1px rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
   color: #aaa;
-}
-select:focus {
-  outline: none;
 }
 select > option {
   background: #444;
@@ -52,39 +75,28 @@ select > option {
 
 /*buttons*/
 button {
-  float: left;
-  line-height: 40px;
-  margin: 0;
-  padding: 0 15px;
-  border: 0 none;
-  border-radius: 3px;
   cursor: pointer;
-  outline: 0 none !important;
   background: #cc0000;
   color: #fff;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.14), 0 2px 1px -2px rgba(0, 0, 0, 0.2), 0 1px 2px 0 rgba(0, 0, 0, 0.12);
-  font-family: inherit;
-  font-size: 0.875em;
+  font-weight: bold;
 }
 button:hover {
   background: #f81717;
 }
 
-/*colorpicker*/
+/* number range */
+input[type='range'] {
+  box-shadow: none;
+}
+
+/* colorpicker */
 input[type='color'] {
   -webkit-appearance: none !important;
-  height: 28px;
-  width: 100%;
   padding: 0;
-  border: 1px solid;
-  border-color: #111 #0a0a0a black;
   background: transparent;
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1), 0 1px 1px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-  text-indent: -999px;
   border-radius: 3px;
   cursor: pointer;
-  outline: none !important;
 }
 input[type='color']::-webkit-color-swatch-wrapper {
   padding: 0;
@@ -98,6 +110,22 @@ input[type='color']::-webkit-color-swatch {
   display: inline-block;
   width: 24px;
   height: auto;
+  vertical-align: middle;
+}
+
+/* user login */
+.user-login button .icon {
+  margin: 0 12px;
+  width: 18px;
+}
+.user-login button.google {
+  background: #222;
+  color: #ddd;
+  text-align: left;
+  border: 0 none;
+}
+.user-login p.small {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /*header*/
@@ -121,7 +149,6 @@ input[type='color']::-webkit-color-swatch {
   margin: 0 8px 0 0;
   width: 28px;
   height: auto;
-  vertical-align: text-bottom;
 }
 #header h1 strong {
   font-weight: 500;
@@ -239,7 +266,6 @@ ul.menu li:hover {
 }
 #editor .section-header .icon {
   margin: 0 10px 0 0;
-  vertical-align: middle;
   fill: #ccc;
 }
 #editor .section-header .arrow {
@@ -257,19 +283,6 @@ ul.menu li:hover {
 }
 #editor .section.active .section-content {
   display: block;
-}
-
-#editor .field {
-  margin: 20px 0;
-  overflow: hidden;
-}
-#editor .field .field {
-  display: inline-block;
-  margin: 0 20px 0 0;
-}
-#editor .field label {
-  display: block;
-  margin: 0 0 10px 0;
 }
 
 @media (orientation: landscape) {
@@ -298,7 +311,6 @@ ul.menu li:hover {
 }
 #vehicle canvas {
   outline: none !important;
-  
 }
 @media (orientation: landscape) {
   #vehicle {
@@ -311,4 +323,36 @@ ul.menu li:hover {
   position: absolute;
   bottom: 20px;
   right: 20px;
+}
+
+/* overlay */
+#overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  background: rgba(20, 20, 20, 0.8);
+  color: #fff;
+  text-align: center;
+  overflow: hidden;
+}
+#overlay .scroll {
+  overflow: auto;
+  max-height: 100%;
+}
+#overlay .scroll::-webkit-scrollbar {
+  display: none;
+}
+#overlay .modal {
+  margin: 20px 0;
+}
+#overlay input,
+#overlay button {
+  width: 100%;
+  padding: 12px;
 }
