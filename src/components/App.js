@@ -1,4 +1,5 @@
 import React, { useEffect, useReducer, useState } from 'react'
+import ReactGA from 'react-ga'
 import swal from 'sweetalert'
 import './App.css'
 
@@ -24,7 +25,7 @@ function App({ auth, database }) {
     // Existing session.
     if (session) {
       // Get config from URL.
-      database
+      database()
         .ref('/configs/' + session)
         .once('value')
         .then(function (data) {
@@ -54,11 +55,13 @@ function App({ auth, database }) {
   // Save current config.
   const saveVehicle = () => {
     // Generate new object key / url.
-    let newVehicleConfig = database.ref().child('configs').push()
+    let newVehicleConfig = database().ref().child('configs').push()
     // Store current config to db.
     newVehicleConfig.set(currentVehicle).then(() => {
       // Push newly created object id to url.
       window.history.pushState({}, 'Save', '/' + newVehicleConfig.key)
+      // Track pageview.
+      ReactGA.pageview(window.location.pathname)
       // Notify user.
       swal('New Vehicle Saved!', 'Please copy or bookmark this page URL.', 'success')
     })
@@ -89,6 +92,10 @@ function App({ auth, database }) {
       }
     })
   }
+
+  // Google Analytics.
+  ReactGA.initialize('UA-2733360-16')
+  ReactGA.pageview(window.location.pathname)
 
   return (
     <div className="App">
