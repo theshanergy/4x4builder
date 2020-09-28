@@ -94,8 +94,10 @@ function App({ auth, database }) {
   }
 
   // Google Analytics.
-  ReactGA.initialize('UA-2733360-16')
-  ReactGA.pageview(window.location.pathname)
+  useEffect(() => {
+    ReactGA.initialize('UA-2733360-16')
+    ReactGA.pageview(window.location.pathname)
+  }, [])
 
   return (
     <div className="App">

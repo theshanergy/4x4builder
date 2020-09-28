@@ -110,7 +110,7 @@ class VehicleCanvas extends Component {
     this.scene = new THREE.Scene()
 
     // Create renderer and set size.
-    this.renderer = new THREE.WebGLRenderer({ antialias: true })
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
     this.renderer.setSize(this.mount.offsetWidth, this.mount.offsetHeight)
     this.renderer.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1)
     this.renderer.shadowMap.enabled = true
@@ -662,11 +662,33 @@ class VehicleCanvas extends Component {
     return obj1
   }
 
+  // Take screenshot.
+  takeScreenshot = () => {
+    // Fixed render size.
+    this.camera.aspect = 1280 / 720
+    this.camera.updateProjectionMatrix()
+    this.renderer.setSize(1280, 720)
+
+    this.renderer.render(this.scene, this.camera)
+
+    // Download image.
+    var link = document.createElement('a')
+    link.download = 'filename.png'
+    link.href = this.renderer.domElement.toDataURL('image/png')
+    link.click()
+
+    // Restore canvas size.
+    this.handleWindowResize()
+  }
+
   render() {
     return (
       <div id="vehicle" ref={(ref) => (this.mount = ref)}>
         {this.state.loading && <Loader loadingMessage={this.state.loadingMessage} />}
         <div id="actions">
+          <button id="screenshot-button" onClick={this.takeScreenshot}>
+            Screenshot
+          </button>
           <button id="save-button" onClick={this.props.saveVehicle}>
             Save
           </button>

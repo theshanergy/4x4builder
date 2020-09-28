@@ -318,11 +318,22 @@ ul.menu li:hover {
   }
 }
 
-/*save button*/
+/* canvas actions*/
 #actions {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  bottom: 10px;
+  right: 10px;
+}
+#actions button {
+  margin: 0 0 0 10px;
+  padding: 10px 12px;
+  border: 0 none;
+}
+@media only screen and (min-width: 980px) {
+  #actions {
+    bottom: 20px;
+    right: 20px;
+  }
 }
 
 /* overlay */
