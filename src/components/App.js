@@ -8,10 +8,7 @@ import Header from './Header'
 import Editor from './Editor'
 import Canvas from './Canvas'
 
-function App({ auth, database }) {
-  // Signed in status.
-  const [userAuthenticated, setUserAuthenticated] = useState(false)
-
+function App({ database }) {
   // Current vehicle config.
   const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), { id: null, addons: {} })
 
@@ -42,15 +39,6 @@ function App({ auth, database }) {
       setVehicle(vehicleConfigs.defaults)
     }
   }, [database])
-
-  // Listen for firebase auth state change.
-  useEffect(() => {
-    let unregisterAuthObserver = auth().onAuthStateChanged((user) => setUserAuthenticated(!!user))
-    return () => {
-      // Un-register firebase observer on unmount.
-      unregisterAuthObserver()
-    }
-  }, [auth])
 
   // Save current config.
   const saveVehicle = () => {
@@ -101,7 +89,7 @@ function App({ auth, database }) {
 
   return (
     <div className="App">
-      <Header userAuthenticated={userAuthenticated} requestForm={requestForm} />
+      <Header requestForm={requestForm} />
       <Canvas vehicle={currentVehicle} setVehicle={setVehicle} saveVehicle={saveVehicle} cameraAutoRotate={cameraAutoRotate} />
       <Editor isActive={true} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} />
     </div>
