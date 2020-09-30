@@ -104,7 +104,7 @@ function Editor(props) {
           <label>Lift</label>
           <InchRangeSelect value={currentVehicle.lift} min={-2} max={8} onChange={(e) => setVehicle({ lift: e.target.value })} />
         </div>
-        
+
         {/* Wheel Offset */}
         <div className="field field-wheel-offset">
           <label>Offset</label>
@@ -120,7 +120,7 @@ function Editor(props) {
           <GroupedSelect value={currentVehicle.rim} itemList={vehicleConfigs.wheels.rims} groupBy={'make'} onChange={(e) => setVehicle({ rim: e.target.value })} />
         </div>
 
-        {/* Rim Color */}
+        {/* Primary Rim Color */}
         <div className="field field-rim-color">
           <label>Color</label>
           <select value={currentVehicle.rim_color || ''} onChange={(e) => setVehicle({ rim_color: e.target.value })}>
@@ -128,6 +128,19 @@ function Editor(props) {
             <option value="gloss_black">Gloss Black</option>
             <option value="silver">Silver</option>
             <option value="chrome">Chrome</option>
+            <option value="body">Body match</option>
+          </select>
+        </div>
+
+        {/* Secondary Rim Color */}
+        <div className="field field-rim-color">
+          <label>Accent</label>
+          <select value={currentVehicle.rim_color_secondary || ''} onChange={(e) => setVehicle({ rim_color_secondary: e.target.value })}>
+            <option value="flat_black">Flat Black</option>
+            <option value="gloss_black">Gloss Black</option>
+            <option value="silver">Silver</option>
+            <option value="chrome">Chrome</option>
+            <option value="body">Body match</option>
           </select>
         </div>
 

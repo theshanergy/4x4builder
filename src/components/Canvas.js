@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import Loader from './Loader'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { isMobileOnly } from 'react-device-detect'
 
 import vehicleConfigs from 'vehicleConfigs'
@@ -59,7 +60,7 @@ class VehicleCanvas extends Component {
       this.loadRims()
     }
     // Rim paint.
-    if (prevProps.vehicle.rim_color !== this.props.vehicle.rim_color) {
+    if (prevProps.vehicle.rim_color !== this.props.vehicle.rim_color || prevProps.vehicle.rim_color_secondary !== this.props.vehicle.rim_color_secondary) {
       this.setObjectColor(this.rim)
     }
     // Tires.
@@ -244,8 +245,13 @@ class VehicleCanvas extends Component {
     this.wheels.add(this.wheelRL)
     this.wheels.add(this.wheelRR)
 
-    // Initialize loader.
+    // Initialize gltf loader.
     this.loader = new GLTFLoader()
+
+    // Add Draco loader for compression.
+    this.DRACOLoader = new DRACOLoader()
+    this.DRACOLoader.setDecoderPath('assets/libs/draco/gltf/')
+    this.loader.setDRACOLoader(this.DRACOLoader)
   }
 
   // Animation loop.
@@ -404,27 +410,27 @@ class VehicleCanvas extends Component {
   setWheelPos = () => {
     // Wheel variables.
     let offset = vehicleConfigs.vehicles[this.props.vehicle.id]['wheel_offset'] + parseFloat(this.props.vehicle.wheel_offset)
-    let axleFront = vehicleConfigs.vehicles[this.props.vehicle.id]['axle_front']
-    let axleRear = vehicleConfigs.vehicles[this.props.vehicle.id]['axle_rear']
+    let wheelbase = vehicleConfigs.vehicles[this.props.vehicle.id]['wheelbase']
+
     let rotation = (Math.PI * 90) / 180
     let steering = (Math.PI * -10) / 180
     let height = this.getWheelPosY()
 
     // FL
     this.wheelFL.rotation.set(0, rotation + steering, 0)
-    this.wheelFL.position.set(offset, height, axleFront)
+    this.wheelFL.position.set(offset, height, wheelbase / 2)
 
     // FR
     this.wheelFR.rotation.set(0, -rotation + steering, 0)
-    this.wheelFR.position.set(-offset, height, axleFront)
+    this.wheelFR.position.set(-offset, height, wheelbase / 2)
 
     // RL
     this.wheelRL.rotation.set(0, rotation, 0)
-    this.wheelRL.position.set(offset, height, axleRear)
+    this.wheelRL.position.set(offset, height, -wheelbase / 2)
 
     // RR
     this.wheelRR.rotation.set(0, -rotation, 0)
-    this.wheelRR.position.set(-offset, height, axleRear)
+    this.wheelRR.position.set(-offset, height, -wheelbase / 2)
   }
 
   // Set wheel size.
@@ -555,9 +561,6 @@ class VehicleCanvas extends Component {
 
   // Update materials.
   setMaterials = (material) => {
-    let silver = new THREE.Color(0.8, 0.8, 0.8)
-    let white = new THREE.Color(1, 1, 1)
-    let black = new THREE.Color(0.1, 0.1, 0.1)
     // Switch materials.
     switch (material.name) {
       // Body paint.
@@ -572,7 +575,7 @@ class VehicleCanvas extends Component {
         material.envMap = this.envMap
         material.metalness = 1
         material.roughness = 0
-        material.color.set(white)
+        material.color.set(new THREE.Color(1, 1, 1))
         break
       case 'glass':
         material.envMap = this.envMap
@@ -599,40 +602,60 @@ class VehicleCanvas extends Component {
         material.color.set(new THREE.Color(0.2, 0.2, 0.2))
         break
       case 'rim':
-        material.envMap = this.envMap
-        switch (this.props.vehicle.rim_color) {
-          case 'silver':
-            material.metalness = 0.6
-            material.roughness = 0.2
-            material.color.set(silver)
-            break
-          case 'chrome':
-            material.metalness = 0.8
-            material.roughness = 0
-            material.color.set(white)
-            break
-          case 'gloss_black':
-            material.metalness = 0.8
-            material.roughness = 0
-            material.color.set(black)
-            break
-          case 'flat_black':
-            material.metalness = 0.5
-            material.roughness = 1
-            material.color.set(black)
-            break
-          default:
-        }
+        this.setRimColor(material)
+        break
+      case 'rim_secondary':
+        this.setRimColor(material, 'secondary')
         break
       case 'rubber':
-        material.metalness = 0
-        material.roughness = 0.4
-        material.color.set(black)
+        material.metalness = 0.6
+        material.roughness = 0.8
+        material.flatShading = true
+        material.color.set(new THREE.Color(0.2, 0.2, 0.2))
         break
       case 'black':
         material.metalness = 0
         material.roughness = 0.5
+        material.color.set(new THREE.Color(0.1, 0.1, 0.1))
+        break
+      default:
+    }
+  }
+
+  setRimColor(material, type = 'primary') {
+    let silver = new THREE.Color(0.8, 0.8, 0.8)
+    let white = new THREE.Color(1, 1, 1)
+    let black = new THREE.Color(0.1, 0.1, 0.1)
+
+    material.envMap = this.envMap
+
+    let color = type === 'secondary' ? this.props.vehicle.rim_color_secondary : this.props.vehicle.rim_color
+
+    switch (color) {
+      case 'silver':
+        material.metalness = 0.6
+        material.roughness = 0.2
+        material.color.set(silver)
+        break
+      case 'chrome':
+        material.metalness = 0.8
+        material.roughness = 0
+        material.color.set(white)
+        break
+      case 'gloss_black':
+        material.metalness = 0.4
+        material.roughness = 0
         material.color.set(black)
+        break
+      case 'flat_black':
+        material.metalness = 0.2
+        material.roughness = 1
+        material.color.set(black)
+        break
+      case 'body':
+        material.metalness = 0.4
+        material.roughness = this.props.vehicle.roughness
+        material.color.setStyle(this.props.vehicle.color)
         break
       default:
     }
