@@ -154,8 +154,8 @@ let vehicleConfigs = {
         make: 'XD Wheels',
         name: 'XD Series Grenade',
         model: 'assets/models/wheels/rims/xd_grenade.glb',
-        width: 0.274,
-        od: 0.529,
+        width: 0.5,
+        od: 1,
       },
       xd_machete: {
         make: 'XD Wheels',
