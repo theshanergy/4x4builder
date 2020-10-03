@@ -250,7 +250,8 @@ class VehicleCanvas extends Component {
 
     // Add Draco loader for compression.
     this.DRACOLoader = new DRACOLoader()
-    this.DRACOLoader.setDecoderPath('assets/libs/draco/gltf/')
+    this.DRACOLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/')
+    this.DRACOLoader.preload()
     this.loader.setDRACOLoader(this.DRACOLoader)
   }
 

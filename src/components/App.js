@@ -1,5 +1,4 @@
 import React, { useEffect, useReducer, useState } from 'react'
-import ReactGA from 'react-ga'
 import swal from 'sweetalert'
 import './App.css'
 
@@ -8,7 +7,7 @@ import Header from './Header'
 import Editor from './Editor'
 import Canvas from './Canvas'
 
-function App({ database }) {
+function App({ database, analytics }) {
   // Current vehicle config.
   const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), { id: null, addons: {} })
 
@@ -49,7 +48,7 @@ function App({ database }) {
       // Push newly created object id to url.
       window.history.pushState({}, 'Save', '/' + newVehicleConfig.key)
       // Track pageview.
-      ReactGA.pageview(window.location.pathname)
+      analytics.pageview(window.location.pathname)
       // Notify user.
       swal('New Vehicle Saved!', 'Please copy or bookmark this page URL.', 'success')
     })
@@ -80,12 +79,6 @@ function App({ database }) {
       }
     })
   }
-
-  // Google Analytics.
-  useEffect(() => {
-    ReactGA.initialize('UA-2733360-16')
-    ReactGA.pageview(window.location.pathname)
-  }, [])
 
   return (
     <div className="App">
