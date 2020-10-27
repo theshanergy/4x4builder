@@ -92,8 +92,8 @@ function Editor(props) {
           <div className="field field-vehicle-roughness">
             <label style={{ visibility: 'hidden' }}>Finish</label>
             <select value={currentVehicle.roughness || 0} onChange={(e) => setVehicle({ roughness: e.target.value })}>
-              <option value="1">Matte</option>
-              <option value="0.5">Semi Gloss</option>
+              <option value="0.6">Matte</option>
+              <option value="0.2">Semi Gloss</option>
               <option value="0">High Gloss</option>
             </select>
           </div>

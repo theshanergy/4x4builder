@@ -115,6 +115,7 @@ class VehicleCanvas extends Component {
     this.renderer.setSize(this.mount.offsetWidth, this.mount.offsetHeight)
     this.renderer.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1)
     this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
     // Attach three canvas.
     this.mount.appendChild(this.renderer.domElement)
@@ -135,16 +136,10 @@ class VehicleCanvas extends Component {
 
     // Lighting.
     this.scene.add(new THREE.AmbientLight(0xffffff))
+
     let light = new THREE.DirectionalLight(0xffffff, 0.5)
     light.position.set(0, 20, 0)
     light.castShadow = true
-    light.shadow.mapSize.width = 256
-    light.shadow.mapSize.height = 256
-    let d = 3
-    light.shadow.camera.left = -d
-    light.shadow.camera.right = d
-    light.shadow.camera.top = d
-    light.shadow.camera.bottom = -d
     light.shadow.camera.far = 50
     this.scene.add(light)
 
@@ -177,7 +172,6 @@ class VehicleCanvas extends Component {
         let groundMirror = new Reflector(groundGeometry, {
           textureWidth: 2048,
           textureHeight: 2048,
-          color: 0x808080,
         })
         groundMirror.position.y = -0.001
         groundMirror.rotateX(-Math.PI / 2)
@@ -193,7 +187,7 @@ class VehicleCanvas extends Component {
 
     let groundMaterial = new THREE.MeshLambertMaterial({
       map: groundTexture,
-      color: 0x999999,
+      color: 0xaaaaaa,
       opacity: 0.8,
       transparent: true,
     })
