@@ -2,6 +2,7 @@ import React, { Component } from 'react'
 import * as THREE from 'three'
 import Loader from './Loader'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import { ARButton } from 'three/examples/jsm/webxr/ARButton.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { isMobileOnly } from 'react-device-detect'
@@ -20,7 +21,7 @@ class VehicleCanvas extends Component {
   componentDidMount() {
     this.startLoader()
     this.sceneSetup()
-    this.startAnimationLoop()
+    this.animate()
     window.addEventListener('resize', this.handleWindowResize)
 
     // Add scene to inspector.
@@ -111,11 +112,12 @@ class VehicleCanvas extends Component {
     this.scene = new THREE.Scene()
 
     // Create renderer and set size.
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
     this.renderer.setSize(this.mount.offsetWidth, this.mount.offsetHeight)
     this.renderer.setPixelRatio(window.devicePixelRatio ? window.devicePixelRatio : 1)
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.xr.enabled = true
 
     // Attach three canvas.
     this.mount.appendChild(this.renderer.domElement)
@@ -150,19 +152,26 @@ class VehicleCanvas extends Component {
     this.envMap.mapping = THREE.CubeReflectionMapping
 
     // Sky.
-    var skyGeometry = new THREE.BoxGeometry(256, 256, 256)
-    var skyMaterial = new THREE.MeshBasicMaterial({
+    this.sky = new THREE.Object3D()
+    this.sky.name = 'Sky'
+    this.scene.add(this.sky)
+
+    let skyGeometry = new THREE.BoxGeometry(256, 256, 256)
+    let skyMaterial = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       side: THREE.BackSide,
     })
-    var skyMesh = new THREE.Mesh(skyGeometry, skyMaterial)
-    skyMesh.name = 'Sky'
-    this.scene.add(skyMesh)
+    let skyMesh = new THREE.Mesh(skyGeometry, skyMaterial)
+    this.sky.add(skyMesh)
 
     // Fog
     this.scene.fog = new THREE.Fog(0xffffff, 10, 100)
 
     // Ground.
+    this.ground = new THREE.Object3D()
+    this.ground.name = 'Ground'
+    this.scene.add(this.ground)
+
     let groundGeometry = new THREE.CircleBufferGeometry(96, 96)
 
     // Ground reflection for desktop devices.
@@ -175,7 +184,7 @@ class VehicleCanvas extends Component {
         })
         groundMirror.position.y = -0.001
         groundMirror.rotateX(-Math.PI / 2)
-        this.scene.add(groundMirror)
+        this.ground.add(groundMirror)
       })
     }
 
@@ -192,11 +201,12 @@ class VehicleCanvas extends Component {
       transparent: true,
     })
 
-    let ground = new THREE.Mesh(groundGeometry, groundMaterial)
-    ground.rotation.x = -Math.PI / 2
-    ground.position.y = 0
-    ground.receiveShadow = true
-    this.scene.add(ground)
+    let groundMesh = new THREE.Mesh(groundGeometry, groundMaterial)
+    groundMesh.rotation.x = -Math.PI / 2
+    groundMesh.position.y = 0
+    groundMesh.receiveShadow = true
+    this.ground.add(groundMesh)
+
 
     // Set up vehicle
     this.vehicle = new THREE.Object3D()
@@ -247,11 +257,84 @@ class VehicleCanvas extends Component {
     this.DRACOLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/')
     this.DRACOLoader.preload()
     this.loader.setDRACOLoader(this.DRACOLoader)
+
+    // Attach AR button
+    this.mount.appendChild(ARButton.createButton(this.renderer, { requiredFeatures: ['hit-test'] }))
+
+  }
+
+  // Animate.
+  animate() {
+    this.renderer.setAnimationLoop(this.animationLoop)
   }
 
   // Animation loop.
-  startAnimationLoop = () => {
-    window.requestAnimationFrame(this.startAnimationLoop)
+  animationLoop = (timestamp, frame) => {
+
+
+    // hide ground and sky in XR
+    this.sky.visible = !this.renderer.xr.isPresenting
+    this.ground.visible = !this.renderer.xr.isPresenting
+
+
+
+    if (frame) {
+
+      this.referenceSpace = this.renderer.xr.getReferenceSpace()
+      this.session = this.renderer.xr.getSession()
+
+      console.log(this.referenceSpace)
+      console.log(this.session)
+      console.log(frame)
+
+
+      if (this.hitTestSourceRequested !== true) {
+        this.session.requestReferenceSpace('viewer').then((referenceSpace) => {
+          this.session.requestHitTestSource({ space: referenceSpace }).then(source => {
+            console.log(source)
+            this.hitTestSource = source
+          })
+        })
+
+        this.session.addEventListener('end', () => {
+          this.hitTestSourceRequested = false
+          this.hitTestSource = null
+        })
+
+        this.hitTestSourceRequested = true
+      }
+
+
+
+      if (this.hitTestSource) {
+
+        const hitTestResults = frame.getHitTestResults(this.hitTestSource)
+
+
+        // Hit test exists and has results
+        if (hitTestResults.length) {
+
+          const hit = hitTestResults[0]
+
+          console.log(hit)
+
+          // Set vehicle position.
+          this.vehicle.matrix.fromArray(hit.getPose(this.referenceSpace).transform.matrix)
+
+
+
+        } else {
+          //reticle.visible = false
+        }
+      }
+    }
+
+
+
+
+
+
+
 
     // Update camera controls.
     this.cameraControls.update()
