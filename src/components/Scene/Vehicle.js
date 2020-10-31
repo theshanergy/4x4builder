@@ -7,14 +7,21 @@ function Vehicle({ vehicle }) {
 
     // Get refs.
     const vehicleContainer = useRef()
-    const vehicleModel = useGLTF(vehicleConfigs.vehicles[vehicle.id].model)
 
     // Get vehicle height
     let axle_height = (vehicle.tire_diameter * 2.54) / 100 / 2
     let lift_height = typeof vehicle.lift !== 'undefined' ? (vehicle.lift * 2.54) / 100 : 0 // adding lift height converted to meters.
     let vehicleHeight = axle_height + lift_height
 
+    // Vehicle.
+    const Vehicle = (id) => {
+        // Load vehicle model.
+        const vehicleModel = useGLTF(vehicleConfigs.vehicles[vehicle.id].model)
 
+        return (
+            <primitive object={vehicleModel.scene} position={[0, vehicleHeight, 0]} />
+        )
+    }
 
     // Load vehicle addon.
     const Addons = () => {
@@ -25,7 +32,6 @@ function Vehicle({ vehicle }) {
             // let addon_selection = vehicle.addons[addon_name]
 
             // let addon_model = useGLTF(vehicleConfigs.vehicles[vehicle.id]['addons'][addon_name]['options'][addon_selection]['model'])
-
         }
 
         return (
@@ -156,23 +162,23 @@ function Vehicle({ vehicle }) {
     // }
 
 
-
     // todo: when vehicle prop changes, set height, animate drop, update colors, set wheel position.
 
     return (
-
-
         <object3D name="Vehicle">
+            <Suspense fallback={null}>
+                <Vehicle id={vehicle.id} />
+            </Suspense>
 
-            <primitive ref={vehicleContainer} object={vehicleModel.scene} position={[0, vehicleHeight, 0]} />
+            <Suspense fallback={null}>
+                <Wheels {...vehicle} />
+            </Suspense>
 
-            <Wheels vehicle={vehicle} />
-
-            <Addons />
+            <Suspense fallback={null}>
+                <Addons />
+            </Suspense>
 
         </object3D>
-
-
     )
 }
 
