@@ -72,32 +72,23 @@ function VehicleCanvas(props) {
         camera={{ fov: 24, position: [6, 2, 6] }}
         shadowMap={true}
       >
-
         <CameraRotation cameraAutoRotate={props.cameraAutoRotate} />
-
-        <fog attach="fog" args={['#ffffff', 10, 100]} />
+        <OrbitControls minDistance={5} maxDistance={15} maxPolarAngle={Math.PI / 2 - 0.05} />
 
         <ambientLight />
-
         <directionalLight args={['#ffffff', 0.5]} position={[0, 20, 0]} castShadow={true} />
 
         <Suspense fallback={null}>
-          <Environment background={false} files={['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png']} path={'/assets/images/envmap/'} />
-        </Suspense>
-
-        <Suspense fallback={null}>
           <Sky />
-        </Suspense>
-
-        <Suspense fallback={null}>
           <Ground />
+          <fog attach="fog" args={['#ffffff', 10, 100]} />
+          <Environment background={false} files={['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png']} path={'/assets/images/envmap/'} />
         </Suspense>
 
         <Suspense fallback={null}>
           <Vehicle vehicle={props.vehicle} />
         </Suspense>
 
-        <OrbitControls minDistance={5} maxDistance={15} maxPolarAngle={Math.PI / 2 - 0.05} />
       </Canvas>
 
       <div id="actions">

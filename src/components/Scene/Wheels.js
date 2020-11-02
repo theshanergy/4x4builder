@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react'
-import { Mesh, Vector3 } from 'three'
+import * as THREE from 'three'
 import { useGLTF } from '@react-three/drei'
 import vehicleConfigs from 'vehicleConfigs'
 
 
-function Wheels({ id, rim, tire, wheel_offset, tire_diameter, rim_diameter, rim_width }) {
+function Wheels({ id, rim, tire, wheel_offset, tire_diameter, rim_diameter, rim_width, setObjectColor }) {
 
     // Load models.
     const rimModel = useGLTF(vehicleConfigs.wheels.rims[rim].model)
@@ -17,7 +17,7 @@ function Wheels({ id, rim, tire, wheel_offset, tire_diameter, rim_diameter, rim_
 
     let rotation = (Math.PI * 90) / 180
     let steering = (Math.PI * -10) / 180
-    let height = (tire_diameter * 2.54) / 100 / 2
+    let height = (tire_diameter * 0.0254) / 2
 
     // Rim scaling.
     let rim_diameter_metric = (rim_diameter * 2.54) / 100
@@ -27,12 +27,11 @@ function Wheels({ id, rim, tire, wheel_offset, tire_diameter, rim_diameter, rim_
     let rim_width_scale = rim_width_metric / vehicleConfigs.wheels.rims[rim].width
 
 
-
     // Run once.
     useEffect(() => {
         // Duplicate tire geometry.
         tireModel.scene.traverse(function (child) {
-            if (child instanceof Mesh) {
+            if (child instanceof THREE.Mesh) {
                 // Cast shadows.
                 child.castShadow = true
                 // Clone original geometry.
@@ -40,7 +39,6 @@ function Wheels({ id, rim, tire, wheel_offset, tire_diameter, rim_diameter, rim_
             }
         })
     }, [tireModel.scene])
-
 
     // Scale tires.
     useEffect(() => {
@@ -55,7 +53,7 @@ function Wheels({ id, rim, tire, wheel_offset, tire_diameter, rim_diameter, rim_
 
         // Traverse tire.
         tireModel.scene.traverse((child) => {
-            if (child instanceof Mesh) {
+            if (child instanceof THREE.Mesh) {
                 // Reset geometry.
                 child.geometry.copy(child.origGeometry)
 
@@ -65,10 +63,10 @@ function Wheels({ id, rim, tire, wheel_offset, tire_diameter, rim_diameter, rim_
                 // Loop through vertices.
                 for (var i = 0, l = child.geometry.attributes.position.count; i < l; i++) {
                     // Start vector.
-                    let startVector = new Vector3().fromBufferAttribute(child.geometry.getAttribute('position'), i)
+                    let startVector = new THREE.Vector3().fromBufferAttribute(child.geometry.getAttribute('position'), i)
 
                     // Center vector.
-                    let centerVector = new Vector3(0, 0, startVector.z)
+                    let centerVector = new THREE.Vector3(0, 0, startVector.z)
 
                     // Distance from center.
                     let centerDist = centerVector.distanceTo(startVector)
