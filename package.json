@@ -13,7 +13,7 @@
     "react-ga": "^3.2.0",
     "react-scripts": "4.0.0",
     "sweetalert": "^2.1.2",
-    "three": "^0.122.0",
+    "three": "^0.125.0",
     "tween.js": "^16.6.0"
   },
   "scripts": {
