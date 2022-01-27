@@ -1,4 +1,5 @@
 import React, { useEffect, useReducer, useState } from 'react'
+import { ref, onValue, push, set } from 'firebase/database'
 import swal from 'sweetalert'
 import './App.css'
 
@@ -17,23 +18,20 @@ function App({ database, analytics }) {
     // Run once.
     useEffect(() => {
         // Get session from url.
-        let session = window.location.pathname.replace(/^\/([^/]*).*$/, '$1')
+        let sessionId = window.location.pathname.replace(/^\/([^/]*).*$/, '$1')
         // Existing session.
-        if (session) {
-            // Get config from URL.
-            database()
-                .ref('/configs/' + session)
-                .once('value')
-                .then(function (data) {
-                    let value = data.val()
-                    // If vehicle exists.
-                    if (value != null) {
-                        // Overwrite current vehicle from response.
-                        setVehicle(value)
-                    } else {
-                        console.log('No saved vehicle at this URL')
-                    }
-                })
+        if (sessionId) {
+            const configRef = ref(database, '/configs/' + sessionId)
+            onValue(configRef, (snapshot) => {
+                const configValue = snapshot.val()
+                // If vehicle exists.
+                if (configValue != null) {
+                    // Overwrite current vehicle from response.
+                    setVehicle(configValue)
+                } else {
+                    console.log('No saved vehicle at this URL')
+                }
+            })
         } else {
             setVehicle(vehicleConfigs.defaults)
         }
@@ -41,12 +39,14 @@ function App({ database, analytics }) {
 
     // Save current config.
     const saveVehicle = () => {
+        // Get configs ref.
+        const configsRef = ref(database, 'configs')
         // Generate new object key / url.
-        let newVehicleConfig = database().ref().child('configs').push()
+        const newVehicleConfigRef = push(configsRef)
         // Store current config to db.
-        newVehicleConfig.set(currentVehicle).then(() => {
+        set(newVehicleConfigRef, currentVehicle).then(() => {
             // Push newly created object id to url.
-            window.history.pushState({}, 'Save', '/' + newVehicleConfig.key)
+            window.history.pushState({}, 'Save', '/' + newVehicleConfigRef.key)
             // Track pageview.
             analytics.pageview(window.location.pathname)
             // Notify user.
@@ -73,7 +73,8 @@ function App({ database, analytics }) {
                 return false
             } else if (value) {
                 // Save request.
-                database().ref('/requests').push(value)
+                set(push(ref(database, 'requests')), value)
+
                 // Notify user.
                 swal('Awesome!', "Thanks for the suggestion! We'll add it to the list.", 'success')
             }
