@@ -1,4 +1,4 @@
-let vehicleConfigs = {
+const vehicleConfigs = {
   defaults: {
     id: 'toyota_4runner_5g',
     lift: 0,

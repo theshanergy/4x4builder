@@ -1,14 +1,15 @@
 import React, { useEffect, useReducer, useState } from 'react'
 import { ref, onValue, push, set } from 'firebase/database'
 import swal from 'sweetalert'
-import './App.css'
 
-import vehicleConfigs from 'vehicleConfigs'
-import Header from './Header'
-import Editor from './Editor'
-import Canvas from './Canvas'
+import './assets/styles/global.css'
 
-function App({ database, analytics }) {
+import vehicleConfigs from './vehicleConfigs'
+import Header from './components/Header'
+import Editor from './components/Editor'
+import Canvas from './components/Canvas'
+
+export default function App({ database }) {
     // Current vehicle config.
     const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), { id: null, addons: {} })
 
@@ -47,8 +48,6 @@ function App({ database, analytics }) {
         set(newVehicleConfigRef, currentVehicle).then(() => {
             // Push newly created object id to url.
             window.history.pushState({}, 'Save', '/' + newVehicleConfigRef.key)
-            // Track pageview.
-            analytics.pageview(window.location.pathname)
             // Notify user.
             swal('New Vehicle Saved!', 'Please copy or bookmark this page URL.', 'success')
         })
@@ -89,5 +88,3 @@ function App({ database, analytics }) {
         </div>
     )
 }
-
-export default App

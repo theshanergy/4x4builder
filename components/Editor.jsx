@@ -1,6 +1,6 @@
 import React from 'react'
 
-import vehicleConfigs from 'vehicleConfigs'
+import vehicleConfigs from '../vehicleConfigs'
 import EditorSection from './EditorSection'
 
 import VehicleIcon from './icons/Vehicle'
