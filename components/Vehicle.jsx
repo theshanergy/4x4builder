@@ -1,5 +1,4 @@
 import React, { useMemo, useEffect, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { useSpring, animated } from '@react-spring/three'
 import { Vector3 } from 'three'
@@ -17,9 +16,9 @@ const Rim = ({ vehicle }) => {
     // Create instance.
     const rimScene = useMemo(() => rimGltf.scene.clone(), [rimGltf.scene])
 
-    // Scale rims.
-    useEffect(() => {
-        if (!rim) return
+    // Calculate rim scale.
+    const [odScale, widthScale] = useMemo(() => {
+        if (!rim) return [1, 1]
 
         // determine rim scale as a percentage of diameter.
         const od = (rim_diameter * 2.54) / 100
@@ -28,15 +27,15 @@ const Rim = ({ vehicle }) => {
         const width = (rim_width * 2.54) / 100
         const widthScale = width / vehicleConfigs.wheels.rims[rim].width
 
-        rimScene.scale.set(odScale, odScale, widthScale)
-    }, [rimScene.scale, rim, rim_diameter, rim_width])
+        return [odScale, widthScale]
+    }, [rim, rim_diameter, rim_width])
 
     // Set rim color.
     useEffect(() => {
         setObjectColor(rimScene)
     }, [rimScene, setObjectColor, vehicle.rim_color, vehicle.rim_color_secondary])
 
-    return <primitive object={rimScene} />
+    return <primitive object={rimScene} scale={[odScale, odScale, widthScale]} />
 }
 
 // Tire

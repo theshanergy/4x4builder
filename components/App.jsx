@@ -2,12 +2,12 @@ import React, { useEffect, useReducer, useState } from 'react'
 import { ref, onValue, push, set } from 'firebase/database'
 import swal from 'sweetalert'
 
-import './assets/styles/global.css'
+import '../assets/styles/global.css'
 
-import vehicleConfigs from './vehicleConfigs'
-import Header from './components/Header'
-import Editor from './components/Editor'
-import Canvas from './components/Canvas'
+import vehicleConfigs from '../vehicleConfigs'
+import Header from './Header'
+import Editor from './Editor'
+import Canvas from './Canvas'
 
 export default function App({ database }) {
     // Current vehicle config.
