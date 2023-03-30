@@ -14,7 +14,7 @@ export default function App({ database }) {
     const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), { id: null, addons: {} })
 
     // Camera.
-    const [cameraAutoRotate, setCameraAutoRotate] = useState(true)
+    const [cameraAutoRotate, setCameraAutoRotate] = useState(false)
 
     // Run once.
     useEffect(() => {

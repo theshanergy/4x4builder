@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react'
-import { useGLTF, useBounds } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import { Vector3 } from 'three'
 import vehicleConfigs from '../vehicleConfigs'
 import useMaterialProperties from '../hooks/useMaterialProperties'
@@ -154,7 +154,7 @@ const Wheels = ({ vehicle, ...props }) => {
     )
 }
 
-const Body = ({ vehicle, bounds, ...props }) => {
+const Body = ({ vehicle, ...props }) => {
     const { setObjectColor } = useMaterialProperties(vehicle)
     const vehicleGltf = useGLTF(vehicleConfigs.vehicles[vehicle.id].model)
 
@@ -199,8 +199,6 @@ const Addons = ({ vehicle, setVehicle }) => {
 
 // Vehicle.
 const Vehicle = ({ vehicle, setVehicle }) => {
-    const bounds = useBounds()
-
     // Get wheel (axle) height.
     const axleHeight = useMemo(() => {
         return (vehicle.tire_diameter * 2.54) / 100 / 2
@@ -216,11 +214,6 @@ const Vehicle = ({ vehicle, setVehicle }) => {
     const vehicleHeight = useMemo(() => {
         return axleHeight + liftHeight
     }, [axleHeight, liftHeight])
-
-    // Refresh bounds on height change.
-    useEffect(() => {
-        bounds.refresh().clip().fit()
-    }, [bounds, vehicleHeight])
 
     return (
         <group>
