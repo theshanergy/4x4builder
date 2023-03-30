@@ -1,5 +1,7 @@
-import React, { useMemo, useEffect } from 'react'
+import React, { useMemo, useEffect, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
+import { useSpring, animated } from '@react-spring/three'
 import { Vector3 } from 'three'
 import vehicleConfigs from '../vehicleConfigs'
 import useMaterialProperties from '../hooks/useMaterialProperties'
@@ -154,16 +156,26 @@ const Wheels = ({ vehicle, ...props }) => {
     )
 }
 
-const Body = ({ vehicle, ...props }) => {
+const Body = ({ vehicle, vehicleHeight }) => {
     const { setObjectColor } = useMaterialProperties(vehicle)
     const vehicleGltf = useGLTF(vehicleConfigs.vehicles[vehicle.id].model)
+
+    const body = useRef()
 
     // Set vehicle color.
     useEffect(() => {
         setObjectColor(vehicleGltf.scene)
     }, [setObjectColor, vehicleGltf.scene, vehicle.color, vehicle.roughness])
 
-    return <primitive object={vehicleGltf.scene} {...props} />
+    // Animate height.
+    const spring = useSpring({ vehicleHeight: vehicleHeight })
+
+    return <animated.primitive ref={body} object={vehicleGltf.scene} position-y={spring.vehicleHeight} />
+}
+
+const lerp = (x, y, a) => {
+    const r = (1 - a) * x + a * y
+    return Math.abs(x - y) < 0.001 ? y : r
 }
 
 const Addon = ({ vehicle, path }) => {
@@ -215,9 +227,19 @@ const Vehicle = ({ vehicle, setVehicle }) => {
         return axleHeight + liftHeight
     }, [axleHeight, liftHeight])
 
+    // Animate the height change.
+    // const spring = useSpring({
+    //     position: [0, vehicleHeight, 0],
+    //     config: {
+    //         mass: 1,
+    //         tension: 200,
+    //         friction: 10,
+    //     },
+    // })
+
     return (
         <group>
-            <Body key={vehicle.id} vehicle={vehicle} position={[0, vehicleHeight, 0]}>
+            <Body key={vehicle.id} vehicle={vehicle} vehicleHeight={vehicleHeight}>
                 <Addons vehicle={vehicle} setVehicle={setVehicle} />
             </Body>
             <Wheels vehicle={vehicle} position={[0, axleHeight, 0]} />
