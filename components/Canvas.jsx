@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera, PerformanceMonitor } from '@react-three/drei'
 import { LoadingManager } from 'three'
 import Environment from './Environment'
 import Loader from './Loader'
@@ -9,6 +9,7 @@ import Screenshot from './Screenshot'
 
 export default function ThreeCanvas({ vehicle, setVehicle, saveVehicle, cameraAutoRotate }) {
     const [isLoaded, setIsLoaded] = useState(false)
+    const [performanceDegraded, setPerformanceDegraded] = useState(false)
     const [triggerScreenshot, setTriggerScreenshot] = useState(false)
 
     // Set loaded state based on default loading manager.
@@ -27,6 +28,8 @@ export default function ThreeCanvas({ vehicle, setVehicle, saveVehicle, cameraAu
         <div id='vehicle'>
             {!isLoaded && <Loader />}
             <Canvas shadows frameloop='demand'>
+                <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
+
                 <OrbitControls
                     makeDefault
                     target={[0, 0.95, 0]}
@@ -35,6 +38,7 @@ export default function ThreeCanvas({ vehicle, setVehicle, saveVehicle, cameraAu
                     maxPolarAngle={Math.PI / 2}
                     autoRotate={cameraAutoRotate}
                     autoRotateSpeed={-0.3}
+                    dampingFactor={0.025}
                 />
 
                 <PerspectiveCamera makeDefault fov={24} position={[-4, 1.5, 6.5]}>
@@ -43,7 +47,7 @@ export default function ThreeCanvas({ vehicle, setVehicle, saveVehicle, cameraAu
 
                 {vehicle.id && <Vehicle vehicle={vehicle} setVehicle={setVehicle} />}
 
-                <Environment />
+                <Environment performanceDegraded={performanceDegraded} />
 
                 <Screenshot triggerScreenshot={triggerScreenshot} setTriggerScreenshot={setTriggerScreenshot} />
             </Canvas>
