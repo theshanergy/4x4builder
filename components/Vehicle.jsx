@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react'
+import React, { memo, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { Vector3 } from 'three'
 import useAnimateHeight from '../hooks/useAnimateHeight'
@@ -6,9 +6,8 @@ import vehicleConfigs from '../vehicleConfigs'
 import useMaterialProperties from '../hooks/useMaterialProperties'
 
 // Rim.
-const Rim = ({ vehicle }) => {
-    const { rim, rim_diameter, rim_width } = vehicle
-    const { setObjectColor } = useMaterialProperties(vehicle)
+const Rim = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, color, roughness }) => {
+    const { setObjectMaterials } = useMaterialProperties()
 
     // Load model.
     const rimGltf = useGLTF(vehicleConfigs.wheels.rims[rim].model)
@@ -16,32 +15,23 @@ const Rim = ({ vehicle }) => {
     // Create instance.
     const rimScene = useMemo(() => rimGltf.scene.clone(), [rimGltf.scene])
 
-    // Calculate rim scale.
-    const [odScale, widthScale] = useMemo(() => {
-        if (!rim) return [1, 1]
+    // Calculate rim scale as a percentage of diameter.
+    const odScale = useMemo(() => ((rim_diameter * 2.54) / 100 + 0.03175) / vehicleConfigs.wheels.rims[rim].od, [rim, rim_diameter])
 
-        // determine rim scale as a percentage of diameter.
-        const od = (rim_diameter * 2.54) / 100
-        const odScale = (od + 0.03175) / vehicleConfigs.wheels.rims[rim].od
-
-        const width = (rim_width * 2.54) / 100
-        const widthScale = width / vehicleConfigs.wheels.rims[rim].width
-
-        return [odScale, widthScale]
-    }, [rim, rim_diameter, rim_width])
+    // Calculate rim width.
+    const widthScale = useMemo(() => (rim_width * 2.54) / 100 / vehicleConfigs.wheels.rims[rim].width, [rim, rim_width])
 
     // Set rim color.
     useEffect(() => {
-        setObjectColor(rimScene)
-    }, [rimScene, setObjectColor, vehicle.rim_color, vehicle.rim_color_secondary])
+        setObjectMaterials(rimScene, color, roughness, rim_color, rim_color_secondary)
+    }, [rimScene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
 
-    return <primitive object={rimScene} scale={[odScale, odScale, widthScale]} />
-}
+    return <primitive name='Rim' object={rimScene} scale={[odScale, odScale, widthScale]} />
+})
 
 // Tire
-const Tire = ({ vehicle }) => {
-    const { rim_diameter, rim_width, tire, tire_diameter } = vehicle
-    const { setObjectColor } = useMaterialProperties(vehicle)
+const Tire = memo(({ rim_diameter, rim_width, tire, tire_diameter }) => {
+    const { setObjectMaterials } = useMaterialProperties(vehicle)
 
     // Load model.
     const tireGltf = useGLTF(vehicleConfigs.wheels.tires[tire].model)
@@ -50,10 +40,10 @@ const Tire = ({ vehicle }) => {
     const tireScene = useMemo(() => tireGltf.scene.clone(), [tireGltf.scene])
 
     // Calculate point on line (a to b, at length).
-    const linePoint = (a, b, length) => {
+    const linePoint = useCallback((a, b, length) => {
         let dir = b.clone().sub(a).normalize().multiplyScalar(length)
         return a.clone().add(dir)
-    }
+    })
 
     // Scale tires.
     useEffect(() => {
@@ -112,119 +102,131 @@ const Tire = ({ vehicle }) => {
 
     // Set color.
     useEffect(() => {
-        setObjectColor(tireScene)
-    }, [tireScene, setObjectColor])
+        setObjectMaterials(tireScene)
+    }, [setObjectMaterials, tireScene])
 
-    return <primitive object={tireScene} />
-}
-
-// Wheel.
-const Wheel = ({ vehicle, ...props }) => {
-    return (
-        <group {...props}>
-            <Rim vehicle={vehicle} />
-            <Tire vehicle={vehicle} />
-        </group>
-    )
-}
+    return <primitive name='Tire' object={tireScene} />
+})
 
 // Wheels.
-const Wheels = ({ vehicle, ...props }) => {
-    const offset = vehicleConfigs.vehicles[vehicle.id]['wheel_offset'] + parseFloat(vehicle.wheel_offset)
-    const wheelbase = vehicleConfigs.vehicles[vehicle.id]['wheelbase']
-
-    const rotation = (Math.PI * 90) / 180
-    const steering = (Math.PI * -10) / 180
-
-    const wheelTransforms = useMemo(
-        () => [
-            { key: 'FL', position: [offset, 0, wheelbase / 2], rotation: [0, rotation + steering, 0] },
-            { key: 'FR', position: [-offset, 0, wheelbase / 2], rotation: [0, -rotation + steering, 0] },
-            { key: 'RL', position: [offset, 0, -wheelbase / 2], rotation: [0, rotation, 0] },
-            { key: 'RR', position: [-offset, 0, -wheelbase / 2], rotation: [0, -rotation, 0] },
-        ],
-        [offset, wheelbase, rotation, steering]
-    )
+const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, offset, wheelbase, axleHeight, color, roughness }) => {
+    // Build wheel transforms.
+    const wheelTransforms = useMemo(() => {
+        const rotation = (Math.PI * 90) / 180
+        const steering = (Math.PI * -10) / 180
+        return [
+            { key: 'FL', name: 'FL', position: [offset, axleHeight, wheelbase / 2], rotation: [0, rotation + steering, 0] },
+            { key: 'FR', name: 'FR', position: [-offset, axleHeight, wheelbase / 2], rotation: [0, -rotation + steering, 0] },
+            { key: 'RL', name: 'RL', position: [offset, axleHeight, -wheelbase / 2], rotation: [0, rotation, 0] },
+            { key: 'RR', name: 'RR', position: [-offset, axleHeight, -wheelbase / 2], rotation: [0, -rotation, 0] },
+        ]
+    }, [offset, axleHeight, wheelbase])
 
     return (
-        <group {...props}>
+        <group name='Wheels'>
             {wheelTransforms.map((transform) => (
-                <Wheel vehicle={vehicle} {...transform} />
+                <group {...transform}>
+                    <Rim
+                        rim={rim}
+                        rim_diameter={rim_diameter}
+                        rim_width={rim_width}
+                        rim_color={rim_color}
+                        rim_color_secondary={rim_color_secondary}
+                        color={color}
+                        roughness={roughness}
+                    />
+                    <Tire tire={tire} tire_diameter={tire_diameter} rim_diameter={rim_diameter} rim_width={rim_width} />
+                </group>
             ))}
         </group>
     )
-}
+})
 
-const Body = ({ vehicle, vehicleHeight }) => {
-    const { setObjectColor } = useMaterialProperties(vehicle)
-    const vehicleGltf = useGLTF(vehicleConfigs.vehicles[vehicle.id].model)
+// Body.
+const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
+    const vehicle = useRef()
+    const { setObjectMaterials } = useMaterialProperties()
 
-    // Set vehicle color.
+    // Load body model.
+    const vehicleGltf = useGLTF(vehicleConfigs.vehicles[id].model)
+
+    // Set body color.
     useEffect(() => {
-        setObjectColor(vehicleGltf.scene)
-    }, [setObjectColor, vehicleGltf.scene, vehicle.color, vehicle.roughness])
+        setObjectMaterials(vehicle.current, color, roughness)
+    }, [setObjectMaterials, vehicleGltf.scene, color, roughness, addons])
+
+    // Set default addons.
+    useEffect(() => {
+        setVehicle({ addons: vehicleConfigs.vehicles[id].default_addons })
+    }, [setVehicle, id])
+
+    // Load addons.
+    const addonsModels = useMemo(() => {
+        return Object.entries(addons)
+            .filter(([type, value]) => vehicleConfigs.vehicles[id]['addons'][type]?.['options'][value])
+            .map(([type, value]) => {
+                const modelPath = vehicleConfigs.vehicles[id]['addons'][type]['options'][value]['model']
+                const model = useGLTF(modelPath)
+                model.scene.name = type + '_' + value
+                return model.scene
+            })
+    }, [id, addons])
 
     // Animate height.
-    const animatedHeight = useAnimateHeight(vehicleHeight, vehicleHeight + 0.1)
-
-    return <primitive object={vehicleGltf.scene} position-y={animatedHeight} />
-}
-
-const Addon = ({ vehicle, path }) => {
-    const { setObjectColor } = useMaterialProperties(vehicle)
-    const addonGltf = useGLTF(path)
-
-    // Set color.
-    useEffect(() => {
-        setObjectColor(addonGltf.scene)
-    }, [setObjectColor, addonGltf.scene, vehicle.color, vehicle.roughness])
-
-    return <primitive object={addonGltf.scene} />
-}
-
-// Addons.
-const Addons = ({ vehicle, setVehicle }) => {
-    useEffect(() => {
-        setVehicle({ addons: vehicleConfigs.vehicles[vehicle.id].default_addons })
-    }, [setVehicle, vehicle.id])
+    const animatedHeight = useAnimateHeight(height, height + 0.1)
 
     return (
-        <group>
-            {Object.entries(vehicle.addons).map(([key, value]) => {
-                if (vehicleConfigs.vehicles[vehicle.id]['addons'][key] && vehicleConfigs.vehicles[vehicle.id]['addons'][key]['options'][value]) {
-                    const path = vehicleConfigs.vehicles[vehicle.id]['addons'][key]['options'][value]['model']
-                    return <Addon key={path} vehicle={vehicle} path={path} />
-                }
-                return null
-            })}
+        <group ref={vehicle} position-y={animatedHeight}>
+            <primitive name='Body' object={vehicleGltf.scene} />
+            <group name='Addons'>
+                {addonsModels.map((model) => (
+                    <primitive key={model.name} object={model} />
+                ))}
+            </group>
         </group>
     )
-}
+})
 
 // Vehicle.
-const Vehicle = ({ vehicle, setVehicle }) => {
+const Vehicle = ({ currentVehicle, setVehicle }) => {
+    const { id, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, addons } = currentVehicle
+
     // Get wheel (axle) height.
     const axleHeight = useMemo(() => {
-        return (vehicle.tire_diameter * 2.54) / 100 / 2
-    }, [vehicle.tire_diameter])
+        return (tire_diameter * 2.54) / 100 / 2
+    }, [tire_diameter])
 
     // Get lift height in meters.
     const liftHeight = useMemo(() => {
-        const liftInches = vehicle.lift || 0
+        const liftInches = lift || 0
         return (liftInches * 2.54) / 100
-    }, [vehicle.lift])
+    }, [lift])
 
     // Get vehicle height.
     const vehicleHeight = useMemo(() => {
         return axleHeight + liftHeight
     }, [axleHeight, liftHeight])
 
+    const offset = vehicleConfigs.vehicles[id]['wheel_offset'] + parseFloat(wheel_offset)
+    const wheelbase = vehicleConfigs.vehicles[id]['wheelbase']
+
     return (
         <group>
-            <Body key={vehicle.id} vehicle={vehicle} vehicleHeight={vehicleHeight}>
-                <Addons vehicle={vehicle} setVehicle={setVehicle} />
-            </Body>
-            <Wheels vehicle={vehicle} position={[0, axleHeight, 0]} />
+            <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
+            <Wheels
+                rim={rim}
+                rim_diameter={rim_diameter}
+                rim_width={rim_width}
+                rim_color={rim_color}
+                rim_color_secondary={rim_color_secondary}
+                tire={tire}
+                tire_diameter={tire_diameter}
+                offset={offset}
+                axleHeight={axleHeight}
+                wheelbase={wheelbase}
+                color={color}
+                roughness={roughness}
+            />
         </group>
     )
 }

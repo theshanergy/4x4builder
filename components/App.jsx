@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer, useState } from 'react'
+import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import { ref, onValue, push, set } from 'firebase/database'
 import swal from 'sweetalert'
 
@@ -11,7 +11,7 @@ import Canvas from './Canvas'
 
 export default function App({ database }) {
     // Current vehicle config.
-    const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), { id: null, addons: {} })
+    const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), vehicleConfigs.defaults)
 
     // Camera.
     const [cameraAutoRotate, setCameraAutoRotate] = useState(false)
@@ -19,7 +19,7 @@ export default function App({ database }) {
     // Run once.
     useEffect(() => {
         // Get session from url.
-        let sessionId = window.location.pathname.replace(/^\/([^/]*).*$/, '$1')
+        const sessionId = window.location.pathname.split('/')[1] || ''
         // Existing session.
         if (sessionId) {
             const configRef = ref(database, '/configs/' + sessionId)
@@ -33,13 +33,11 @@ export default function App({ database }) {
                     console.log('No saved vehicle at this URL')
                 }
             })
-        } else {
-            setVehicle(vehicleConfigs.defaults)
         }
     }, [database])
 
     // Save current config.
-    const saveVehicle = () => {
+    const saveVehicle = useCallback(() => {
         // Get configs ref.
         const configsRef = ref(database, 'configs')
         // Generate new object key / url.
@@ -51,10 +49,10 @@ export default function App({ database }) {
             // Notify user.
             swal('New Vehicle Saved!', 'Please copy or bookmark this page URL.', 'success')
         })
-    }
+    }, [database, currentVehicle])
 
     // Request new part.
-    const requestForm = () => {
+    const requestForm = useCallback(() => {
         // Popup.
         swal({
             title: 'Vehicle Request',
@@ -78,12 +76,12 @@ export default function App({ database }) {
                 swal('Awesome!', "Thanks for the suggestion! We'll add it to the list.", 'success')
             }
         })
-    }
+    }, [database])
 
     return (
         <div className='App'>
             <Header requestForm={requestForm} />
-            <Canvas vehicle={currentVehicle} setVehicle={setVehicle} saveVehicle={saveVehicle} cameraAutoRotate={cameraAutoRotate} />
+            <Canvas currentVehicle={currentVehicle} setVehicle={setVehicle} saveVehicle={saveVehicle} cameraAutoRotate={cameraAutoRotate} />
             <Editor isActive={true} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} />
         </div>
     )
