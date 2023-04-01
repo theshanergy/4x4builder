@@ -1,53 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { MathUtils } from 'three'
 
-const useAnimateHeight = (targetValue, initialValue, duration = 1000) => {
-    // Initialize animation state.
-    const [animationState, setAnimationState] = useState({
-        progress: 0,
-        targetValue: targetValue,
-        initialValue: initialValue,
-        currentValue: initialValue,
-    })
+// Elastic out easing.
+const elasticOutEasing = (t, p = 0.3) => {
+    return Math.pow(2, -10 * t) * Math.sin(((t - p / 4) * (2 * Math.PI)) / p) + 1
+}
 
-    // Update animation state when target value changes.
-    useEffect(() => {
-        setAnimationState((prevState) => ({
-            ...prevState,
-            progress: 0,
-            initialValue: prevState.currentValue,
-            targetValue,
-        }))
-    }, [targetValue])
+// Custom hook to animate height.
+const useAnimateHeight = (elementRef, targetHeight, startHeight) => {
+    const animation = useRef({ targetHeight, progress: 0, initialHeight: startHeight || 0 })
 
-    // Elastic out easing.
-    const elasticOutEasing = (t, p = 0.3) => {
-        return Math.pow(2, -10 * t) * Math.sin(((t - p / 4) * (2 * Math.PI)) / p) + 1
-    }
-
-    // Update animation on each frame.
-    useFrame((_, delta) => {
-        // Animation in progress.
-        if (animationState.progress < 1) {
-            // Calculate new progress based on delta time and duration
-            const newProgress = Math.min(animationState.progress + delta * (1000 / duration), 1)
-
-            // Calculate the eased progress using custom easing function.
-            const easedProgress = elasticOutEasing(newProgress)
-
-            // Calculate new value based on eased progress.
-            const newValue = animationState.initialValue + (animationState.targetValue - animationState.initialValue) * easedProgress
-
-            // Update animation state with new progress and value.
-            setAnimationState((prevState) => ({
-                ...prevState,
-                progress: newProgress,
-                currentValue: newValue,
-            }))
+    useFrame((state, delta) => {
+        // Target height has changed.
+        if (animation.current.targetHeight !== targetHeight) {
+            animation.current.targetHeight = targetHeight
+            animation.current.progress = 0
+            animation.current.initialHeight = elementRef.current.position.y
         }
-    })
 
-    return animationState.currentValue || animationState.initialValue
+        // Increment progress.
+        animation.current.progress += delta
+        animation.current.progress = MathUtils.clamp(animation.current.progress, 0, 1)
+
+        // Get eased progress.
+        const easedProgress = elasticOutEasing(animation.current.progress)
+
+        // Get current height.
+        const currentHeight = MathUtils.lerp(animation.current.initialHeight, animation.current.targetHeight, easedProgress)
+
+        // Update element position.
+        elementRef.current.position.y = currentHeight
+    })
 }
 
 export default useAnimateHeight

@@ -173,10 +173,10 @@ const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
     }, [id, addons])
 
     // Animate height.
-    const animatedHeight = useAnimateHeight(height, height + 0.1)
+    useAnimateHeight(vehicle, height, height + 0.1)
 
     return (
-        <group ref={vehicle} position-y={animatedHeight}>
+        <group ref={vehicle}>
             <primitive name='Body' object={vehicleGltf.scene} />
             <group name='Addons'>
                 {addonsModels.map((model) => (
