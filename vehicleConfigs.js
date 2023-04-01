@@ -147,6 +147,15 @@ const vehicleConfigs = {
             default_addons: {},
             addons: {},
         },
+        ford_bronco_6g: {
+            name: 'Ford Bronco',
+            make: 'Ford',
+            model: 'assets/models/vehicles/ford/bronco/6g/bronco.glb',
+            wheel_offset: 0.85,
+            wheelbase: 2.95,
+            default_addons: {},
+            addons: {},
+        },
     },
     wheels: {
         rims: {
@@ -210,6 +219,13 @@ const vehicleConfigs = {
                 make: 'Toyota',
                 name: 'Toyota TRD Pro',
                 model: 'assets/models/wheels/rims/toyota_trd.glb',
+                width: 0.5,
+                od: 1,
+            },
+            ford_bronco: {
+                make: 'Ford',
+                name: 'Ford Bronco',
+                model: 'assets/models/wheels/rims/ford_bronco.glb',
                 width: 0.5,
                 od: 1,
             },
