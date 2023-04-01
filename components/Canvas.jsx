@@ -10,7 +10,6 @@ import Screenshot from './Screenshot'
 const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate }) => {
     const [isLoaded, setIsLoaded] = useState(false)
     const [performanceDegraded, setPerformanceDegraded] = useState(false)
-    const [triggerScreenshot, setTriggerScreenshot] = useState(false)
 
     // Set loaded state based on default loading manager.
     useEffect(() => {
@@ -27,6 +26,12 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate
             loadingManager.onLoad = null
         }
     }, [])
+
+    // Trigger screenshot event.
+    const takeScreenshot = () => {
+        const event = new Event('takeScreenshot')
+        window.dispatchEvent(event)
+    }
 
     return (
         <div id='vehicle'>
@@ -53,10 +58,10 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate
 
                 <Environment performanceDegraded={performanceDegraded} />
 
-                <Screenshot triggerScreenshot={triggerScreenshot} setTriggerScreenshot={setTriggerScreenshot} />
+                <Screenshot />
             </Canvas>
             <div id='actions'>
-                <button onClick={() => setTriggerScreenshot(true)}>Screenshot</button>
+                <button onClick={takeScreenshot}>Screenshot</button>
                 <button onClick={saveVehicle}>Save</button>
             </div>
         </div>

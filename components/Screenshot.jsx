@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { useThree } from '@react-three/fiber'
 
-export default function Screenshot({ triggerScreenshot, setTriggerScreenshot }) {
+export default function Screenshot() {
     const { gl, scene, camera, size } = useThree()
 
     // Take screenshot.
@@ -11,12 +11,11 @@ export default function Screenshot({ triggerScreenshot, setTriggerScreenshot }) 
         camera.aspect = aspect
         camera.updateProjectionMatrix()
         gl.setSize(1280, 720)
-
         gl.render(scene, camera)
 
         // Download image.
         var link = document.createElement('a')
-        link.download = 'filename.png'
+        link.download = '4x4builder.png'
         link.href = gl.domElement.toDataURL('image/png')
         link.click()
 
@@ -27,15 +26,12 @@ export default function Screenshot({ triggerScreenshot, setTriggerScreenshot }) 
         gl.render(scene, camera)
     }, [gl, scene, camera, size])
 
-    // Listen for screenshot.
+
+    // Listen for screenshot event.
     useEffect(() => {
-        if (triggerScreenshot) {
-            // Take screenshot.
-            takeScreenshot()
-            // Reset trigger.
-            setTriggerScreenshot(false)
-        }
-    }, [takeScreenshot, triggerScreenshot, setTriggerScreenshot])
+        window.addEventListener('takeScreenshot', takeScreenshot)
+        return () => window.removeEventListener('takeScreenshot', takeScreenshot)
+    }, [takeScreenshot])
 
     return null
 }
