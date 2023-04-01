@@ -14,13 +14,17 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate
 
     // Set loaded state based on default loading manager.
     useEffect(() => {
-        const manager = DefaultLoadingManager
-        manager.onLoad = () => {
+        const loadingManager = DefaultLoadingManager
+        loadingManager.onStart = () => {
+            setIsLoaded(false)
+        }
+        loadingManager.onLoad = () => {
             setIsLoaded(true)
         }
 
         return () => {
-            manager.onLoad = null
+            loadingManager.onStart = null
+            loadingManager.onLoad = null
         }
     }, [])
 

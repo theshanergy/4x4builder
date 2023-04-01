@@ -374,6 +374,7 @@ ul.menu li:hover {
     position: absolute;
     top: 0;
     left: 0;
+    z-index: 1;
 }
 #loader .spinner {
     margin: auto;
