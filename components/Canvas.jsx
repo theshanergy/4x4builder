@@ -1,7 +1,7 @@
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera, PerformanceMonitor } from '@react-three/drei'
-import { LoadingManager } from 'three'
+import { DefaultLoadingManager } from 'three'
 import Environment from './Environment'
 import Loader from './Loader'
 import Vehicle from './Vehicle'
@@ -14,7 +14,7 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate
 
     // Set loaded state based on default loading manager.
     useEffect(() => {
-        const manager = LoadingManager
+        const manager = DefaultLoadingManager
         manager.onLoad = () => {
             setIsLoaded(true)
         }
@@ -45,7 +45,7 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate
                     <pointLight position={[4, 2, 4]} intensity={0.75} />
                 </PerspectiveCamera>
 
-                {currentVehicle.id && <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />}
+                <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
 
                 <Environment performanceDegraded={performanceDegraded} />
 
