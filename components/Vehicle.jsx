@@ -153,7 +153,7 @@ const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
     // Set body color.
     useEffect(() => {
         setObjectMaterials(vehicle.current, color, roughness)
-    }, [setObjectMaterials, vehicleGltf.scene, color, roughness, addons])
+    }, [setObjectMaterials, color, roughness, addons])
 
     // Set default addons.
     useEffect(() => {
@@ -176,8 +176,8 @@ const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
     useAnimateHeight(vehicle, height, height + 0.1)
 
     return (
-        <group ref={vehicle}>
-            <primitive name='Body' object={vehicleGltf.scene} />
+        <group ref={vehicle} name='Body' key={id}>
+            <primitive name='Model' object={vehicleGltf.scene} />
             <group name='Addons'>
                 {addonsModels.map((model) => (
                     <primitive key={model.name} object={model} />
@@ -211,7 +211,7 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
     const wheelbase = vehicleConfigs.vehicles[id]['wheelbase']
 
     return (
-        <group>
+        <group name='Vehicle'>
             <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
             <Wheels
                 rim={rim}
