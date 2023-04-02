@@ -13,7 +13,7 @@ const vehicleConfigs = {
         rim_width: 10,
         tire: 'bfg_at',
         tire_diameter: 32,
-        spare: false,
+        spare: true,
     },
     vehicles: {
         toyota_4runner_5g_late: {
@@ -49,9 +49,7 @@ const vehicleConfigs = {
             model: 'assets/models/vehicles/toyota/4runner/3g/4runner.glb',
             wheel_offset: 0.75,
             wheelbase: 2.675,
-            placement: {
-                spare_tire: { x: 0, y: 0.7, z: -2.45 },
-            },
+            spare: [-0.175, 0.7, -2.5],
             default_addons: {
                 bumper_f: 'stock',
                 sliders: 'stock',
@@ -153,6 +151,7 @@ const vehicleConfigs = {
             model: 'assets/models/vehicles/ford/bronco/6g/bronco.glb',
             wheel_offset: 0.85,
             wheelbase: 2.95,
+            spare: [0, 0.7, -2.35],
             default_addons: {},
             addons: {},
         },
