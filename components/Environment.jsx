@@ -1,25 +1,6 @@
-import { memo } from 'react'
-import { useThree } from '@react-three/fiber'
-import { Environment, AccumulativeShadows, RandomizedLight, MeshReflectorMaterial, useTexture } from '@react-three/drei'
-import { RepeatWrapping, BackSide } from 'three'
-
-const Ground = memo(() => {
-    const { gl } = useThree()
-
-    // Load texture.
-    const groundTexture = useTexture('assets/images/ground/ground_tile.png', (texture) => {
-        texture.wrapS = texture.wrapT = RepeatWrapping
-        texture.repeat.set(228, 228)
-        texture.anisotropy = gl.capabilities.getMaxAnisotropy()
-    })
-
-    return (
-        <mesh name='Ground' rotation-x={-Math.PI / 2} position={[0, -0.0001, 0]}>
-            <circleGeometry args={[96, 96]} />
-            <MeshReflectorMaterial map={groundTexture} resolution={2048} mirror={0} toneMapped={false} />
-        </mesh>
-    )
-})
+import { Environment, AccumulativeShadows, RandomizedLight } from '@react-three/drei'
+import { BackSide } from 'three'
+import Ground from './Ground'
 
 export default function SceneEnvironment({ performanceDegraded }) {
     return (
