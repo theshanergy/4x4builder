@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera, PerformanceMonitor } from '@react-three/drei'
 import { DefaultLoadingManager } from 'three'
@@ -48,7 +48,9 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
                     <pointLight position={[4, 2, 4]} intensity={0.75} />
                 </PerspectiveCamera>
 
-                <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
+                <Suspense fallback={null}>
+                    <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
+                </Suspense>
 
                 <Environment performanceDegraded={performanceDegraded} />
 
