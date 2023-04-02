@@ -22,10 +22,6 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-.small {
-    font-size: 0.813em;
-}
-
 /* forms */
 .field {
     margin: 20px 0;
@@ -276,38 +272,6 @@ input[type='color']::-webkit-color-swatch {
         bottom: 20px;
         right: 20px;
     }
-}
-
-/* overlay */
-#overlay {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 99999;
-    background: rgba(20, 20, 20, 0.8);
-    color: #fff;
-    text-align: center;
-    overflow: hidden;
-}
-#overlay .scroll {
-    overflow: auto;
-    max-height: 100%;
-}
-#overlay .scroll::-webkit-scrollbar {
-    display: none;
-}
-#overlay .modal {
-    margin: 20px 0;
-}
-#overlay input,
-#overlay button {
-    width: 100%;
-    padding: 12px;
 }
 
 /*loader*/
