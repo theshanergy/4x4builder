@@ -7,7 +7,7 @@ import Loader from './Loader'
 import Vehicle from './Vehicle'
 import Screenshot from './Screenshot'
 
-const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate }) => {
+const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
     const [isLoaded, setIsLoaded] = useState(false)
     const [performanceDegraded, setPerformanceDegraded] = useState(false)
 
@@ -26,12 +26,6 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate
             loadingManager.onLoad = null
         }
     }, [])
-
-    // Trigger screenshot event.
-    const takeScreenshot = () => {
-        const event = new Event('takeScreenshot')
-        window.dispatchEvent(event)
-    }
 
     return (
         <div id='vehicle'>
@@ -60,10 +54,6 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, saveVehicle, cameraAutoRotate
 
                 <Screenshot />
             </Canvas>
-            <div id='actions'>
-                <button onClick={takeScreenshot}>Screenshot</button>
-                <button onClick={saveVehicle}>Save</button>
-            </div>
         </div>
     )
 }

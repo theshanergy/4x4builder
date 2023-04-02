@@ -197,7 +197,7 @@ input[type='color']::-webkit-color-swatch {
 }
 
 /* navigation */
-#header #navigation {
+#navigation {
     display: none;
     position: absolute;
     top: 100%;
@@ -210,23 +210,33 @@ input[type='color']::-webkit-color-swatch {
     box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.2);
     color: #fff;
 }
-#header #navigation.active {
+#navigation.active {
     display: block;
 }
-
-/* menus */
-ul.menu {
+#navigation .menu {
     margin: 0;
-    padding: 8px 0;
+    padding: 0;
     list-style: none;
 }
-ul.menu li {
+#navigation .menu li {
     margin: 0;
-    padding: 10px 24px;
+    padding: 0;
+}
+#navigation .menu li :is(a, span) {
+    display: block;
+    padding: 1em;
     cursor: pointer;
 }
-ul.menu li:hover {
+#navigation .menu li :is(a, span):hover {
     background: #f81717;
+}
+#navigation .menu li:first-child :is(a, span) {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+}
+#navigation .menu li:last-child :is(a, span) {
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
 }
 
 /* editor */
