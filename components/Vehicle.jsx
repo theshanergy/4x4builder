@@ -12,10 +12,10 @@ const linePoint = (a, b, length) => {
 }
 
 // Model loader.
-const Model = ({ path, ...props }) => {
+const Model = memo(({ path, ...props }) => {
     const model = useGLTF(path)
     return <primitive object={model.scene} {...props} />
-}
+})
 
 // Wheels.
 const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, offset, wheelbase, axleHeight, color, roughness }) => {
@@ -43,10 +43,14 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
         // Scale to match wheel width.
         geometry.scale(1, 1, wheelWidthScale)
 
+        // Get position attributes.
+        const positionAttribute = geometry.getAttribute('position')
+        const positionArray = positionAttribute.array
+
         // Loop through vertices.
-        for (var i = 0, l = geometry.attributes.position.count; i < l; i++) {
+        for (var i = 0, l = positionAttribute.count; i < l; i++) {
             // Start vector.
-            let startVector = new Vector3().fromBufferAttribute(geometry.getAttribute('position'), i)
+            let startVector = new Vector3().fromBufferAttribute(positionAttribute, i)
 
             // Center vector.
             let centerVector = new Vector3(0, 0, startVector.z)
@@ -67,8 +71,8 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
             let setVector = linePoint(centerVector, startVector, newRimDist)
 
             // Set x,y
-            geometry.attributes.position.setX(i, setVector.x)
-            geometry.attributes.position.setY(i, setVector.y)
+            positionArray[i * 3] = setVector.x
+            positionArray[i * 3 + 1] = setVector.y
         }
 
         return geometry
