@@ -1,24 +1,25 @@
-import React, { useEffect, useReducer, useState } from 'react'
+import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import { ref, onValue, push, set } from 'firebase/database'
 import swal from 'sweetalert'
-import './App.css'
 
-import vehicleConfigs from 'vehicleConfigs'
+import '../assets/styles/global.css'
+
+import vehicleConfigs from '../vehicleConfigs'
 import Header from './Header'
 import Editor from './Editor'
 import Canvas from './Canvas'
 
-function App({ database, analytics }) {
+export default function App({ database }) {
     // Current vehicle config.
-    const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), { id: null, addons: {} })
+    const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), vehicleConfigs.defaults)
 
     // Camera.
-    const [cameraAutoRotate, setCameraAutoRotate] = useState(true)
+    const [cameraAutoRotate, setCameraAutoRotate] = useState(false)
 
     // Run once.
     useEffect(() => {
         // Get session from url.
-        let sessionId = window.location.pathname.replace(/^\/([^/]*).*$/, '$1')
+        const sessionId = window.location.pathname.split('/')[1] || ''
         // Existing session.
         if (sessionId) {
             const configRef = ref(database, '/configs/' + sessionId)
@@ -32,13 +33,11 @@ function App({ database, analytics }) {
                     console.log('No saved vehicle at this URL')
                 }
             })
-        } else {
-            setVehicle(vehicleConfigs.defaults)
         }
     }, [database])
 
     // Save current config.
-    const saveVehicle = () => {
+    const saveVehicle = useCallback(() => {
         // Get configs ref.
         const configsRef = ref(database, 'configs')
         // Generate new object key / url.
@@ -47,15 +46,13 @@ function App({ database, analytics }) {
         set(newVehicleConfigRef, currentVehicle).then(() => {
             // Push newly created object id to url.
             window.history.pushState({}, 'Save', '/' + newVehicleConfigRef.key)
-            // Track pageview.
-            analytics.pageview(window.location.pathname)
             // Notify user.
             swal('New Vehicle Saved!', 'Please copy or bookmark this page URL.', 'success')
         })
-    }
+    }, [database, currentVehicle])
 
     // Request new part.
-    const requestForm = () => {
+    const requestForm = useCallback(() => {
         // Popup.
         swal({
             title: 'Vehicle Request',
@@ -79,15 +76,13 @@ function App({ database, analytics }) {
                 swal('Awesome!', "Thanks for the suggestion! We'll add it to the list.", 'success')
             }
         })
-    }
+    }, [database])
 
     return (
         <div className='App'>
             <Header requestForm={requestForm} />
-            <Canvas vehicle={currentVehicle} setVehicle={setVehicle} saveVehicle={saveVehicle} cameraAutoRotate={cameraAutoRotate} />
+            <Canvas currentVehicle={currentVehicle} setVehicle={setVehicle} saveVehicle={saveVehicle} cameraAutoRotate={cameraAutoRotate} />
             <Editor isActive={true} currentVehicle={currentVehicle} setVehicle={setVehicle} cameraAutoRotate={cameraAutoRotate} setCameraAutoRotate={setCameraAutoRotate} />
         </div>
     )
 }
-
-export default App
