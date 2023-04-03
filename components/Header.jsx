@@ -1,13 +1,14 @@
 import { ReactComponent as LogoIcon } from '../assets/images/icons/Logo.svg'
 import { ReactComponent as GitHubIcon } from '../assets/images/icons/GitHub.svg'
 
-function Header() {
+function Header({ children }) {
     return (
         <div id='header'>
             <h1>
                 <LogoIcon className='icon' />
                 <strong>4x4</strong>builder
             </h1>
+            {children}
             <div className='actions'>
                 <a target='_blank' href='https://github.com/theshanergy/4x4builder' title='GitHub'>
                     <GitHubIcon className='icon' />
