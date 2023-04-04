@@ -122,7 +122,7 @@ const vehicleConfigs = {
             name: 'Jeep Wrangler (JKU)',
             make: 'Jeep',
             model: 'assets/models/vehicles/jeep/jk/jku.glb',
-            wheel_offset: 0.85,
+            wheel_offset: 0.8,
             wheelbase: 2.946,
             default_addons: {},
             addons: {},
