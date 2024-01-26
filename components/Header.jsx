@@ -1,5 +1,5 @@
-import { ReactComponent as LogoIcon } from '../assets/images/icons/Logo.svg'
-import { ReactComponent as GitHubIcon } from '../assets/images/icons/GitHub.svg'
+import LogoIcon from '../assets/images/icons/Logo.svg'
+import GitHubIcon from '../assets/images/icons/GitHub.svg'
 
 function Header({ children }) {
     return (

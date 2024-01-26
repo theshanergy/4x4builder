@@ -10,7 +10,7 @@ export default function SceneEnvironment({ performanceDegraded }) {
                 <meshBasicMaterial color={0xffffff} side={BackSide} toneMapped={false} />
             </mesh>
 
-            <ambientLight intensity={0.15} />
+            <ambientLight intensity={0.5} />
 
             <Environment files={['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png']} path={'assets/images/envmap/'} />
 

@@ -3,11 +3,11 @@ import React from 'react'
 import vehicleConfigs from '../vehicleConfigs'
 import EditorSection from './EditorSection'
 
-import { ReactComponent as VehicleIcon } from '../assets/images/icons/Vehicle.svg'
-import { ReactComponent as RimIcon } from '../assets/images/icons/Rim.svg'
-import { ReactComponent as TireIcon } from '../assets/images/icons/Tire.svg'
-import { ReactComponent as ToolIcon } from '../assets/images/icons/Tool.svg'
-import { ReactComponent as GearIcon } from '../assets/images/icons/Gear.svg'
+import VehicleIcon from '../assets/images/icons/Vehicle.svg'
+import RimIcon from '../assets/images/icons/Rim.svg'
+import TireIcon from '../assets/images/icons/Tire.svg'
+import ToolIcon from '../assets/images/icons/Tool.svg'
+import GearIcon from '../assets/images/icons/Gear.svg'
 
 function Editor(props) {
     // Get props.
