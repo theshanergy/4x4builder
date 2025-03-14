@@ -1,33 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { DefaultLoadingManager } from 'three'
 import useGameStore from '../store/gameStore'
 
 const useLoadingManager = () => {
     const setSceneLoaded = useGameStore((state) => state.setSceneLoaded)
-    const [isLoading, setIsLoading] = useState(true)
+    const isLoading = useRef(false)
 
     useEffect(() => {
-        const onStart = () => {
-            setIsLoading(true)
+        DefaultLoadingManager.onStart = () => {
+            isLoading.current = true
+            setTimeout(() => isLoading.current && setSceneLoaded(false), 0)
         }
 
-        const onLoad = () => {
-            setIsLoading(false)
+        DefaultLoadingManager.onLoad = () => {
+            isLoading.current = false
+            setSceneLoaded(true)
         }
-
-        DefaultLoadingManager.onStart = onStart
-        DefaultLoadingManager.onLoad = onLoad
 
         return () => {
-            DefaultLoadingManager.onStart = null
-            DefaultLoadingManager.onLoad = null
+            DefaultLoadingManager.onStart = DefaultLoadingManager.onLoad = null
         }
-    }, [])
-
-    // Set scene loaded when loading is complete
-    useEffect(() => {
-        setSceneLoaded(!isLoading)
-    }, [isLoading, setSceneLoaded])
+    }, [setSceneLoaded])
 }
 
 export default useLoadingManager
