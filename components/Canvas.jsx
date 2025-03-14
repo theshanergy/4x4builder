@@ -4,7 +4,6 @@ import { PerformanceMonitor, KeyboardControls } from '@react-three/drei'
 import { DefaultLoadingManager } from 'three'
 import { Physics } from '@react-three/rapier'
 import Environment from './Environment'
-import { CameraProvider } from '../context/CameraContext'
 import CameraControls from './CameraControls'
 import Loader from './Loader'
 import Vehicle from './Vehicle'
@@ -43,23 +42,21 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
         <div id='vehicle'>
             {!isLoaded && <Loader />}
             <KeyboardControls map={keyMap}>
-                <CameraProvider>
-                    <Canvas shadows>
-                        <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
+                <Canvas shadows>
+                    <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 
-                        <CameraControls autoRotate={cameraAutoRotate} />
+                    <CameraControls autoRotate={cameraAutoRotate} />
 
-                        <Physics>
-                            <Suspense fallback={null}>
-                                <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
-                            </Suspense>
+                    <Physics>
+                        <Suspense fallback={null}>
+                            <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
+                        </Suspense>
 
-                            <Environment performanceDegraded={performanceDegraded} />
-                        </Physics>
+                        <Environment performanceDegraded={performanceDegraded} />
+                    </Physics>
 
-                        <Screenshot />
-                    </Canvas>
-                </CameraProvider>
+                    <Screenshot />
+                </Canvas>
             </KeyboardControls>
         </div>
     )

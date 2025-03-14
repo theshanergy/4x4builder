@@ -1,12 +1,13 @@
-import React, { memo, useMemo, useEffect, useRef } from 'react'
-import { useGLTF, useKeyboardControls } from '@react-three/drei'
-import { Vector3 } from 'three'
+import { memo, useMemo, useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
+import { useGLTF, useKeyboardControls } from '@react-three/drei'
+import { Vector3 } from 'three'
+
+import useGameStore from '../store/gameStore'
+import vehicleConfigs from '../vehicleConfigs'
 import useAnimateHeight from '../hooks/useAnimateHeight'
 import useVehiclePhysics from '../hooks/useVehiclePhysics'
-import { useCameraContext } from '../context/CameraContext'
-import vehicleConfigs from '../vehicleConfigs'
 import useMaterialProperties from '../hooks/useMaterialProperties'
 
 // Calculate point on line (a to b, at length).
@@ -157,23 +158,10 @@ const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
 // Vehicle component with physics
 const Vehicle = ({ currentVehicle, setVehicle }) => {
     const { id, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, addons } = currentVehicle
+    const setCameraTarget = useGameStore((state) => state.setCameraTarget)
+
     const chassisRef = useRef(null)
     const wheelRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
-
-    // Get the chase camera target ref from context
-    const { targetRef } = useCameraContext()
-
-    // Update the chase camera target when the chassis position changes
-    useFrame(() => {
-        if (chassisRef.current) {
-            // Set the target position to the chassis position
-            targetRef.current = {
-                x: chassisRef.current.translation().x,
-                y: chassisRef.current.translation().y + 0.95,
-                z: chassisRef.current.translation().z,
-            }
-        }
-    })
 
     // Get keyboard controls
     const [, getKeys] = useKeyboardControls()
@@ -240,6 +228,15 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
         // All wheels braking
         for (let i = 0; i < 4; i++) {
             applyBrake(i, brakeForce)
+        }
+
+        if (chassisRef.current) {
+            // Set the camera target to the chassis position
+            setCameraTarget({
+                x: chassisRef.current.translation().x,
+                y: chassisRef.current.translation().y + 0.95,
+                z: chassisRef.current.translation().z,
+            })
         }
     })
 
