@@ -243,18 +243,15 @@ const Vehicle = () => {
         }
 
         if (chassisRef.current) {
-            // Set the camera target to the chassis position
-            setCameraTarget({
-                x: chassisRef.current.translation().x,
-                y: chassisRef.current.translation().y + 0.95,
-                z: chassisRef.current.translation().z,
-            })
+            // Set camera target
+            const { x, y, z } = chassisRef.current.translation()
+            setCameraTarget({ x, y: y + 0.95, z })
         }
     })
 
     return (
-        <RigidBody ref={chassisRef} type='dynamic' colliders={false} position-y={vehicleHeight + 0.5} canSleep={false}>
-            <CuboidCollider args={[1, 0.5, (wheelbase / 2) + axleHeight]} position={[0, 1, 0]} />
+        <RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false}>
+            <CuboidCollider args={[1, 0.5, wheelbase / 2 + axleHeight]} position={[0, 1, 0]} />
             <group name='Vehicle'>
                 <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
                 <Wheels
