@@ -1,35 +1,25 @@
-import { Environment, AccumulativeShadows, RandomizedLight } from '@react-three/drei'
-
-import useGameStore from '../store/gameStore'
+import { Environment, Sky } from '@react-three/drei'
 import TerrainManager from './TerrainManager'
-import Ground from './Ground'
 
-const PHYSICS = true
-
-export default function SceneEnvironment() {
-    const performanceDegraded = useGameStore((state) => state.performanceDegraded)
-
+const SceneEnvironment = () => {
     return (
         <>
-            <ambientLight intensity={0.5} />
+            {/* Main light */}
+            <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
 
-            <fog attach='fog' args={['white', 80, 160]} />
+            {/* Blue sky */}
+            <Sky distance={450000} sunPosition={[10, 5, 10]} inclination={0.49} azimuth={0.25} rayleigh={0.5} />
 
+            {/* Distant fog for depth */}
+            <fog attach='fog' args={['#b8d9f9', 80, 160]} />
+
+            {/* Environment map for reflections */}
             <Environment files={['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png']} path={'assets/images/envmap/'} />
 
-            {PHYSICS ? (
-                <TerrainManager />
-            ) : (
-                <>
-                    <Ground />
-
-                    {!performanceDegraded && (
-                        <AccumulativeShadows temporal scale={10}>
-                            <RandomizedLight position={[5, 5, -10]} radius={8} />
-                        </AccumulativeShadows>
-                    )}
-                </>
-            )}
+            {/* Terrain */}
+            <TerrainManager />
         </>
     )
 }
+
+export default SceneEnvironment
