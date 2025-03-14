@@ -95,12 +95,15 @@ const Wheels = memo(
 
         return (
             <group name='Wheels'>
-                {wheelPositions.map(({ key, ...transform }, index) => (
+                {wheelPositions.map(({ key, rotation, ...transform }, index) => (
                     <group key={key} ref={wheelRefs[index]} {...transform}>
-                        <primitive name='Rim' object={rimGltf.scene.clone()} scale={[odScale, odScale, widthScale]} />
-                        <mesh name='Tire' geometry={tireGeometry} castShadow>
-                            <meshStandardMaterial color='#121212' />
-                        </mesh>
+                        {/* Add an inner group with the correct visual rotation */}
+                        <group rotation={rotation}>
+                            <primitive name='Rim' object={rimGltf.scene.clone()} scale={[odScale, odScale, widthScale]} />
+                            <mesh name='Tire' geometry={tireGeometry} castShadow>
+                                <meshStandardMaterial color='#121212' />
+                            </mesh>
+                        </group>
                     </group>
                 ))}
             </group>
@@ -204,8 +207,8 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
         const { forward, backward, left, right, brake } = getKeys()
 
         // Calculate forces
-        const engineForce = (forward ? FORCES.accelerate : 0) + (backward ? -FORCES.accelerate : 0)
-        const steerForce = (left ? -FORCES.steerAngle : 0) + (right ? FORCES.steerAngle : 0)
+        const engineForce = (forward ? -FORCES.accelerate : 0) + (backward ? FORCES.accelerate : 0)
+        const steerForce = (left ? FORCES.steerAngle : 0) + (right ? -FORCES.steerAngle : 0)
         const brakeForce = brake ? FORCES.brake : 0
 
         // Front wheels steering
@@ -226,7 +229,7 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
 
     return (
         <RigidBody ref={chassisRef} type='dynamic' colliders={false} position={[0, vehicleHeight + 0.5, 0]} canSleep={false}>
-            <CuboidCollider args={[1, 0.5, 2]} />
+            <CuboidCollider args={[1, 0.5, 2]} position={[0, 1, 0]} />
             <group name='Vehicle'>
                 <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
                 <Wheels
