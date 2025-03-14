@@ -4,7 +4,7 @@ import useGameStore from '../store/gameStore'
 
 const useLoadingManager = () => {
     const setSceneLoaded = useGameStore((state) => state.setSceneLoaded)
-    const [isLoading, setIsLoading] = useState(false)
+    const [isLoading, setIsLoading] = useState(true)
 
     useEffect(() => {
         const onStart = () => {
