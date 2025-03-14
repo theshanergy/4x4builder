@@ -51,7 +51,7 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 
                 // Calculate height based on distance from center
                 if (distSq >= flatAreaRadiusSq) {
-                    const rawHeight = noise.perlin3(worldX / smoothness, worldZ / smoothness, 0) * maxHeight
+                    const rawHeight = noise.perlin2(worldX / smoothness, worldZ / smoothness) * maxHeight
 
                     if (isCenterTile || distSq < transitionEndDistSq) {
                         const t = (Math.sqrt(distSq) - Math.sqrt(flatAreaRadiusSq)) / (Math.sqrt(transitionEndDistSq) - Math.sqrt(flatAreaRadiusSq))
