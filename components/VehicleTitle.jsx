@@ -1,6 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
+import useGameStore from '../store/gameStore'
 
-const VehicleTitle = ({ savedVehicles, setSavedVehicles, setVehicle }) => {
+const VehicleTitle = () => {
+    // Get vehicle state from store using selectors
+    const savedVehicles = useGameStore((state) => state.savedVehicles)
+    const setSavedVehicles = useGameStore((state) => state.setSavedVehicles)
+    const setVehicle = useGameStore((state) => state.setVehicle)
     const dropdownRef = useRef(null)
     const [showDropdown, setShowDropdown] = useState(false)
 

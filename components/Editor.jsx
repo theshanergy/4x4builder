@@ -10,12 +10,32 @@ import TireIcon from '../assets/images/icons/Tire.svg'
 import ToolIcon from '../assets/images/icons/Tool.svg'
 import GearIcon from '../assets/images/icons/Gear.svg'
 
-function Editor(props) {
+function Editor({ isActive }) {
     const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
     const setCameraAutoRotate = useGameStore((state) => state.setCameraAutoRotate)
-
-    // Get props.
-    const { isActive, currentVehicle = { id: null }, setVehicle } = props
+    
+    // Get vehicle state from store using granular selectors
+    const id = useGameStore((state) => state.currentVehicle?.id) || null
+    const color = useGameStore((state) => state.currentVehicle?.color)
+    const roughness = useGameStore((state) => state.currentVehicle?.roughness) || 0
+    const lift = useGameStore((state) => state.currentVehicle?.lift)
+    const wheel_offset = useGameStore((state) => state.currentVehicle?.wheel_offset) || 0
+    const rim = useGameStore((state) => state.currentVehicle?.rim)
+    const rim_color = useGameStore((state) => state.currentVehicle?.rim_color)
+    const rim_color_secondary = useGameStore((state) => state.currentVehicle?.rim_color_secondary)
+    const rim_diameter = useGameStore((state) => state.currentVehicle?.rim_diameter)
+    const rim_width = useGameStore((state) => state.currentVehicle?.rim_width)
+    const tire = useGameStore((state) => state.currentVehicle?.tire)
+    const tire_diameter = useGameStore((state) => state.currentVehicle?.tire_diameter)
+    const addons = useGameStore((state) => state.currentVehicle?.addons) || {}
+    const setVehicle = useGameStore((state) => state.setVehicle)
+    
+    // Reconstruct currentVehicle for existing code
+    const currentVehicle = {
+        id, color, roughness, lift, wheel_offset, rim,
+        rim_color, rim_color_secondary, rim_diameter, rim_width,
+        tire, tire_diameter, addons
+    }
 
     // Check if current vehicle has addons.
     function addonsExist() {

@@ -1,7 +1,12 @@
 import { useCallback } from 'react'
 import Swal from 'sweetalert2'
+import useGameStore from '../store/gameStore'
 
-const Actions = ({ currentVehicle, savedVehicles, setSavedVehicles }) => {
+const Actions = () => {
+    // Get vehicle state from store using selectors
+    const currentVehicle = useGameStore((state) => state.currentVehicle)
+    const savedVehicles = useGameStore((state) => state.savedVehicles)
+    const setSavedVehicles = useGameStore((state) => state.setSavedVehicles)
     // Save current vehicle to local storage.
     const saveVehicle = () => {
         // Get the name of the existing vehicle, if available.

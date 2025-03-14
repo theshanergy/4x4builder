@@ -20,7 +20,7 @@ const keyMap = [
 ]
 
 // Canvas component
-const ThreeCanvas = ({ currentVehicle, setVehicle }) => {
+const ThreeCanvas = () => {
     const sceneLoaded = useGameStore((state) => state.sceneLoaded)
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
 
@@ -38,7 +38,7 @@ const ThreeCanvas = ({ currentVehicle, setVehicle }) => {
 
                     <Physics>
                         <Suspense fallback={null}>
-                            <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
+                            <Vehicle />
                         </Suspense>
 
                         <Environment />

@@ -1,66 +1,29 @@
-import React, { useEffect, useReducer, useState } from 'react'
+import { useEffect } from 'react'
 
-import vehicleConfigs from '../vehicleConfigs'
+import useGameStore from '../store/gameStore'
+import VehicleTitle from './VehicleTitle'
 import Header from './Header'
 import Editor from './Editor'
 import Canvas from './Canvas'
 import Actions from './Actions'
-import VehicleTitle from './VehicleTitle'
 
 export default function App() {
-    // Saved vehicles.
-    const [savedVehicles, setSavedVehicles] = useState(() => {
-        // Get from local storage or null.
-        const localStorageVehicles = localStorage.getItem('savedVehicles')
-        return localStorageVehicles ? JSON.parse(localStorageVehicles) : { current: null }
-    })
+    // Get vehicle state from game store
+    const loadVehicleFromUrl = useGameStore((state) => state.loadVehicleFromUrl)
 
-    // On saved Vehicles update.
+    // Run once to load vehicle from URL if present
     useEffect(() => {
-        // Update local storage.
-        localStorage.setItem('savedVehicles', JSON.stringify(savedVehicles))
-    }, [savedVehicles])
-
-    // Load default vehicle from local storage (if it exists).
-    const defaultVehicleConfig = () => {
-        // Get current save.
-        const defaultVehicleId = savedVehicles.current
-        return defaultVehicleId && savedVehicles[defaultVehicleId] ? savedVehicles[defaultVehicleId].config : vehicleConfigs.defaults
-    }
-
-    // Current vehicle config.
-    const [currentVehicle, setVehicle] = useReducer((currentVehicle, newState) => ({ ...currentVehicle, ...newState }), defaultVehicleConfig())
-
-    // Run once.
-    useEffect(() => {
-        // Get config from URL parameters.
-        const urlParams = new URLSearchParams(window.location.search)
-        const encodedConfig = urlParams.get('config')
-        // Existing config.
-        if (encodedConfig) {
-            console.log('Loading vehicle from shared url.')
-            const jsonString = decodeURIComponent(encodedConfig)
-            const config = JSON.parse(jsonString)
-            // Overwrite current vehicle from URL parameter.
-            setVehicle(config)
-            // Clear current saved vehicle.
-            setSavedVehicles((prevSavedVehicles) => ({
-                ...prevSavedVehicles,
-                current: null,
-            }))
-            // Clear URL parameters.
-            window.history.replaceState({}, '', window.location.pathname)
-        }
-    }, [])
+        loadVehicleFromUrl()
+    }, [loadVehicleFromUrl])
 
     return (
         <div className='App'>
             <Header>
-                <VehicleTitle savedVehicles={savedVehicles} setSavedVehicles={setSavedVehicles} setVehicle={setVehicle} />
+                <VehicleTitle />
             </Header>
-            <Canvas currentVehicle={currentVehicle} setVehicle={setVehicle} />
-            <Editor isActive={true} currentVehicle={currentVehicle} setVehicle={setVehicle} />
-            <Actions currentVehicle={currentVehicle} savedVehicles={savedVehicles} setSavedVehicles={setSavedVehicles} />
+            <Canvas />
+            <Editor isActive={true} />
+            <Actions />
         </div>
     )
 }
