@@ -1,5 +1,4 @@
 import { Environment, AccumulativeShadows, RandomizedLight } from '@react-three/drei'
-import { BackSide } from 'three'
 import Ground from './Ground'
 import TerrainManager from './TerrainManager'
 
@@ -10,10 +9,7 @@ export default function SceneEnvironment({ performanceDegraded }) {
         <>
             <ambientLight intensity={0.5} />
 
-            <mesh name='Sky'>
-                <boxGeometry args={[256, 256, 256]} />
-                <meshBasicMaterial color={0xffffff} side={BackSide} toneMapped={false} />
-            </mesh>
+            <fog attach='fog' args={['white', 80, 160]} />
 
             <Environment files={['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png']} path={'assets/images/envmap/'} />
 
