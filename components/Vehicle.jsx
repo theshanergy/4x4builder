@@ -209,8 +209,8 @@ const Vehicle = () => {
             position: new Vector3(...wheel.position),
             suspensionDirection: new Vector3(0, -1, 0),
             maxSuspensionTravel: 0.3,
-            suspensionRestLength: 0.125,
-            suspensionStiffness: 24,
+            suspensionRestLength: 0.1,
+            suspensionStiffness: 28,
             radius: (tire_diameter * 2.54) / 100 / 2,
         }))
     }, [offset, axleHeight, wheelbase, tire_diameter])
@@ -254,7 +254,7 @@ const Vehicle = () => {
 
     return (
         <RigidBody ref={chassisRef} type='dynamic' colliders={false} position-y={vehicleHeight + 0.5} canSleep={false}>
-            <CuboidCollider args={[1, 0.5, 2]} position={[0, 1, 0]} />
+            <CuboidCollider args={[1, 0.5, (wheelbase / 2) + axleHeight]} position={[0, 1, 0]} />
             <group name='Vehicle'>
                 <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
                 <Wheels

@@ -38,6 +38,8 @@ export const useVehiclePhysics = (vehicleRef, wheels, config = {}) => {
             vehicle.addWheel(wheel.position, wheel.suspensionDirection || VECTORS.DOWN, wheel.axleCs || VECTORS.RIGHT, wheel.suspensionRestLength || 0.05, wheel.radius)
             vehicle.setWheelSuspensionStiffness(index, wheel.suspensionStiffness || 20)
             vehicle.setWheelMaxSuspensionTravel(index, wheel.maxSuspensionTravel || 0.23)
+            vehicle.setWheelSuspensionCompression(index, wheel.suspensionCompression || 2.3)
+            vehicle.setWheelSuspensionRelaxation(index, wheel.suspensionRebound || 3.4)
         })
 
         // Store controller reference
