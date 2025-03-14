@@ -10,20 +10,18 @@ export default function SceneEnvironment({ performanceDegraded }) {
         <>
             <ambientLight intensity={0.5} />
 
+            <mesh name='Sky'>
+                <boxGeometry args={[256, 256, 256]} />
+                <meshBasicMaterial color={0xffffff} side={BackSide} toneMapped={false} />
+            </mesh>
+
+            <Environment files={['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png']} path={'assets/images/envmap/'} />
+
             {PHYSICS ? (
-                <>
-                    <TerrainManager />
-                    <Environment files='assets/images/envmap/sky.hdr' background />
-                </>
+                <TerrainManager />
             ) : (
                 <>
                     <Ground />
-                    <mesh name='Sky'>
-                        <boxGeometry args={[256, 256, 256]} />
-                        <meshBasicMaterial color={0xffffff} side={BackSide} toneMapped={false} />
-                    </mesh>
-
-                    <Environment files={['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png']} path={'assets/images/envmap/'} />
 
                     {!performanceDegraded && (
                         <AccumulativeShadows temporal scale={10}>
