@@ -1,10 +1,14 @@
 import { Environment, AccumulativeShadows, RandomizedLight } from '@react-three/drei'
-import Ground from './Ground'
+
+import useGameStore from '../store/gameStore'
 import TerrainManager from './TerrainManager'
+import Ground from './Ground'
 
 const PHYSICS = true
 
-export default function SceneEnvironment({ performanceDegraded }) {
+export default function SceneEnvironment() {
+    const performanceDegraded = useGameStore((state) => state.performanceDegraded)
+
     return (
         <>
             <ambientLight intensity={0.5} />

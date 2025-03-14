@@ -1,8 +1,10 @@
-import React, { useState, useEffect, Suspense } from 'react'
+import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor, KeyboardControls } from '@react-three/drei'
-import { DefaultLoadingManager } from 'three'
 import { Physics } from '@react-three/rapier'
+
+import useLoadingManager from '../hooks/useLoadingManager'
+import useGameStore from '../store/gameStore'
 import Environment from './Environment'
 import CameraControls from './CameraControls'
 import Loader from './Loader'
@@ -19,28 +21,15 @@ const keyMap = [
 
 // Canvas component
 const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
-    const [isLoaded, setIsLoaded] = useState(false)
-    const [performanceDegraded, setPerformanceDegraded] = useState(false)
+    const sceneLoaded = useGameStore((state) => state.sceneLoaded)
+    const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
 
-    // Set loaded state based on default loading manager.
-    useEffect(() => {
-        const loadingManager = DefaultLoadingManager
-        loadingManager.onStart = () => {
-            setIsLoaded(false)
-        }
-        loadingManager.onLoad = () => {
-            setIsLoaded(true)
-        }
-
-        return () => {
-            loadingManager.onStart = null
-            loadingManager.onLoad = null
-        }
-    }, [])
+    // Use loading manager
+    useLoadingManager()
 
     return (
         <div id='vehicle'>
-            {!isLoaded && <Loader />}
+            {!sceneLoaded && <Loader />}
             <KeyboardControls map={keyMap}>
                 <Canvas shadows>
                     <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
@@ -52,7 +41,7 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
                             <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
                         </Suspense>
 
-                        <Environment performanceDegraded={performanceDegraded} />
+                        <Environment />
                     </Physics>
 
                     <Screenshot />
