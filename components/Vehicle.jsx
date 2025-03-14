@@ -159,6 +159,13 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
     const chassisRef = useRef(null)
     const wheelRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
 
+    // When chassisRef is set, set the vehicle object
+    useEffect(() => {
+        if (chassisRef.current) {
+            setVehicle({ ref: chassisRef.current })
+        }
+    }, [chassisRef.current])
+
     // Get keyboard controls
     const [, getKeys] = useKeyboardControls()
 

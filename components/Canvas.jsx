@@ -1,9 +1,10 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, PerformanceMonitor, KeyboardControls } from '@react-three/drei'
+import { PerspectiveCamera, PerformanceMonitor, KeyboardControls } from '@react-three/drei'
 import { DefaultLoadingManager } from 'three'
 import { Physics } from '@react-three/rapier'
 import Environment from './Environment'
+import ChaseCam from './ChaseCam'
 import Loader from './Loader'
 import Vehicle from './Vehicle'
 import Screenshot from './Screenshot'
@@ -43,16 +44,7 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
             <Canvas shadows>
                 <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 
-                <OrbitControls
-                    makeDefault
-                    target={[0, 0.95, 0]}
-                    minDistance={4}
-                    maxDistance={12}
-                    maxPolarAngle={Math.PI / 2}
-                    autoRotate={cameraAutoRotate}
-                    autoRotateSpeed={-0.3}
-                    dampingFactor={0.025}
-                />
+                <ChaseCam target={currentVehicle.ref} autoRotate={cameraAutoRotate} />
 
                 <PerspectiveCamera makeDefault fov={24} position={[-4, 1.5, 6.5]}>
                     <pointLight position={[4, 2, 4]} intensity={0.75} />
