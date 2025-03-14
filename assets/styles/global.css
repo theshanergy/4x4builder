@@ -208,8 +208,6 @@ input[type='color']::-webkit-color-swatch {
     overflow-x: hidden;
     background: rgba(0, 0, 0, 0.8);
     box-shadow: 0 0 1px #aaa;
-    -webkit-box-shadow: 0 0 1px #aaa;
-    transition: 0.5s;
     color: #ccc;
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
