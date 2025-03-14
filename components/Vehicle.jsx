@@ -103,8 +103,8 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 
     return (
         <group name='Wheels'>
-            {wheelTransforms.map((transform) => (
-                <group {...transform}>
+            {wheelTransforms.map(({ key, ...transform }) => (
+                <group key={key} {...transform}>
                     <primitive name='Rim' object={rimGltf.scene.clone()} scale={[odScale, odScale, widthScale]} />
                     <mesh name='Tire' geometry={tireGeometry} castShadow>
                         <meshStandardMaterial color='#121212' />

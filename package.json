@@ -11,18 +11,18 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@react-three/drei": "^9.96.5",
-        "@react-three/fiber": "^8.15.15",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
-        "sweetalert2": "^11.10.4",
-        "three": "^0.160.1",
-        "vite-plugin-svgr": "^4.2.0"
+        "@react-three/drei": "^10.0.4",
+        "@react-three/fiber": "^9.1.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "sweetalert2": "^11.17.2",
+        "three": "^0.174.0",
+        "vite-plugin-svgr": "^4.3.0"
     },
     "devDependencies": {
-        "@types/react": "^18.2.48",
-        "@types/react-dom": "^18.2.18",
-        "@vitejs/plugin-react": "^4.2.1",
-        "vite": "^5.0.12"
+        "@types/react": "^19.0.10",
+        "@types/react-dom": "^19.0.4",
+        "@vitejs/plugin-react": "^4.3.4",
+        "vite": "^6.2.1"
     }
 }
