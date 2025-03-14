@@ -6,16 +6,31 @@ import { Noise } from 'noisejs'
 import { RigidBody, TrimeshCollider } from '@react-three/rapier'
 
 // Default terrain configuration
-export const DEFAULT_TERRAIN_CONFIG = {
-    viewDistance: 200,
+const DEFAULT_TERRAIN_CONFIG = {
+    viewDistance: 160,
     tileSize: 32,
     resolution: 32,
-    smoothness: 10,
+    smoothness: 15,
     maxHeight: 2,
 }
 
 // TerrainTile component
-const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, noise, textures }) => {
+const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, noise }) => {
+    // Load textures once for all tiles
+    const textures = useTexture({
+        map: 'assets/images/ground/dirt_01.png',
+        normalMap: 'assets/images/ground/dirt_01_nrm.png',
+    })
+
+    // Apply texture settings
+    useMemo(() => {
+        const textureRepeat = tileSize / 3
+        Object.values(textures).forEach((texture) => {
+            texture.wrapS = texture.wrapT = RepeatWrapping
+            texture.repeat.set(textureRepeat, textureRepeat)
+        })
+    }, [textures])
+
     // Generate geometry for this tile
     const geometry = useMemo(() => {
         const step = tileSize / (resolution - 1)
@@ -104,8 +119,8 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 }
 
 // Main TerrainManager component
-const TerrainManager = ({ terrainConfig = DEFAULT_TERRAIN_CONFIG }) => {
-    const { viewDistance, tileSize, resolution, smoothness, maxHeight } = terrainConfig
+const TerrainManager = () => {
+    const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
     const { camera } = useThree()
     const [activeTiles, setActiveTiles] = useState([])
     const loadedTiles = useRef(new Map())
@@ -113,22 +128,8 @@ const TerrainManager = ({ terrainConfig = DEFAULT_TERRAIN_CONFIG }) => {
     const tilesInViewDistance = Math.ceil(viewDistance / tileSize)
     const lastTileCoord = useRef({ x: null, z: null })
 
-    // Load textures once for all tiles
-    const textures = useTexture({
-        map: 'assets/images/ground/dirt_01.png',
-        normalMap: 'assets/images/ground/dirt_01_nrm.png',
-    })
-
     // Generate noise instance
     const noise = useMemo(() => new Noise(seed.current), [])
-
-    // Apply texture settings
-    useMemo(() => {
-        Object.values(textures).forEach((texture) => {
-            texture.wrapS = texture.wrapT = RepeatWrapping
-            texture.repeat.set(4, 4)
-        })
-    }, [textures])
 
     // Update tiles based on camera position
     useFrame(() => {
@@ -193,16 +194,7 @@ const TerrainManager = ({ terrainConfig = DEFAULT_TERRAIN_CONFIG }) => {
     return (
         <group name='TerrainManager'>
             {activeTiles.map(([key, position]) => (
-                <TerrainTile
-                    key={key}
-                    position={position}
-                    tileSize={tileSize}
-                    resolution={resolution}
-                    smoothness={smoothness}
-                    maxHeight={maxHeight}
-                    noise={noise}
-                    textures={textures}
-                />
+                <TerrainTile key={key} position={position} tileSize={tileSize} resolution={resolution} smoothness={smoothness} maxHeight={maxHeight} noise={noise} />
             ))}
         </group>
     )
