@@ -2,6 +2,7 @@ import React from 'react'
 
 import vehicleConfigs from '../vehicleConfigs'
 import EditorSection from './EditorSection'
+import useGameStore from '../store/gameStore'
 
 import VehicleIcon from '../assets/images/icons/Vehicle.svg'
 import RimIcon from '../assets/images/icons/Rim.svg'
@@ -10,8 +11,11 @@ import ToolIcon from '../assets/images/icons/Tool.svg'
 import GearIcon from '../assets/images/icons/Gear.svg'
 
 function Editor(props) {
+    const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
+    const setCameraAutoRotate = useGameStore((state) => state.setCameraAutoRotate)
+
     // Get props.
-    const { isActive, currentVehicle = { id: null }, setVehicle, cameraAutoRotate, setCameraAutoRotate } = props
+    const { isActive, currentVehicle = { id: null }, setVehicle } = props
 
     // Check if current vehicle has addons.
     function addonsExist() {

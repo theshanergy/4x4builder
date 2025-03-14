@@ -20,7 +20,7 @@ const keyMap = [
 ]
 
 // Canvas component
-const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
+const ThreeCanvas = ({ currentVehicle, setVehicle }) => {
     const sceneLoaded = useGameStore((state) => state.sceneLoaded)
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
 
@@ -34,7 +34,7 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
                 <Canvas shadows>
                     <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 
-                    <CameraControls autoRotate={cameraAutoRotate} />
+                    <CameraControls />
 
                     <Physics>
                         <Suspense fallback={null}>

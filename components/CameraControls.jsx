@@ -6,8 +6,9 @@ import { Vector3, Raycaster } from 'three'
 import useGameStore from '../store/gameStore'
 
 // Camera controls and chase cam logic
-const CameraControls = ({ autoRotate = false, followSpeed = 0.1, minGroundDistance = 0.5 }) => {
+const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
     const targetPosition = useGameStore((state) => state.cameraTarget)
+    const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 
     const { camera, scene } = useThree()
     const cameraControlsRef = useRef()
@@ -69,7 +70,7 @@ const CameraControls = ({ autoRotate = false, followSpeed = 0.1, minGroundDistan
                 maxDistance={16}
                 minPolarAngle={Math.PI / 6} // Prevent camera from going below the ground
                 maxPolarAngle={Math.PI / 2} // Prevent camera from going above the target
-                autoRotate={autoRotate}
+                autoRotate={cameraAutoRotate}
                 autoRotateSpeed={-0.3}
             />
             <PerspectiveCamera makeDefault fov={24} position={[-4, 1.5, 6.5]}>
