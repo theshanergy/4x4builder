@@ -21,101 +21,92 @@ const Model = memo(({ path, ...props }) => {
 })
 
 // Wheels.
-const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, offset, wheelbase, axleHeight, color, roughness, wheelRefs }) => {
-    const { setObjectMaterials } = useMaterialProperties()
+const Wheels = memo(
+    ({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, offset, wheelbase, axleHeight, color, roughness, wheelPositions, wheelRefs }) => {
+        const { setObjectMaterials } = useMaterialProperties()
 
-    // Load models.
-    const rimGltf = useGLTF(vehicleConfigs.wheels.rims[rim].model)
-    const tireGltf = useGLTF(vehicleConfigs.wheels.tires[tire].model)
+        // Load models.
+        const rimGltf = useGLTF(vehicleConfigs.wheels.rims[rim].model)
+        const tireGltf = useGLTF(vehicleConfigs.wheels.tires[tire].model)
 
-    // Scale tires.
-    const tireGeometry = useMemo(() => {
-        // Determine y scale as a percentage of width.
-        const wheelWidth = (rim_width * 2.54) / 100
-        const wheelWidthScale = wheelWidth / vehicleConfigs.wheels.tires[tire].width
+        // Scale tires.
+        const tireGeometry = useMemo(() => {
+            // Determine y scale as a percentage of width.
+            const wheelWidth = (rim_width * 2.54) / 100
+            const wheelWidthScale = wheelWidth / vehicleConfigs.wheels.tires[tire].width
 
-        const tireOD = vehicleConfigs.wheels.tires[tire].od / 2
-        const tireID = vehicleConfigs.wheels.tires[tire].id / 2
+            const tireOD = vehicleConfigs.wheels.tires[tire].od / 2
+            const tireID = vehicleConfigs.wheels.tires[tire].id / 2
 
-        const newOd = (tire_diameter * 2.54) / 10 / 2
-        const newId = (rim_diameter * 2.54) / 10 / 2
+            const newOd = (tire_diameter * 2.54) / 10 / 2
+            const newId = (rim_diameter * 2.54) / 10 / 2
 
-        // Create a copy of the original geometry.
-        const geometry = tireGltf.scene.children[0].geometry.clone()
+            // Create a copy of the original geometry.
+            const geometry = tireGltf.scene.children[0].geometry.clone()
 
-        // Scale to match wheel width.
-        geometry.scale(1, 1, wheelWidthScale)
+            // Scale to match wheel width.
+            geometry.scale(1, 1, wheelWidthScale)
 
-        // Get position attributes.
-        const positionAttribute = geometry.getAttribute('position')
-        const positionArray = positionAttribute.array
+            // Get position attributes.
+            const positionAttribute = geometry.getAttribute('position')
+            const positionArray = positionAttribute.array
 
-        // Loop through vertices.
-        for (var i = 0, l = positionAttribute.count; i < l; i++) {
-            // Start vector.
-            let startVector = new Vector3().fromBufferAttribute(positionAttribute, i)
+            // Loop through vertices.
+            for (var i = 0, l = positionAttribute.count; i < l; i++) {
+                // Start vector.
+                let startVector = new Vector3().fromBufferAttribute(positionAttribute, i)
 
-            // Center vector.
-            let centerVector = new Vector3(0, 0, startVector.z)
+                // Center vector.
+                let centerVector = new Vector3(0, 0, startVector.z)
 
-            // Distance from center.
-            let centerDist = centerVector.distanceTo(startVector)
+                // Distance from center.
+                let centerDist = centerVector.distanceTo(startVector)
 
-            // Distance from rim.
-            let rimDist = centerDist - tireID
+                // Distance from rim.
+                let rimDist = centerDist - tireID
 
-            // Percentage from rim.
-            let percentOut = rimDist / (tireOD - tireID)
+                // Percentage from rim.
+                let percentOut = rimDist / (tireOD - tireID)
 
-            // New distance from center.
-            let newRimDist = (percentOut * (newOd - newId) + newId) / 10
+                // New distance from center.
+                let newRimDist = (percentOut * (newOd - newId) + newId) / 10
 
-            // End vector.
-            let setVector = linePoint(centerVector, startVector, newRimDist)
+                // End vector.
+                let setVector = linePoint(centerVector, startVector, newRimDist)
 
-            // Set x,y
-            positionArray[i * 3] = setVector.x
-            positionArray[i * 3 + 1] = setVector.y
-        }
+                // Set x,y
+                positionArray[i * 3] = setVector.x
+                positionArray[i * 3 + 1] = setVector.y
+            }
 
-        return geometry
-    }, [tireGltf.scene.children, rim_diameter, rim_width, tire, tire_diameter])
+            return geometry
+        }, [tireGltf.scene.children, rim_diameter, rim_width, tire, tire_diameter])
 
-    // Calculate rim scale as a percentage of diameter.
-    const odScale = useMemo(() => ((rim_diameter * 2.54) / 100 + 0.03175) / vehicleConfigs.wheels.rims[rim].od, [rim, rim_diameter])
+        // Calculate rim scale as a percentage of diameter.
+        const odScale = useMemo(() => ((rim_diameter * 2.54) / 100 + 0.03175) / vehicleConfigs.wheels.rims[rim].od, [rim, rim_diameter])
 
-    // Calculate rim width.
-    const widthScale = useMemo(() => (rim_width * 2.54) / 100 / vehicleConfigs.wheels.rims[rim].width, [rim, rim_width])
+        // Calculate rim width.
+        const widthScale = useMemo(() => (rim_width * 2.54) / 100 / vehicleConfigs.wheels.rims[rim].width, [rim, rim_width])
 
-    // Set rim color.
-    useEffect(() => {
-        setObjectMaterials(rimGltf.scene, color, roughness, rim_color, rim_color_secondary)
-    }, [rimGltf.scene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
+        // Set rim color.
+        useEffect(() => {
+            setObjectMaterials(rimGltf.scene, color, roughness, rim_color, rim_color_secondary)
+        }, [rimGltf.scene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
 
-    // Build wheel transforms.
-    const wheelTransforms = useMemo(() => {
-        const rotation = (Math.PI * 90) / 180
-        return [
-            { key: 'FL', name: 'FL', position: [offset, axleHeight, wheelbase / 2], rotation: [0, rotation, 0] },
-            { key: 'FR', name: 'FR', position: [-offset, axleHeight, wheelbase / 2], rotation: [0, -rotation, 0] },
-            { key: 'RL', name: 'RL', position: [offset, axleHeight, -wheelbase / 2], rotation: [0, rotation, 0] },
-            { key: 'RR', name: 'RR', position: [-offset, axleHeight, -wheelbase / 2], rotation: [0, -rotation, 0] },
-        ]
-    }, [offset, axleHeight, wheelbase])
-
-    return (
-        <group name='Wheels'>
-            {wheelTransforms.map(({ key, ...transform }, index) => (
-                <group key={key} ref={wheelRefs[index]} {...transform}>
-                    <primitive name='Rim' object={rimGltf.scene.clone()} scale={[odScale, odScale, widthScale]} />
-                    <mesh name='Tire' geometry={tireGeometry} castShadow>
-                        <meshStandardMaterial color='#121212' />
-                    </mesh>
-                </group>
-            ))}
-        </group>
-    )
-})
+        return (
+            <group name='Wheels'>
+                {wheelPositions.map(({ key, ...transform }, index) => (
+                    <group key={key} ref={wheelRefs[index]} {...transform}>
+                        <primitive name='Rim' object={rimGltf.scene.clone()} scale={[odScale, odScale, widthScale]} />
+                        <mesh name='Tire' geometry={tireGeometry} castShadow>
+                            <meshStandardMaterial color='#121212' />
+                        </mesh>
+                    </group>
+                ))}
+            </group>
+        )
+    }
+)
 
 // Body.
 const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
@@ -164,38 +155,39 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
     const { id, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, addons } = currentVehicle
     const chassisRef = useRef(null)
     const wheelRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
-    
+
     // Get keyboard controls
     const [, getKeys] = useKeyboardControls()
 
     // Get wheel (axle) height
     const axleHeight = useMemo(() => (tire_diameter * 2.54) / 100 / 2, [tire_diameter])
-    
+
     // Get lift height in meters
     const liftHeight = useMemo(() => ((lift || 0) * 2.54) / 100, [lift])
-    
+
     // Get vehicle height
     const vehicleHeight = useMemo(() => axleHeight + liftHeight, [axleHeight, liftHeight])
-    
+
     const offset = vehicleConfigs.vehicles[id]['wheel_offset'] + parseFloat(wheel_offset)
     const wheelbase = vehicleConfigs.vehicles[id]['wheelbase']
-    
+
     // Physics constants
     const FORCES = { accelerate: 30, brake: 0.5, steerAngle: Math.PI / 6 }
-    
+
+    const rotation = (Math.PI * 90) / 180
+    const wheelPositions = [
+        { key: 'FL', name: 'FL', position: [offset, axleHeight, wheelbase / 2], rotation: [0, rotation, 0] },
+        { key: 'FR', name: 'FR', position: [-offset, axleHeight, wheelbase / 2], rotation: [0, -rotation, 0] },
+        { key: 'RL', name: 'RL', position: [offset, axleHeight, -wheelbase / 2], rotation: [0, rotation, 0] },
+        { key: 'RR', name: 'RR', position: [-offset, axleHeight, -wheelbase / 2], rotation: [0, -rotation, 0] },
+    ]
+
     // Create wheel configurations
-    const wheels = useMemo(() => {
-        const wheelPositions = [
-            [offset, axleHeight, wheelbase / 2],       // front left
-            [-offset, axleHeight, wheelbase / 2],      // front right
-            [offset, axleHeight, -wheelbase / 2],      // rear left
-            [-offset, axleHeight, -wheelbase / 2],     // rear right
-        ]
-        
-        return wheelPositions.map((pos, i) => ({
+    const physicsWheels = useMemo(() => {
+        return wheelPositions.map((wheel, i) => ({
             ref: wheelRefs[i],
             axleCs: new Vector3(1, 0, 0),
-            position: new Vector3(...pos),
+            position: new Vector3(...wheel.position),
             suspensionDirection: new Vector3(0, -1, 0),
             maxSuspensionTravel: 0.3,
             suspensionRestLength: 0.125,
@@ -203,27 +195,32 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
             radius: (tire_diameter * 2.54) / 100 / 2,
         }))
     }, [offset, axleHeight, wheelbase, tire_diameter])
-    
+
     // Use vehicle physics
-    const { applyEngineForce, applySteering, applyBrake } = useVehiclePhysics(chassisRef, wheels)
-    
+    const { applyEngineForce, applySteering, applyBrake } = useVehiclePhysics(chassisRef, physicsWheels)
+
     // Apply input forces each frame
     useFrame(() => {
         const { forward, backward, left, right, brake } = getKeys()
-        
+
         // Calculate forces
         const engineForce = (forward ? FORCES.accelerate : 0) + (backward ? -FORCES.accelerate : 0)
         const steerForce = (left ? -FORCES.steerAngle : 0) + (right ? FORCES.steerAngle : 0)
         const brakeForce = brake ? FORCES.brake : 0
-        
-        // Apply forces to wheels
+
+        // Front wheels steering
         for (let i = 0; i < 2; i++) {
-            applyEngineForce(i, engineForce)  // Front wheels: engine
-            applySteering(i, steerForce)      // Front wheels: steering
+            applySteering(i, steerForce)
         }
-        
+
+        // Rear wheels driving
+        for (let i = 2; i < 4; i++) {
+            applyEngineForce(i, engineForce)
+        }
+
+        // All wheels braking
         for (let i = 0; i < 4; i++) {
-            applyBrake(i, brakeForce)         // All wheels: braking
+            applyBrake(i, brakeForce)
         }
     })
 
@@ -245,6 +242,7 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
                     wheelbase={wheelbase}
                     color={color}
                     roughness={roughness}
+                    wheelPositions={wheelPositions}
                     wheelRefs={wheelRefs}
                 />
             </group>
