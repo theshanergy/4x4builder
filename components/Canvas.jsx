@@ -9,15 +9,7 @@ import Loader from './Loader'
 import Vehicle from './Vehicle'
 import Screenshot from './Screenshot'
 
-// Keyboard controls map
-const CONTROLS = {
-    forward: 'forward',
-    backward: 'backward',
-    left: 'left',
-    right: 'right',
-    brake: 'brake',
-}
-
+// Canvas component
 const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
     const [isLoaded, setIsLoaded] = useState(false)
     const [performanceDegraded, setPerformanceDegraded] = useState(false)
@@ -52,11 +44,11 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
 
                 <KeyboardControls
                     map={[
-                        { name: CONTROLS.forward, keys: ['ArrowUp', 'w', 'W'] },
-                        { name: CONTROLS.backward, keys: ['ArrowDown', 's', 'S'] },
-                        { name: CONTROLS.left, keys: ['ArrowLeft', 'a', 'A'] },
-                        { name: CONTROLS.right, keys: ['ArrowRight', 'd', 'D'] },
-                        { name: CONTROLS.brake, keys: ['Space'] },
+                        { name: 'forward', keys: ['ArrowUp', 'w', 'W'] },
+                        { name: 'backward', keys: ['ArrowDown', 's', 'S'] },
+                        { name: 'left', keys: ['ArrowLeft', 'a', 'A'] },
+                        { name: 'right', keys: ['ArrowRight', 'd', 'D'] },
+                        { name: 'brake', keys: ['Space'] },
                     ]}>
                     <Physics>
                         <Suspense fallback={null}>
