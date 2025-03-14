@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import useAnimateHeight from '../hooks/useAnimateHeight'
 import useVehiclePhysics from '../hooks/useVehiclePhysics'
+import { useCameraContext } from '../context/CameraContext'
 import vehicleConfigs from '../vehicleConfigs'
 import useMaterialProperties from '../hooks/useMaterialProperties'
 
@@ -159,12 +160,20 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
     const chassisRef = useRef(null)
     const wheelRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
 
-    // When chassisRef is set, set the vehicle object
-    useEffect(() => {
+    // Get the chase camera target ref from context
+    const { targetRef } = useCameraContext()
+
+    // Update the chase camera target when the chassis position changes
+    useFrame(() => {
         if (chassisRef.current) {
-            setVehicle({ ref: chassisRef.current })
+            // Set the target position to the chassis position
+            targetRef.current = {
+                x: chassisRef.current.translation().x,
+                y: chassisRef.current.translation().y + 0.95,
+                z: chassisRef.current.translation().z,
+            }
         }
-    }, [chassisRef.current])
+    })
 
     // Get keyboard controls
     const [, getKeys] = useKeyboardControls()

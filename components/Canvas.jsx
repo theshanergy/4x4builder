@@ -1,13 +1,22 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { PerspectiveCamera, PerformanceMonitor, KeyboardControls } from '@react-three/drei'
+import { PerformanceMonitor, KeyboardControls } from '@react-three/drei'
 import { DefaultLoadingManager } from 'three'
 import { Physics } from '@react-three/rapier'
 import Environment from './Environment'
-import ChaseCam from './ChaseCam'
+import { CameraProvider } from '../context/CameraContext'
+import CameraControls from './CameraControls'
 import Loader from './Loader'
 import Vehicle from './Vehicle'
 import Screenshot from './Screenshot'
+
+const keyMap = [
+    { name: 'forward', keys: ['ArrowUp', 'w', 'W'] },
+    { name: 'backward', keys: ['ArrowDown', 's', 'S'] },
+    { name: 'left', keys: ['ArrowLeft', 'a', 'A'] },
+    { name: 'right', keys: ['ArrowRight', 'd', 'D'] },
+    { name: 'brake', keys: ['Space'] },
+]
 
 // Canvas component
 const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
@@ -33,34 +42,25 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
     return (
         <div id='vehicle'>
             {!isLoaded && <Loader />}
-            <Canvas shadows>
-                <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
+            <KeyboardControls map={keyMap}>
+                <CameraProvider>
+                    <Canvas shadows>
+                        <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 
-                <ChaseCam target={currentVehicle.ref} autoRotate={cameraAutoRotate} />
+                        <CameraControls autoRotate={cameraAutoRotate} />
 
-                <PerspectiveCamera makeDefault fov={24} position={[-4, 1.5, 6.5]}>
-                    <pointLight position={[4, 2, 4]} intensity={0.75} />
-                </PerspectiveCamera>
+                        <Physics>
+                            <Suspense fallback={null}>
+                                <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
+                            </Suspense>
 
-                <KeyboardControls
-                    map={[
-                        { name: 'forward', keys: ['ArrowUp', 'w', 'W'] },
-                        { name: 'backward', keys: ['ArrowDown', 's', 'S'] },
-                        { name: 'left', keys: ['ArrowLeft', 'a', 'A'] },
-                        { name: 'right', keys: ['ArrowRight', 'd', 'D'] },
-                        { name: 'brake', keys: ['Space'] },
-                    ]}>
-                    <Physics>
-                        <Suspense fallback={null}>
-                            <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
-                        </Suspense>
+                            <Environment performanceDegraded={performanceDegraded} />
+                        </Physics>
 
-                        <Environment performanceDegraded={performanceDegraded} />
-                    </Physics>
-                </KeyboardControls>
-
-                <Screenshot />
-            </Canvas>
+                        <Screenshot />
+                    </Canvas>
+                </CameraProvider>
+            </KeyboardControls>
         </div>
     )
 }
