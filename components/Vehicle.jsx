@@ -241,7 +241,7 @@ const Vehicle = ({ currentVehicle, setVehicle }) => {
     })
 
     return (
-        <RigidBody ref={chassisRef} type='dynamic' colliders={false} position={[0, vehicleHeight + 0.5, 0]} canSleep={false}>
+        <RigidBody ref={chassisRef} type='dynamic' colliders={false} position-y={vehicleHeight + 0.5} canSleep={false}>
             <CuboidCollider args={[1, 0.5, 2]} position={[0, 1, 0]} />
             <group name='Vehicle'>
                 <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
