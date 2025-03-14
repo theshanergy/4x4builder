@@ -1,11 +1,21 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, PerformanceMonitor } from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera, PerformanceMonitor, KeyboardControls } from '@react-three/drei'
 import { DefaultLoadingManager } from 'three'
+import { Physics } from '@react-three/rapier'
 import Environment from './Environment'
 import Loader from './Loader'
 import Vehicle from './Vehicle'
 import Screenshot from './Screenshot'
+
+// Keyboard controls map
+const CONTROLS = {
+    forward: 'forward',
+    backward: 'backward',
+    left: 'left',
+    right: 'right',
+    brake: 'brake',
+}
 
 const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
     const [isLoaded, setIsLoaded] = useState(false)
@@ -48,11 +58,22 @@ const ThreeCanvas = ({ currentVehicle, setVehicle, cameraAutoRotate }) => {
                     <pointLight position={[4, 2, 4]} intensity={0.75} />
                 </PerspectiveCamera>
 
-                <Suspense fallback={null}>
-                    <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
-                </Suspense>
+                <KeyboardControls
+                    map={[
+                        { name: CONTROLS.forward, keys: ['ArrowUp', 'w', 'W'] },
+                        { name: CONTROLS.backward, keys: ['ArrowDown', 's', 'S'] },
+                        { name: CONTROLS.left, keys: ['ArrowLeft', 'a', 'A'] },
+                        { name: CONTROLS.right, keys: ['ArrowRight', 'd', 'D'] },
+                        { name: CONTROLS.brake, keys: ['Space'] },
+                    ]}>
+                    <Physics>
+                        <Suspense fallback={null}>
+                            <Vehicle currentVehicle={currentVehicle} setVehicle={setVehicle} />
+                        </Suspense>
 
-                <Environment performanceDegraded={performanceDegraded} />
+                        <Environment performanceDegraded={performanceDegraded} />
+                    </Physics>
+                </KeyboardControls>
 
                 <Screenshot />
             </Canvas>

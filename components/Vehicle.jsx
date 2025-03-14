@@ -1,7 +1,10 @@
 import React, { memo, useMemo, useEffect, useRef } from 'react'
-import { useGLTF } from '@react-three/drei'
+import { useGLTF, useKeyboardControls } from '@react-three/drei'
 import { Vector3 } from 'three'
+import { useFrame } from '@react-three/fiber'
+import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import useAnimateHeight from '../hooks/useAnimateHeight'
+import useVehiclePhysics from '../hooks/useVehiclePhysics'
 import vehicleConfigs from '../vehicleConfigs'
 import useMaterialProperties from '../hooks/useMaterialProperties'
 
@@ -18,7 +21,7 @@ const Model = memo(({ path, ...props }) => {
 })
 
 // Wheels.
-const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, offset, wheelbase, axleHeight, color, roughness }) => {
+const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, offset, wheelbase, axleHeight, color, roughness, wheelRefs }) => {
     const { setObjectMaterials } = useMaterialProperties()
 
     // Load models.
@@ -92,10 +95,9 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
     // Build wheel transforms.
     const wheelTransforms = useMemo(() => {
         const rotation = (Math.PI * 90) / 180
-        const steering = (Math.PI * -10) / 180
         return [
-            { key: 'FL', name: 'FL', position: [offset, axleHeight, wheelbase / 2], rotation: [0, rotation + steering, 0] },
-            { key: 'FR', name: 'FR', position: [-offset, axleHeight, wheelbase / 2], rotation: [0, -rotation + steering, 0] },
+            { key: 'FL', name: 'FL', position: [offset, axleHeight, wheelbase / 2], rotation: [0, rotation, 0] },
+            { key: 'FR', name: 'FR', position: [-offset, axleHeight, wheelbase / 2], rotation: [0, -rotation, 0] },
             { key: 'RL', name: 'RL', position: [offset, axleHeight, -wheelbase / 2], rotation: [0, rotation, 0] },
             { key: 'RR', name: 'RR', position: [-offset, axleHeight, -wheelbase / 2], rotation: [0, -rotation, 0] },
         ]
@@ -103,8 +105,8 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 
     return (
         <group name='Wheels'>
-            {wheelTransforms.map(({ key, ...transform }) => (
-                <group key={key} {...transform}>
+            {wheelTransforms.map(({ key, ...transform }, index) => (
+                <group key={key} ref={wheelRefs[index]} {...transform}>
                     <primitive name='Rim' object={rimGltf.scene.clone()} scale={[odScale, odScale, widthScale]} />
                     <mesh name='Tire' geometry={tireGeometry} castShadow>
                         <meshStandardMaterial color='#121212' />
@@ -157,47 +159,96 @@ const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
     )
 })
 
-// Vehicle.
+// Vehicle component with physics
 const Vehicle = ({ currentVehicle, setVehicle }) => {
     const { id, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, addons } = currentVehicle
+    const chassisRef = useRef(null)
+    const wheelRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
+    
+    // Get keyboard controls
+    const [, getKeys] = useKeyboardControls()
 
-    // Get wheel (axle) height.
-    const axleHeight = useMemo(() => {
-        return (tire_diameter * 2.54) / 100 / 2
-    }, [tire_diameter])
-
-    // Get lift height in meters.
-    const liftHeight = useMemo(() => {
-        const liftInches = lift || 0
-        return (liftInches * 2.54) / 100
-    }, [lift])
-
-    // Get vehicle height.
-    const vehicleHeight = useMemo(() => {
-        return axleHeight + liftHeight
-    }, [axleHeight, liftHeight])
-
+    // Get wheel (axle) height
+    const axleHeight = useMemo(() => (tire_diameter * 2.54) / 100 / 2, [tire_diameter])
+    
+    // Get lift height in meters
+    const liftHeight = useMemo(() => ((lift || 0) * 2.54) / 100, [lift])
+    
+    // Get vehicle height
+    const vehicleHeight = useMemo(() => axleHeight + liftHeight, [axleHeight, liftHeight])
+    
     const offset = vehicleConfigs.vehicles[id]['wheel_offset'] + parseFloat(wheel_offset)
     const wheelbase = vehicleConfigs.vehicles[id]['wheelbase']
+    
+    // Physics constants
+    const FORCES = { accelerate: 30, brake: 0.5, steerAngle: Math.PI / 6 }
+    
+    // Create wheel configurations
+    const wheels = useMemo(() => {
+        const wheelPositions = [
+            [offset, axleHeight, wheelbase / 2],       // front left
+            [-offset, axleHeight, wheelbase / 2],      // front right
+            [offset, axleHeight, -wheelbase / 2],      // rear left
+            [-offset, axleHeight, -wheelbase / 2],     // rear right
+        ]
+        
+        return wheelPositions.map((pos, i) => ({
+            ref: wheelRefs[i],
+            axleCs: new Vector3(1, 0, 0),
+            position: new Vector3(...pos),
+            suspensionDirection: new Vector3(0, -1, 0),
+            maxSuspensionTravel: 0.3,
+            suspensionRestLength: 0.125,
+            suspensionStiffness: 24,
+            radius: (tire_diameter * 2.54) / 100 / 2,
+        }))
+    }, [offset, axleHeight, wheelbase, tire_diameter])
+    
+    // Use vehicle physics
+    const { applyEngineForce, applySteering, applyBrake } = useVehiclePhysics(chassisRef, wheels)
+    
+    // Apply input forces each frame
+    useFrame(() => {
+        const { forward, backward, left, right, brake } = getKeys()
+        
+        // Calculate forces
+        const engineForce = (forward ? FORCES.accelerate : 0) + (backward ? -FORCES.accelerate : 0)
+        const steerForce = (left ? -FORCES.steerAngle : 0) + (right ? FORCES.steerAngle : 0)
+        const brakeForce = brake ? FORCES.brake : 0
+        
+        // Apply forces to wheels
+        for (let i = 0; i < 2; i++) {
+            applyEngineForce(i, engineForce)  // Front wheels: engine
+            applySteering(i, steerForce)      // Front wheels: steering
+        }
+        
+        for (let i = 0; i < 4; i++) {
+            applyBrake(i, brakeForce)         // All wheels: braking
+        }
+    })
 
     return (
-        <group name='Vehicle'>
-            <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
-            <Wheels
-                rim={rim}
-                rim_diameter={rim_diameter}
-                rim_width={rim_width}
-                rim_color={rim_color}
-                rim_color_secondary={rim_color_secondary}
-                tire={tire}
-                tire_diameter={tire_diameter}
-                offset={offset}
-                axleHeight={axleHeight}
-                wheelbase={wheelbase}
-                color={color}
-                roughness={roughness}
-            />
-        </group>
+        <RigidBody ref={chassisRef} type='dynamic' colliders={false} position={[0, vehicleHeight + 0.5, 0]} canSleep={false}>
+            <CuboidCollider args={[1, 0.5, 2]} />
+            <group name='Vehicle'>
+                <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
+                <Wheels
+                    rim={rim}
+                    rim_diameter={rim_diameter}
+                    rim_width={rim_width}
+                    rim_color={rim_color}
+                    rim_color_secondary={rim_color_secondary}
+                    tire={tire}
+                    tire_diameter={tire_diameter}
+                    offset={offset}
+                    axleHeight={axleHeight}
+                    wheelbase={wheelbase}
+                    color={color}
+                    roughness={roughness}
+                    wheelRefs={wheelRefs}
+                />
+            </group>
+        </RigidBody>
     )
 }
 
