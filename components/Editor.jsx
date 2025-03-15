@@ -4,6 +4,7 @@ import vehicleConfigs from '../vehicleConfigs'
 import EditorSection from './EditorSection'
 import useGameStore from '../store/gameStore'
 
+import Drawer from './Drawer'
 import VehicleIcon from '../assets/images/icons/Vehicle.svg'
 import RimIcon from '../assets/images/icons/Rim.svg'
 import TireIcon from '../assets/images/icons/Tire.svg'
@@ -108,7 +109,7 @@ function Editor({ isActive }) {
     }
 
     return (
-        <div id='editor' className='absolute top-1/2 bottom-0 w-full overflow-y-auto overflow-x-hidden bg-black/80 text-gray-400 lg:w-72 lg:top-15 scrollbar-none'>
+        <Drawer id='editor' className='lg:pt-15 bg-black/80 text-gray-400' open={isActive}>
             {/* Vehicle */}
             <EditorSection title='Vehicle' icon={<VehicleIcon className='icon' />} defaultActive={true}>
                 {/* Vehicle */}
@@ -245,7 +246,7 @@ function Editor({ isActive }) {
                     <label htmlFor='physics'>Physics</label>
                 </div>
             </EditorSection>
-        </div>
+        </Drawer>
     )
 }
 

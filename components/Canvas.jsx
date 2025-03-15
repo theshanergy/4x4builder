@@ -30,7 +30,7 @@ const ThreeCanvas = () => {
     useLoadingManager()
 
     return (
-        <div id='vehicle' className='absolute top-0 bottom-1/2 w-full overflow-hidden lg:bottom-0'>
+        <div id='vehicle' className='absolute inset-0 overflow-hidden'>
             {!sceneLoaded && <Loader />}
 
             <KeyboardControls map={keyMap} onChange={() => !physicsEnabled && setPhysicsEnabled(true)}>
