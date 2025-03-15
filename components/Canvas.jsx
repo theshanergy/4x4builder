@@ -30,10 +30,10 @@ const ThreeCanvas = () => {
     useLoadingManager()
 
     return (
-        <div id='vehicle'>
+        <div id='vehicle' className='absolute top-0 bottom-1/2 w-full overflow-hidden lg:bottom-0'>
             {!sceneLoaded && <Loader />}
-            <KeyboardControls map={keyMap} onChange={() => !physicsEnabled && setPhysicsEnabled(true)}>
 
+            <KeyboardControls map={keyMap} onChange={() => !physicsEnabled && setPhysicsEnabled(true)}>
                 <Canvas shadows>
                     <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 

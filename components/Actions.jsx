@@ -95,7 +95,7 @@ const Actions = () => {
     }
 
     return (
-        <div id='actions'>
+        <div id='actions' className='flex gap-2 text-md absolute bottom-2 right-2 md:bottom-5 md:right-5'>
             <button onClick={saveVehicle}>Save</button>
             <button onClick={shareVehicle}>Share</button>
             <button onClick={takeScreenshot}>Screenshot</button>

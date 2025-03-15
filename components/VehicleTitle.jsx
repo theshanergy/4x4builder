@@ -48,7 +48,7 @@ const VehicleTitle = () => {
         <>
             {savedVehicleCount.length > 1 ? (
                 // Show vehicle selector when saved vehicle count is greater than 1.
-                <div className='dropdown' ref={dropdownRef}>
+                <div className='flex items-center h-full relative cursor-pointer' ref={dropdownRef}>
                     <strong onClick={() => setShowDropdown(!showDropdown)}>
                         {title}
                         <svg aria-hidden='true' className='icon' viewBox='0 0 24 24'>
@@ -56,11 +56,11 @@ const VehicleTitle = () => {
                         </svg>
                     </strong>
                     {showDropdown && (
-                        <ul>
+                        <ul className='absolute top-full left-0 min-w-24 p-0 bg-white shadow-md shadow-black/20 z-10'>
                             {Object.entries(savedVehicles).map(([vehicleId, vehicle]) => {
                                 if (vehicleId === 'current') return null
                                 return (
-                                    <li key={vehicleId} onClick={() => handleVehicleSelect(vehicleId)}>
+                                    <li key={vehicleId} onClick={() => handleVehicleSelect(vehicleId)} className='block py-3 px-6 whitespace-nowrap hover:bg-stone-900/10'>
                                         {vehicle.name}
                                     </li>
                                 )

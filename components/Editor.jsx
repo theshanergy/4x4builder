@@ -108,7 +108,7 @@ function Editor({ isActive }) {
     }
 
     return (
-        <div id='editor' className={isActive ? 'visible' : ''}>
+        <div id='editor' className='absolute top-1/2 bottom-0 w-full overflow-y-auto overflow-x-hidden bg-black/80 text-gray-400 lg:w-72 lg:top-15 scrollbar-none'>
             {/* Vehicle */}
             <EditorSection title='Vehicle' icon={<VehicleIcon className='icon' />} defaultActive={true}>
                 {/* Vehicle */}
