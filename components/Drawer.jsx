@@ -1,8 +1,7 @@
 import React, { useState, useRef, useLayoutEffect } from 'react'
 import classNames from 'classnames'
-import Gear from '../assets/images/icons/Gear.svg'
 
-const Drawer = ({ id, open: controlledOpen, defaultOpen = true, onToggle, className = '', children, placement = 'left', label = 'Configure' }) => {
+const Drawer = ({ id, icon, open: controlledOpen, defaultOpen = true, onToggle, className = '', children, placement = 'left', label = 'Configure' }) => {
     const isControlled = controlledOpen !== undefined
     const [internalOpen, setInternalOpen] = useState(defaultOpen)
     const open = isControlled ? controlledOpen : internalOpen
@@ -80,7 +79,7 @@ const Drawer = ({ id, open: controlledOpen, defaultOpen = true, onToggle, classN
                     'flex gap-4 py-4 px-10 absolute bg-black/80 text-white/80 pointer-events-auto cursor-pointer touch-none',
                     isVertical ? 'top-8 left-full rounded-r-lg [writing-mode:vertical-rl]' : 'bottom-full left-8 rounded-t-lg'
                 )}>
-                <Gear className='w-6 h-6' />
+                {icon}
                 <span className='font-semibold'>{label}</span>
             </div>
             <div className={classNames('overflow-y-auto scrollbar-none', isVertical ? 'h-full' : 'h-[50vh]')}>{children}</div>
