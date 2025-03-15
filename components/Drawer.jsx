@@ -66,7 +66,7 @@ const Drawer = ({ id, open: controlledOpen, defaultOpen = true, onToggle, classN
         <div
             id={id}
             ref={drawerRef}
-            className={classNames('fixed bg-black/80 text-gray-400 transform-gpu', isVertical ? 'inset-y-0 left-0 z-50 w-72' : 'inset-x-0 bottom-0 z-50 w-full', className)}
+            className={classNames('fixed bg-black/80 text-gray-400 transform-gpu', isVertical ? 'inset-y-0 left-0 w-72' : 'inset-x-0 bottom-0', className)}
             style={{
                 transform: transformStyle,
                 transition: dragging ? 'none' : 'transform 0.3s ease-in-out',
