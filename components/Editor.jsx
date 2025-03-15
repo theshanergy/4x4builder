@@ -109,7 +109,7 @@ function Editor({ isActive }) {
     }
 
     return (
-        <Drawer id='editor' className='lg:pt-15 bg-black/80 text-gray-400' open={isActive}>
+        <Drawer id='editor' className='lg:pt-15'>
             {/* Vehicle */}
             <EditorSection title='Vehicle' icon={<VehicleIcon className='icon' />} defaultActive={true}>
                 {/* Vehicle */}
