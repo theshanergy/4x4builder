@@ -6,8 +6,10 @@ const useGameStore = create((set, get) => {
     return {
         // Game state
         sceneLoaded: false,
+        physicsEnabled: false,
         performanceDegraded: false,
         setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
+        setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
         setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
 
         // Camera state

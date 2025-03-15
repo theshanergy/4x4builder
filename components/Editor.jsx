@@ -11,9 +11,6 @@ import ToolIcon from '../assets/images/icons/Tool.svg'
 import GearIcon from '../assets/images/icons/Gear.svg'
 
 function Editor({ isActive }) {
-    const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
-    const setCameraAutoRotate = useGameStore((state) => state.setCameraAutoRotate)
-    
     // Get vehicle state from store using granular selectors
     const id = useGameStore((state) => state.currentVehicle?.id) || null
     const color = useGameStore((state) => state.currentVehicle?.color)
@@ -28,13 +25,28 @@ function Editor({ isActive }) {
     const tire = useGameStore((state) => state.currentVehicle?.tire)
     const tire_diameter = useGameStore((state) => state.currentVehicle?.tire_diameter)
     const addons = useGameStore((state) => state.currentVehicle?.addons) || {}
+
     const setVehicle = useGameStore((state) => state.setVehicle)
-    
+    const physicsEnabled = useGameStore((state) => state.physicsEnabled)
+    const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
+    const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
+    const setCameraAutoRotate = useGameStore((state) => state.setCameraAutoRotate)
+
     // Reconstruct currentVehicle for existing code
     const currentVehicle = {
-        id, color, roughness, lift, wheel_offset, rim,
-        rim_color, rim_color_secondary, rim_diameter, rim_width,
-        tire, tire_diameter, addons
+        id,
+        color,
+        roughness,
+        lift,
+        wheel_offset,
+        rim,
+        rim_color,
+        rim_color_secondary,
+        rim_diameter,
+        rim_width,
+        tire,
+        tire_diameter,
+        addons,
     }
 
     // Check if current vehicle has addons.
@@ -225,6 +237,12 @@ function Editor({ isActive }) {
                 <div className='field field-camera-autorotate'>
                     <input type='checkbox' id='camera-autorotate' checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} />
                     <label htmlFor='camera-autorotate'>Auto Rotate</label>
+                </div>
+
+                {/* Physics */}
+                <div className='field field-physics'>
+                    <input type='checkbox' id='physics' checked={physicsEnabled} onChange={(e) => setPhysicsEnabled(e.target.checked)} />
+                    <label htmlFor='physics'>Physics</label>
                 </div>
             </EditorSection>
         </div>

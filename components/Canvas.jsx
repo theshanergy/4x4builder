@@ -22,6 +22,7 @@ const keyMap = [
 // Canvas component
 const ThreeCanvas = () => {
     const sceneLoaded = useGameStore((state) => state.sceneLoaded)
+    const physicsEnabled = useGameStore((state) => state.physicsEnabled)
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
 
     // Use loading manager
@@ -36,7 +37,7 @@ const ThreeCanvas = () => {
 
                     <CameraControls />
 
-                    <Physics>
+                    <Physics paused={!physicsEnabled}>
                         <Suspense fallback={null}>
                             <Vehicle />
                         </Suspense>
