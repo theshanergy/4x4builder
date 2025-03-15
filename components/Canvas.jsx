@@ -23,6 +23,7 @@ const keyMap = [
 const ThreeCanvas = () => {
     const sceneLoaded = useGameStore((state) => state.sceneLoaded)
     const physicsEnabled = useGameStore((state) => state.physicsEnabled)
+    const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
 
     // Use loading manager
@@ -31,7 +32,8 @@ const ThreeCanvas = () => {
     return (
         <div id='vehicle'>
             {!sceneLoaded && <Loader />}
-            <KeyboardControls map={keyMap}>
+            <KeyboardControls map={keyMap} onChange={() => !physicsEnabled && setPhysicsEnabled(true)}>
+
                 <Canvas shadows>
                     <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 
