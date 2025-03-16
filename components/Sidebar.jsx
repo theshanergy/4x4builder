@@ -5,10 +5,10 @@ import Editor from './Editor'
 
 // Sidebar component
 const Sidebar = () => {
-    const [isVertical, setIsVertical] = useState(window.innerWidth > 1080)
+    const [isVertical, setIsVertical] = useState(window.innerWidth >= 1024)
 
     useEffect(() => {
-        const handleResize = () => setIsVertical(window.innerWidth > 1080)
+        const handleResize = () => setIsVertical(window.innerWidth >= 1024)
         window.addEventListener('resize', handleResize)
         return () => window.removeEventListener('resize', handleResize)
     }, [])

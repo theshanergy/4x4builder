@@ -3,6 +3,8 @@ import EditorSection from './EditorSection'
 import useGameStore from '../store/gameStore'
 
 import VehicleIcon from '../assets/images/icons/Vehicle.svg'
+import SuspensionIcon from '../assets/images/icons/Suspension.svg'
+import PaintIcon from '../assets/images/icons/Paint.svg'
 import RimIcon from '../assets/images/icons/Rim.svg'
 import TireIcon from '../assets/images/icons/Tire.svg'
 import ToolIcon from '../assets/images/icons/Tool.svg'
@@ -114,7 +116,10 @@ function Editor() {
                     <label>Model</label>
                     <GroupedSelect value={currentVehicle.id} itemList={vehicleConfigs.vehicles} groupBy={'make'} onChange={(e) => setVehicle({ id: e.target.value })} />
                 </div>
+            </EditorSection>
 
+            {/* Paint */}
+            <EditorSection title='Paint' icon={<PaintIcon className='icon' />}>
                 {/* Paint */}
                 <div className='field field-paint'>
                     <div className='field field-vehicle-color'>
@@ -132,7 +137,10 @@ function Editor() {
                         </select>
                     </div>
                 </div>
+            </EditorSection>
 
+            {/* Suspension */}
+            <EditorSection title='Suspension' icon={<SuspensionIcon className='icon' />}>
                 {/* Vehicle Lift */}
                 <div className='field field-vehicle-lift'>
                     <label>Lift</label>
