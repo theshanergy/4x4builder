@@ -1,17 +1,21 @@
-import React, { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import classNames from 'classnames'
 
-const Drawer = ({ id, icon, open: controlledOpen, defaultOpen = true, onToggle, className = '', children, placement = 'left', label = 'Configure' }) => {
+import HamburgerIcon from '../assets/images/icons/Hamburger.svg'
+import CloseIcon from '../assets/images/icons/Close.svg'
+
+// Drawer component
+const Drawer = ({ id, open: controlledOpen, defaultOpen = true, onToggle, className = '', isVertical = true, children }) => {
+    const drawerRef = useRef(null)
     const isControlled = controlledOpen !== undefined
     const [internalOpen, setInternalOpen] = useState(defaultOpen)
-    const open = isControlled ? controlledOpen : internalOpen
-
+    const [drawerSize, setDrawerSize] = useState(0)
     const [dragging, setDragging] = useState(false)
     const [dragStart, setDragStart] = useState(0)
     const [dragTranslate, setDragTranslate] = useState(null)
-    const drawerRef = useRef(null)
-    const [drawerSize, setDrawerSize] = useState(0)
-    const isVertical = placement === 'left'
+
+    // Get open state
+    const open = isControlled ? controlledOpen : internalOpen
 
     // Get drawer size
     useLayoutEffect(() => {
@@ -59,15 +63,14 @@ const Drawer = ({ id, icon, open: controlledOpen, defaultOpen = true, onToggle, 
 
     // Calculate drawer transform
     const translateValue = dragTranslate ?? (open ? 0 : isVertical ? -drawerSize : drawerSize)
-    const transformStyle = isVertical ? `translateX(${translateValue}px)` : `translateY(${translateValue}px)`
 
     return (
         <div
             id={id}
             ref={drawerRef}
-            className={classNames('fixed bg-black/80 text-gray-400 transform-gpu', isVertical ? 'inset-y-0 left-0 w-72' : 'inset-x-0 bottom-0', className)}
+            className={classNames('fixed bg-black/80 text-gray-400 z-20 transform-gpu', isVertical ? 'inset-y-0 left-0 w-64' : 'inset-x-0 bottom-0', className)}
             style={{
-                transform: transformStyle,
+                transform: isVertical ? `translateX(${translateValue}px)` : `translateY(${translateValue}px)`,
                 transition: dragging ? 'none' : 'transform 0.3s ease-in-out',
             }}>
             <div
@@ -76,11 +79,10 @@ const Drawer = ({ id, icon, open: controlledOpen, defaultOpen = true, onToggle, 
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
                 className={classNames(
-                    'flex gap-4 py-4 px-10 absolute bg-black/80 text-white/80 pointer-events-auto cursor-pointer touch-none',
-                    isVertical ? 'top-8 left-full rounded-r-lg [writing-mode:vertical-rl]' : 'bottom-full left-8 rounded-t-lg'
+                    'absolute flex items-center justify-center h-11 w-11 bg-black/80 text-white/80 rounded pointer-events-auto cursor-pointer touch-none',
+                    isVertical ? 'left-full bottom-4 ml-4' : 'bottom-full left-4 mb-4'
                 )}>
-                {icon}
-                <span className='font-semibold'>{label}</span>
+                {open ? <CloseIcon className='icon' /> : <HamburgerIcon className='icon' />}
             </div>
             <div className={classNames('overflow-y-auto scrollbar-none', isVertical ? 'h-full' : 'h-[50vh]')}>{children}</div>
         </div>

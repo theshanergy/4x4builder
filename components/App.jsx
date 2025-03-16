@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
 
 import useGameStore from '../store/gameStore'
-import VehicleTitle from './VehicleTitle'
+
 import Header from './Header'
-import Editor from './Editor'
+import Sidebar from './Sidebar'
 import Canvas from './Canvas'
 import Actions from './Actions'
 
@@ -18,11 +18,9 @@ export default function App() {
 
     return (
         <div className='App'>
-            <Header>
-                <VehicleTitle />
-            </Header>
+            <Header />
             <Canvas />
-            <Editor isActive={true} />
+            <Sidebar />
             <Actions />
         </div>
     )

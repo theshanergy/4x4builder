@@ -1,17 +1,14 @@
-import React from 'react'
-
 import vehicleConfigs from '../vehicleConfigs'
 import EditorSection from './EditorSection'
 import useGameStore from '../store/gameStore'
 
-import Drawer from './Drawer'
 import VehicleIcon from '../assets/images/icons/Vehicle.svg'
 import RimIcon from '../assets/images/icons/Rim.svg'
 import TireIcon from '../assets/images/icons/Tire.svg'
 import ToolIcon from '../assets/images/icons/Tool.svg'
 import GearIcon from '../assets/images/icons/Gear.svg'
 
-function Editor({ isActive }) {
+function Editor() {
     // Get vehicle state from store using granular selectors
     const id = useGameStore((state) => state.currentVehicle?.id) || null
     const color = useGameStore((state) => state.currentVehicle?.color)
@@ -109,7 +106,7 @@ function Editor({ isActive }) {
     }
 
     return (
-        <Drawer id='editor' icon={<GearIcon className='icon' />} className='lg:top-15'>
+        <div id='editor'>
             {/* Vehicle */}
             <EditorSection title='Vehicle' icon={<VehicleIcon className='icon' />} defaultActive={true}>
                 {/* Vehicle */}
@@ -198,7 +195,7 @@ function Editor({ isActive }) {
 
             {/* Tires */}
             <EditorSection title='Tires' icon={<TireIcon className='icon' />}>
-                <div className='field field-tire-type'>
+                <div className='field field-tire-type flex gap-4'>
                     {/* Tire */}
                     <div className='field field-tire-type'>
                         <label>Type</label>
@@ -246,7 +243,7 @@ function Editor({ isActive }) {
                     <label htmlFor='physics'>Physics</label>
                 </div>
             </EditorSection>
-        </Drawer>
+        </div>
     )
 }
 

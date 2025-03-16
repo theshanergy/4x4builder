@@ -56,11 +56,11 @@ const VehicleTitle = () => {
                         </svg>
                     </strong>
                     {showDropdown && (
-                        <ul className='absolute top-full left-0 min-w-24 p-0 bg-white shadow-md shadow-black/20 z-10'>
+                        <ul className='absolute top-full mt-2 left-1/2 -translate-x-1/2 flex flex-col py-1 min-w-24 p-0 bg-black/80 text-white/80 z-10 rounded text-sm'>
                             {Object.entries(savedVehicles).map(([vehicleId, vehicle]) => {
                                 if (vehicleId === 'current') return null
                                 return (
-                                    <li key={vehicleId} onClick={() => handleVehicleSelect(vehicleId)} className='block py-3 px-6 whitespace-nowrap hover:bg-stone-900/10'>
+                                    <li key={vehicleId} onClick={() => handleVehicleSelect(vehicleId)} className='block py-3 px-4 whitespace-nowrap hover:bg-black/10 hover:text-green-500'>
                                         {vehicle.name}
                                     </li>
                                 )
