@@ -3,7 +3,6 @@ import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor, KeyboardControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 
-import useLoadingManager from '../hooks/useLoadingManager'
 import useGameStore from '../store/gameStore'
 import Environment from './Environment'
 import CameraControls from './CameraControls'
@@ -21,17 +20,13 @@ const keyMap = [
 
 // Canvas component
 const ThreeCanvas = () => {
-    const sceneLoaded = useGameStore((state) => state.sceneLoaded)
     const physicsEnabled = useGameStore((state) => state.physicsEnabled)
     const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
 
-    // Use loading manager
-    useLoadingManager()
-
     return (
         <div id='vehicle' className='absolute inset-0 overflow-hidden'>
-            {!sceneLoaded && <Loader />}
+            <Loader />
 
             <KeyboardControls map={keyMap} onChange={() => !physicsEnabled && setPhysicsEnabled(true)}>
                 <Canvas shadows>
