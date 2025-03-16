@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { Vector3, Raycaster } from 'three'
@@ -10,21 +10,24 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
     const targetPosition = useGameStore((state) => state.cameraTarget)
     const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 
-    const { camera, scene } = useThree()
+    const { camera, scene, size } = useThree()
     const cameraControlsRef = useRef()
 
     const raycaster = useRef(new Raycaster())
     const downDirection = useRef(new Vector3(0, -1, 0))
     const cameraPosition = useRef(new Vector3())
 
-    // Main camera update logic
+    // Determine if the device is in portrait mode
+    const isPortrait = useMemo(() => size.width / size.height < 1, [size])
+
+    // Set default camera position based on aspect ratio
+    const defaultCameraPosition = isPortrait ? [-2, 2, 12] : [-4, 1.5, 6.5]
+
     useFrame(() => {
         if (!cameraControlsRef.current) return
 
-        // Smoothly update the orbit controls target (the point the camera looks at)
+        // Smoothly update the orbit controls target
         cameraControlsRef.current.target.lerp(targetPosition, followSpeed)
-
-        // Update controls
         cameraControlsRef.current.update()
 
         // Ground avoidance logic
@@ -73,7 +76,7 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
                 autoRotate={cameraAutoRotate}
                 autoRotateSpeed={-0.3}
             />
-            <PerspectiveCamera makeDefault fov={24} position={[-4, 1.5, 6.5]} />
+            <PerspectiveCamera makeDefault fov={24} position={defaultCameraPosition} />
         </>
     )
 }
