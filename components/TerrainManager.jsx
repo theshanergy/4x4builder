@@ -109,8 +109,8 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 
     return (
         <RigidBody type='fixed' position={position} colliders={false}>
-            <mesh name={`TerrainTile-${position[0]}-${position[2]}`}>
-                <meshStandardMaterial {...textures} receiveShadow />
+            <mesh name={`TerrainTile-${position[0]}-${position[2]}`} receiveShadow>
+                <meshStandardMaterial {...textures} />
                 <primitive object={geometry} />
                 <TrimeshCollider args={[geometry.attributes.position.array, geometry.index.array]} />
             </mesh>
