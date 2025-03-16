@@ -1,13 +1,40 @@
-import { memo } from 'react'
-
+import { memo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { Environment, Sky } from '@react-three/drei'
+
+import useGameStore from '../store/gameStore'
 import TerrainManager from './TerrainManager'
 
+// User following light
+const UserFollow = () => {
+    const targetPosition = useGameStore((state) => state.cameraTarget)
+
+    // Refs for light and sky
+    const lightRef = useRef()
+
+    // Update position on each frame
+    useFrame(() => {
+        if (lightRef.current && targetPosition) {
+            lightRef.current.position.set(targetPosition.x + 10, 10, targetPosition.z + 10)
+            lightRef.current.target.position.copy(targetPosition)
+            lightRef.current.target.updateMatrixWorld()
+        }
+    })
+
+    return (
+        <>
+            {/* Main light (updates dynamically) */}
+            <directionalLight ref={lightRef} castShadow intensity={1.5} position={[10, 10, 10]} shadow-camera-far={50} />
+        </>
+    )
+}
+
+// Environment component
 const SceneEnvironment = memo(() => {
     return (
         <>
-            {/* Main light */}
-            <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
+            {/* User following */}
+            <UserFollow />
 
             {/* Blue sky */}
             <Sky distance={450000} sunPosition={[10, 5, 10]} inclination={0.49} azimuth={0.25} rayleigh={0.5} />
