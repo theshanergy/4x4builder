@@ -29,10 +29,32 @@ const useGameStore = create((set, get) => {
         setSavedVehicles: (updater) =>
             set((state) => {
                 const newSavedVehicles = typeof updater === 'function' ? updater(state.savedVehicles) : updater
-                // Update local storage.
                 localStorage.setItem('savedVehicles', JSON.stringify(newSavedVehicles))
-                return { savedVehicles: newSavedVehicles }
+
+                // Force state to reinitialize `currentVehicle`
+                return {
+                    savedVehicles: newSavedVehicles,
+                    currentVehicle:
+                        newSavedVehicles.current && newSavedVehicles[newSavedVehicles.current] ? newSavedVehicles[newSavedVehicles.current].config : vehicleConfigs.defaults,
+                }
             }),
+
+        // Delete a vehicle from saved vehicles
+        deleteSavedVehicle: (vehicleId) => {
+            set((state) => {
+                const updatedVehicles = { ...state.savedVehicles }
+                delete updatedVehicles[vehicleId]
+
+                if (state.savedVehicles.current === vehicleId) {
+                    const remainingIds = Object.keys(updatedVehicles).filter((key) => key !== 'current')
+                    updatedVehicles.current = remainingIds[0] || null
+                }
+
+                return { savedVehicles: updatedVehicles }
+            })
+
+            get().setSavedVehicles((vehicles) => vehicles) // Forces resync with localStorage
+        },
 
         // Current vehicle config
         currentVehicle: (() => {
