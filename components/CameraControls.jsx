@@ -73,9 +73,7 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
                 autoRotate={cameraAutoRotate}
                 autoRotateSpeed={-0.3}
             />
-            <PerspectiveCamera makeDefault fov={24} position={[-4, 1.5, 6.5]}>
-                <pointLight position={[4, 2, 4]} intensity={0.75} />
-            </PerspectiveCamera>
+            <PerspectiveCamera makeDefault fov={24} position={[-4, 1.5, 6.5]} />
         </>
     )
 }
