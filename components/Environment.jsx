@@ -1,7 +1,9 @@
+import { memo } from 'react'
+
 import { Environment, Sky } from '@react-three/drei'
 import TerrainManager from './TerrainManager'
 
-const SceneEnvironment = () => {
+const SceneEnvironment = memo(() => {
     return (
         <>
             {/* Main light */}
@@ -20,6 +22,6 @@ const SceneEnvironment = () => {
             <TerrainManager />
         </>
     )
-}
+})
 
 export default SceneEnvironment
