@@ -21,7 +21,7 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
     const isPortrait = useMemo(() => size.width / size.height < 1, [size])
 
     // Set default camera position based on aspect ratio
-    const defaultCameraPosition = isPortrait ? [-2, 2, 12] : [-4, 1.5, 6.5]
+    const defaultCameraPosition = isPortrait ? [-2, 1, 12] : [-4, 1, 6.5]
 
     useFrame(() => {
         if (!cameraControlsRef.current) return
