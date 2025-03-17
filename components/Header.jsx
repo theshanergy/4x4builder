@@ -1,4 +1,4 @@
-import VehicleTitle from './VehicleTitle'
+import VehicleSwitcher from './VehicleSwitcher'
 import GitHubIcon from '../assets/images/icons/GitHub.svg'
 
 function Header() {
@@ -7,7 +7,7 @@ function Header() {
             <div />
 
             <div className='min-w-0 justify-self-center flex items-center justify-center'>
-                <VehicleTitle />
+                <VehicleSwitcher />
             </div>
 
             <div className='px-5 flex justify-end items-center'>

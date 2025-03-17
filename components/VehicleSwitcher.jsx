@@ -5,7 +5,8 @@ import useGameStore from '../store/gameStore'
 import ChevronIcon from '../assets/images/icons/Chevron.svg'
 import TrashIcon from '../assets/images/icons/Trash.svg'
 
-const VehicleTitle = () => {
+// Vehicle switcher component
+const VehicleSwitcher = () => {
     const { setVehicle, savedVehicles, setSavedVehicles, deleteSavedVehicle } = useGameStore((state) => state)
     const dropdownRef = useRef(null)
     const [showDropdown, setShowDropdown] = useState(false)
@@ -76,4 +77,4 @@ const VehicleTitle = () => {
     )
 }
 
-export default VehicleTitle
+export default VehicleSwitcher
