@@ -1,27 +1,26 @@
 import { useState, useRef, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { RepeatWrapping, BufferAttribute, BufferGeometry, Vector2 } from 'three'
+import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 import { useTexture } from '@react-three/drei'
+import { Vector2, RepeatWrapping, PlaneGeometry } from 'three'
 import { Noise } from 'noisejs'
-import { RigidBody, TrimeshCollider } from '@react-three/rapier'
 
 // Default terrain configuration
 const DEFAULT_TERRAIN_CONFIG = {
     viewDistance: 160,
     tileSize: 32,
-    resolution: 32,
+    resolution: 16,
     smoothness: 15,
     maxHeight: 2,
 }
 
 // TerrainTile component
 const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, noise }) => {
-    // Load textures once for all tiles
+    // Load texture
     const textures = useTexture({
         map: 'assets/images/ground/dirt_01.png',
         normalMap: 'assets/images/ground/dirt_01_nrm.png',
     })
-
     // Apply texture settings
     useMemo(() => {
         const textureRepeat = tileSize / 3
@@ -31,88 +30,59 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
         })
     }, [textures])
 
-    // Generate geometry for this tile
-    const geometry = useMemo(() => {
-        const step = tileSize / (resolution - 1)
+    // Generate heights
+    const heights = useMemo(() => {
+        const values = []
+        const positions = new Float32Array((resolution + 1) * (resolution + 1) * 3)
         const flatAreaRadiusSq = (tileSize * 0.5) ** 2
         const transitionEndDistSq = (tileSize * 2) ** 2
-        const uvScale = 1 / (resolution - 1)
-
-        // Determine if this is a center tile (one of the 4 tiles around [0,0])
+        const step = tileSize / resolution
         const tileX = Math.floor(position[0] / tileSize)
         const tileZ = Math.floor(position[2] / tileSize)
         const isCenterTile = tileX >= -1 && tileX <= 0 && tileZ >= -1 && tileZ <= 0
 
-        // Generate vertices, UVs, and indices
-        const vertices = new Float32Array(resolution * resolution * 3)
-        const uvs = new Float32Array(resolution * resolution * 2)
-        const indices = new Uint32Array((resolution - 1) * (resolution - 1) * 6)
-
-        let vIndex = 0,
-            uvIndex = 0,
-            iIndex = 0
-
-        // Generate vertices, UVs, and indices
-        for (let i = 0; i < resolution; i++) {
-            for (let j = 0; j < resolution; j++) {
-                // Calculate world position
+        for (let i = 0; i <= resolution; i++) {
+            for (let j = 0; j <= resolution; j++) {
                 const worldX = position[0] + i * step
                 const worldZ = position[2] + j * step
-
-                // Calculate distance from world center [0,0]
                 const distSq = worldX * worldX + worldZ * worldZ
 
                 let height = 0
-
-                // Calculate height based on distance from center
                 if (distSq >= flatAreaRadiusSq) {
-                    const rawHeight = noise.perlin2(worldX / smoothness, worldZ / smoothness) * maxHeight
-
+                    const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
+                    const normalizedHeight = (noiseValue + 1) / 2
                     if (isCenterTile || distSq < transitionEndDistSq) {
                         const t = (Math.sqrt(distSq) - Math.sqrt(flatAreaRadiusSq)) / (Math.sqrt(transitionEndDistSq) - Math.sqrt(flatAreaRadiusSq))
-                        height = rawHeight * (t * t * (3 - 2 * t)) // Smoothstep function
+                        height = normalizedHeight * (t * t * (3 - 2 * t))
                     } else {
-                        height = rawHeight
+                        height = normalizedHeight
                     }
                 }
+                values.push(height)
 
-                // Add vertex and UV data
-                vertices[vIndex++] = i * step
-                vertices[vIndex++] = height
-                vertices[vIndex++] = j * step
-
-                uvs[uvIndex++] = i * uvScale
-                uvs[uvIndex++] = j * uvScale
-
-                // Add triangle indices
-                if (i < resolution - 1 && j < resolution - 1) {
-                    const index = i * resolution + j
-                    indices[iIndex++] = index + resolution
-                    indices[iIndex++] = index + 1
-                    indices[iIndex++] = index + resolution + 1
-
-                    indices[iIndex++] = index
-                    indices[iIndex++] = index + 1
-                    indices[iIndex++] = index + resolution
-                }
+                const vertIndex = (i + (resolution + 1) * j) * 3
+                positions[vertIndex] = (i / resolution) * tileSize - tileSize / 2
+                positions[vertIndex + 1] = height * maxHeight
+                positions[vertIndex + 2] = (j / resolution) * tileSize - tileSize / 2
             }
         }
 
-        const geometry = new BufferGeometry()
-        geometry.setIndex(new BufferAttribute(indices, 1))
-        geometry.setAttribute('position', new BufferAttribute(vertices, 3))
-        geometry.setAttribute('uv', new BufferAttribute(uvs, 2))
-        geometry.computeVertexNormals()
+        return { values, positions }
+    }, [position, tileSize, resolution, smoothness, noise, maxHeight])
 
-        return geometry
-    }, [position, tileSize, resolution, smoothness, maxHeight, noise])
+    // Create geometry for terrain mesh
+    const geometry = useMemo(() => {
+        const geom = new PlaneGeometry(tileSize, tileSize, resolution, resolution)
+        geom.getAttribute('position').array.set(heights.positions)
+        geom.computeVertexNormals()
+        return geom
+    }, [heights, tileSize, resolution])
 
     return (
         <RigidBody type='fixed' position={position} colliders={false}>
-            <mesh name={`TerrainTile-${position[0]}-${position[2]}`} receiveShadow>
+            <HeightfieldCollider args={[resolution, resolution, heights.values, { x: tileSize, y: maxHeight, z: tileSize }]} name={`Tile-${position[0]}-${position[2]}`} />
+            <mesh geometry={geometry}>
                 <meshStandardMaterial {...textures} />
-                <primitive object={geometry} />
-                <TrimeshCollider args={[geometry.attributes.position.array, geometry.index.array]} />
             </mesh>
         </RigidBody>
     )
