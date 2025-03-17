@@ -7,7 +7,7 @@ import useGameStore from '../store/gameStore'
 import Environment from './Environment'
 import CameraControls from './CameraControls'
 import Loader from './Loader'
-import Vehicle from './Vehicle'
+import VehicleManager from './VehicleManager'
 import Screenshot from './Screenshot'
 
 const keyMap = [
@@ -25,7 +25,7 @@ const ThreeCanvas = () => {
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
 
     return (
-        <div id='vehicle' className='absolute inset-0 overflow-hidden'>
+        <div id='canvas' className='absolute inset-0 overflow-hidden'>
             <Loader />
 
             <KeyboardControls map={keyMap} onChange={() => !physicsEnabled && setPhysicsEnabled(true)}>
@@ -36,7 +36,7 @@ const ThreeCanvas = () => {
 
                     <Physics paused={!physicsEnabled}>
                         <Suspense fallback={null}>
-                            <Vehicle />
+                            <VehicleManager />
                         </Suspense>
 
                         <Environment />
