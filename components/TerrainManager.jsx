@@ -43,8 +43,9 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 
         for (let i = 0; i <= resolution; i++) {
             for (let j = 0; j <= resolution; j++) {
-                const worldX = position[0] + i * step
-                const worldZ = position[2] + j * step
+                const worldX = position[0] + i * step - tileSize / 2;
+                const worldZ = position[2] + j * step - tileSize / 2;
+                
                 const distSq = worldX * worldX + worldZ * worldZ
 
                 let height = 0
@@ -81,7 +82,7 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
     return (
         <RigidBody type='fixed' position={position} colliders={false}>
             <HeightfieldCollider args={[resolution, resolution, heights.values, { x: tileSize, y: maxHeight, z: tileSize }]} name={`Tile-${position[0]}-${position[2]}`} />
-            <mesh geometry={geometry}>
+            <mesh geometry={geometry} receiveShadow>
                 <meshStandardMaterial {...textures} />
             </mesh>
         </RigidBody>
