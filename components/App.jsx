@@ -6,6 +6,7 @@ import Header from './Header'
 import Sidebar from './Sidebar'
 import Canvas from './Canvas'
 import Actions from './Actions'
+import Notification from './Notification'
 
 export default function App() {
     // Get vehicle state from game store
@@ -22,6 +23,7 @@ export default function App() {
             <Canvas />
             <Sidebar />
             <Actions />
+            <Notification />
         </div>
     )
 }

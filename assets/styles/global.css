@@ -12,6 +12,11 @@
     }
 }
 
+/* links */
+a {
+    @apply underline text-blue-500;
+}
+
 /* forms */
 .field {
     @apply overflow-hidden;
@@ -59,15 +64,18 @@ button,
 .button {
     @apply flex items-center gap-2 h-11 px-5 py-0 text-white font-medium text-sm bg-red-700 hover:bg-red-600 border-none rounded shadow-md cursor-pointer;
 }
+button.secondary,
+.button.secondary {
+    @apply bg-stone-700 hover:bg-stone-600;
+}
+button.success,
+.button.success {
+    @apply bg-green-700 hover:bg-green-600;
+}
 
 /* icons */
 .icon {
     @apply inline-block w-5 h-auto align-middle;
-}
-
-/* sweetalert */
-.swal2-container .swal2-styled.swal2-confirm {
-    @apply bg-green-500 text-white;
 }
 
 /* loader animation */

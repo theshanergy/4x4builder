@@ -12,6 +12,11 @@ const useGameStore = create((set, get) => {
         setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
         setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
 
+        // Notification state
+        notification: null,
+        showNotification: (notificationData) => set({ notification: notificationData }),
+        hideNotification: () => set({ notification: null }),
+
         // Camera state
         cameraTarget: { x: 0, y: 0, z: 0 },
         cameraControlsRef: null,

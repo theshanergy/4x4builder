@@ -20,7 +20,6 @@
         "noisejs": "^2.1.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
-        "sweetalert2": "^11.17.2",
         "tailwindcss": "^4.0.14",
         "three": "^0.174.0",
         "vite-plugin-svgr": "^4.3.0",
