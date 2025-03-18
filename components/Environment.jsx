@@ -1,9 +1,26 @@
-import { memo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { Environment, Sky } from '@react-three/drei'
+import { memo, useRef, useEffect } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { TextureLoader, EquirectangularReflectionMapping } from 'three'
+import { Sky } from '@react-three/drei'
 
 import useGameStore from '../store/gameStore'
 import TerrainManager from './TerrainManager'
+
+// Equirectangular environment map
+const EquirectEnvMap = ({ file }) => {
+    const { scene } = useThree()
+
+    useEffect(() => {
+        const loader = new TextureLoader()
+        loader.load(file, (texture) => {
+            texture.mapping = EquirectangularReflectionMapping
+            texture.needsUpdate = true
+            scene.environment = texture
+        })
+    }, [file, scene])
+
+    return null
+}
 
 // User following light
 const UserFollow = () => {
@@ -43,7 +60,7 @@ const SceneEnvironment = memo(() => {
             <fog attach='fog' args={['#b8d9f9', 80, 160]} />
 
             {/* Environment map for reflections */}
-            <Environment files={['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png']} path={'assets/images/envmap/'} />
+            <EquirectEnvMap file='/assets/images/envmap/gainmap.webp' />
 
             {/* Terrain */}
             <TerrainManager />
