@@ -24,16 +24,16 @@ const EquirectEnvMap = ({ file }) => {
 
 // User following light
 const UserFollow = () => {
-    const targetPosition = useGameStore((state) => state.cameraTarget)
+    const cameraTargetRef = useGameStore((state) => state.cameraTargetRef)
 
     // Refs for light and sky
     const lightRef = useRef()
 
     // Update position on each frame
     useFrame(() => {
-        if (lightRef.current && targetPosition) {
-            lightRef.current.position.set(targetPosition.x + 10, 10, targetPosition.z + 10)
-            lightRef.current.target.position.copy(targetPosition)
+        if (lightRef.current && cameraTargetRef?.current) {
+            lightRef.current.position.set(cameraTargetRef.current.x + 10, 10, cameraTargetRef.current.z + 10)
+            lightRef.current.target.position.copy(cameraTargetRef.current)
             lightRef.current.target.updateMatrixWorld()
         }
     })
