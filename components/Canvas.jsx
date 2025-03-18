@@ -11,10 +11,10 @@ import VehicleManager from './VehicleManager'
 import Screenshot from './Screenshot'
 
 const keyMap = [
-    { name: 'forward', keys: ['ArrowUp', 'w', 'W'] },
-    { name: 'backward', keys: ['ArrowDown', 's', 'S'] },
-    { name: 'left', keys: ['ArrowLeft', 'a', 'A'] },
-    { name: 'right', keys: ['ArrowRight', 'd', 'D'] },
+    { name: 'forward', keys: ['ArrowUp'] },
+    { name: 'backward', keys: ['ArrowDown'] },
+    { name: 'left', keys: ['ArrowLeft'] },
+    { name: 'right', keys: ['ArrowRight'] },
     { name: 'brake', keys: ['Space'] },
 ]
 
@@ -24,11 +24,18 @@ const ThreeCanvas = () => {
     const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
 
+    // Handle key press
+    const handleKeyPress = (key) => {
+        if (key === 'forward' && !physicsEnabled) {
+            setPhysicsEnabled(true)
+        }
+    }
+
     return (
         <div id='canvas' className='absolute inset-0 overflow-hidden'>
             <Loader />
 
-            <KeyboardControls map={keyMap} onChange={() => !physicsEnabled && setPhysicsEnabled(true)}>
+            <KeyboardControls map={keyMap} onChange={handleKeyPress}>
                 <Canvas shadows>
                     <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 
