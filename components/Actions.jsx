@@ -36,6 +36,10 @@ const Actions = () => {
                         title: 'Error',
                         text: 'Please enter a name for your vehicle.',
                         type: 'error',
+                        onConfirm: () => {
+                            // Reopen the original save dialog
+                            saveVehicle()
+                        }
                     })
                     return
                 }
