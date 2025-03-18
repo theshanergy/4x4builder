@@ -7,7 +7,11 @@ import TrashIcon from '../assets/images/icons/Trash.svg'
 
 // Vehicle switcher component
 const VehicleSwitcher = () => {
-    const { setVehicle, savedVehicles, setSavedVehicles, deleteSavedVehicle } = useGameStore((state) => state)
+    const setVehicle = useGameStore((state) => state.setVehicle)
+    const savedVehicles = useGameStore((state) => state.savedVehicles)
+    const setSavedVehicles = useGameStore((state) => state.setSavedVehicles)
+    const deleteSavedVehicle = useGameStore((state) => state.deleteSavedVehicle)
+
     const dropdownRef = useRef(null)
     const [showDropdown, setShowDropdown] = useState(false)
 
