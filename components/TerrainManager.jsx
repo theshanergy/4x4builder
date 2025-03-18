@@ -11,7 +11,7 @@ const DEFAULT_TERRAIN_CONFIG = {
     tileSize: 32,
     resolution: 16,
     smoothness: 15,
-    maxHeight: 2,
+    maxHeight: 4,
 }
 
 // TerrainTile component
