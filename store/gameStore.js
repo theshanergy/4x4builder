@@ -21,7 +21,16 @@ const useGameStore = create((set, get) => {
         cameraTarget: { x: 0, y: 0, z: 0 },
         cameraControlsRef: null,
         cameraAutoRotate: false,
-        setCameraTarget: (target) => set({ cameraTarget: target }),
+        setCameraTarget: (x, y, z) => {
+            const state = get()
+            if (state.cameraTarget) {
+                state.cameraTarget.x = x
+                state.cameraTarget.y = y
+                state.cameraTarget.z = z
+            } else {
+                set({ cameraTarget: { x, y, z } })
+            }
+        },
         setCameraControlsRef: (ref) => set({ cameraControlsRef: ref }),
         setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
 

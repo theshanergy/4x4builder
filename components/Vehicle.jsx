@@ -206,9 +206,10 @@ const Vehicle = (props) => {
     // Update camera target each frame
     useFrame(() => {
         if (chassisRef.current) {
-            // Set camera target
+            // Get chassis position
             const { x, y, z } = chassisRef.current.translation()
-            setCameraTarget({ x, y: y + 0.95, z })
+            // Set camera target
+            setCameraTarget(x, y + 0.95, z)
         }
     })
 
