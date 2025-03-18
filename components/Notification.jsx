@@ -12,17 +12,18 @@ const Notification = () => {
     // Reset input value when notification changes
     useEffect(() => {
         if (notification?.input) {
+            // Set default input value
             setInputValue(notification.inputValue || '')
             // Focus the input field when it appears
-            setTimeout(() => {
-                inputRef.current?.focus()
-            }, 100)
+            setTimeout(() => inputRef.current?.focus(), 100)
         }
     }, [notification])
 
     if (!notification) return null
 
+    // Confirm the notification
     const handleConfirm = () => {
+        const currentId = notification.id
         if (notification.onConfirm) {
             notification.onConfirm({
                 isConfirmed: true,
@@ -30,9 +31,14 @@ const Notification = () => {
                 isDismissed: false,
             })
         }
-        hideNotification()
+
+        // Hide if no new notification was shown
+        if (useGameStore.getState().notification?.id === currentId) {
+            hideNotification()
+        }
     }
 
+    // Cancel the notification
     const handleCancel = () => {
         if (notification.onCancel) {
             notification.onCancel({
@@ -43,6 +49,7 @@ const Notification = () => {
         hideNotification()
     }
 
+    // Keyboard shortcuts
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
             handleConfirm()
@@ -51,14 +58,9 @@ const Notification = () => {
         }
     }
 
-    // Prevent clicks on the overlay from closing the notification
-    const handleOverlayClick = (e) => {
-        e.stopPropagation()
-    }
-
     return (
         <div className='fixed inset-0 flex items-center justify-center bg-black/20 z-50' onClick={handleCancel}>
-            <div className='bg-black/80 text-gray-400 rounded-xl space-y-4 p-8 max-w-md w-full shadow-xl' onClick={handleOverlayClick}>
+            <div className='bg-black/80 text-gray-400 rounded-xl space-y-4 p-8 max-w-md w-full shadow-xl' onClick={(e) => e.stopPropagation()}>
                 {notification.title && <h2 className='text-xl text-white/90 font-bold'>{notification.title}</h2>}
 
                 {notification.text && <p>{notification.text}</p>}

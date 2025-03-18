@@ -14,7 +14,7 @@ const useGameStore = create((set, get) => {
 
         // Notification state
         notification: null,
-        showNotification: (notificationData) => set({ notification: notificationData }),
+        showNotification: (notificationData) => set({ notification: { ...notificationData, id: Date.now() } }),
         hideNotification: () => set({ notification: null }),
 
         // Camera state
