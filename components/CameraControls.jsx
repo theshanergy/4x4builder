@@ -7,12 +7,14 @@ import useGameStore from '../store/gameStore'
 
 // Camera controls and chase cam logic
 const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
-    console.log('CameraControls')
     const setCameraTargetRef = useGameStore((state) => state.setCameraTargetRef)
     const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 
-    const { camera, scene, size } = useThree()
+    //const camera = useThree((state) => state.camera)
+    const scene = useThree((state) => state.scene)
+    const size = useThree((state) => state.size)
 
+    const cameraRef = useRef()
     const targetPosition = useRef(new Vector3(0, 0.95, 0))
     const cameraControlsRef = useRef()
 
@@ -39,7 +41,7 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
         cameraControlsRef.current.update()
 
         // Ground avoidance logic
-        camera.getWorldPosition(cameraPosition.current)
+        cameraRef.current.getWorldPosition(cameraPosition.current)
         raycaster.current.set(cameraPosition.current, downDirection.current)
 
         // Filter for terrain objects
@@ -66,7 +68,7 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
 
             // If camera is too close to the ground, move it up
             if (groundDistance < minGroundDistance) {
-                camera.position.y += minGroundDistance - groundDistance
+                cameraRef.current.position.y += minGroundDistance - groundDistance
             }
         }
     })
@@ -84,7 +86,7 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
                 autoRotate={cameraAutoRotate}
                 autoRotateSpeed={-0.3}
             />
-            <PerspectiveCamera makeDefault fov={24} position={defaultCameraPosition} />
+            <PerspectiveCamera ref={cameraRef} fov={24} position={defaultCameraPosition} makeDefault />
         </>
     )
 }
