@@ -1,5 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { useRapier, useAfterPhysicsStep } from '@react-three/rapier'
+import { useFrame } from '@react-three/fiber'
+import { useKeyboardControls } from '@react-three/drei'
 import * as THREE from 'three'
 
 // Constants
@@ -9,14 +11,16 @@ const VECTORS = {
     DOWN: new THREE.Vector3(0, -1, 0),
 }
 
+// Physics
+const FORCES = { accelerate: 30, brake: 0.5, steerAngle: Math.PI / 6 }
+
 /**
  * Generic vehicle physics hook for wheeled vehicles
  * @param {Object} vehicleRef - Reference to the vehicle rigid body
  * @param {Array} wheels - Array of wheel configurations with refs and positions
- * @param {Object} config - Vehicle configuration
- * @returns {Object} - Vehicle controller and other physics-related functions
+ * @returns {Object} - Vehicle controller
  */
-export const useVehiclePhysics = (vehicleRef, wheels, config = {}) => {
+export const useVehiclePhysics = (vehicleRef, wheels) => {
     const { world } = useRapier()
 
     // Refs
@@ -81,36 +85,39 @@ export const useVehiclePhysics = (vehicleRef, wheels, config = {}) => {
         })
     })
 
-    // Basic vehicle control functions
-    const applyEngineForce = (wheelIndex, force) => {
-        if (!vehicleController.current) return
-        vehicleController.current.setWheelEngineForce(wheelIndex, force)
-    }
+    // Get keyboard controls
+    const [, getKeys] = useKeyboardControls()
 
-    const applySteering = (wheelIndex, angle) => {
+    // Handle input forces each frame
+    useFrame(() => {
         if (!vehicleController.current) return
-        vehicleController.current.setWheelSteering(wheelIndex, angle)
-    }
 
-    const applyBrake = (wheelIndex, force) => {
-        if (!vehicleController.current) return
-        vehicleController.current.setWheelBrake(wheelIndex, force)
-    }
+        const { forward, backward, left, right, brake } = getKeys()
 
-    // Calculate vehicle velocity
-    const getVelocity = () => {
-        if (!vehicleRef.current) return new THREE.Vector3()
-        const vel = vehicleRef.current.linvel()
-        return new THREE.Vector3(vel.x, vel.y, vel.z)
-    }
+        // Calculate forces
+        const engineForce = (forward ? -FORCES.accelerate : 0) + (backward ? FORCES.accelerate : 0)
+        const steerForce = (left ? FORCES.steerAngle : 0) + (right ? -FORCES.steerAngle : 0)
+        const brakeForce = brake ? FORCES.brake : 0
+
+        // Front wheels steering (assuming first two wheels are front)
+        for (let i = 0; i < 2 && i < wheels.length; i++) {
+            vehicleController.current.setWheelSteering(i, steerForce)
+        }
+
+        // Rear wheels driving (assuming last two wheels are rear)
+        for (let i = 2; i < 4 && i < wheels.length; i++) {
+            vehicleController.current.setWheelEngineForce(i, engineForce)
+        }
+
+        // All wheels braking
+        for (let i = 0; i < wheels.length; i++) {
+            vehicleController.current.setWheelBrake(i, brakeForce)
+        }
+    })
 
     // Return the vehicleController ref and control functions
     return {
         vehicleController,
-        applyEngineForce,
-        applySteering,
-        applyBrake,
-        getVelocity,
     }
 }
 

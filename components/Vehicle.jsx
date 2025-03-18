@@ -1,7 +1,7 @@
 import { memo, useMemo, useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
-import { useGLTF, useKeyboardControls } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import { Vector3 } from 'three'
 
 import useGameStore from '../store/gameStore'
@@ -162,9 +162,6 @@ const Vehicle = (props) => {
     const chassisRef = useRef(null)
     const wheelRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
 
-    // Get keyboard controls
-    const [, getKeys] = useKeyboardControls()
-
     // Get wheel (axle) height
     const axleHeight = useMemo(() => (tire_diameter * 2.54) / 100 / 2, [tire_diameter])
 
@@ -174,13 +171,14 @@ const Vehicle = (props) => {
     // Get vehicle height
     const vehicleHeight = useMemo(() => axleHeight + liftHeight, [axleHeight, liftHeight])
 
+    // Get wheel offset and wheelbase
     const offset = vehicleConfigs.vehicles[id]['wheel_offset'] + parseFloat(wheel_offset)
     const wheelbase = vehicleConfigs.vehicles[id]['wheelbase']
 
-    // Physics constants
-    const FORCES = { accelerate: 30, brake: 0.5, steerAngle: Math.PI / 6 }
-
+    // Get wheel rotation
     const rotation = (Math.PI * 90) / 180
+
+    // Set wheel positions
     const wheelPositions = [
         { key: 'FL', name: 'FL', position: [offset, axleHeight, wheelbase / 2], rotation: [0, rotation, 0] },
         { key: 'FR', name: 'FR', position: [-offset, axleHeight, wheelbase / 2], rotation: [0, -rotation, 0] },
@@ -203,32 +201,10 @@ const Vehicle = (props) => {
     }, [offset, axleHeight, wheelbase, tire_diameter])
 
     // Use vehicle physics
-    const { applyEngineForce, applySteering, applyBrake } = useVehiclePhysics(chassisRef, physicsWheels)
+    useVehiclePhysics(chassisRef, physicsWheels)
 
-    // Apply input forces each frame
+    // Update camera target each frame
     useFrame(() => {
-        const { forward, backward, left, right, brake } = getKeys()
-
-        // Calculate forces
-        const engineForce = (forward ? -FORCES.accelerate : 0) + (backward ? FORCES.accelerate : 0)
-        const steerForce = (left ? FORCES.steerAngle : 0) + (right ? -FORCES.steerAngle : 0)
-        const brakeForce = brake ? FORCES.brake : 0
-
-        // Front wheels steering
-        for (let i = 0; i < 2; i++) {
-            applySteering(i, steerForce)
-        }
-
-        // Rear wheels driving
-        for (let i = 2; i < 4; i++) {
-            applyEngineForce(i, engineForce)
-        }
-
-        // All wheels braking
-        for (let i = 0; i < 4; i++) {
-            applyBrake(i, brakeForce)
-        }
-
         if (chassisRef.current) {
             // Set camera target
             const { x, y, z } = chassisRef.current.translation()
