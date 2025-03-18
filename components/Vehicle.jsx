@@ -157,7 +157,7 @@ const Vehicle = (props) => {
     }
 
     // Get vehicle store
-    const setCameraTarget = useGameStore((state) => state.setCameraTarget)
+    const cameraTargetRef = useGameStore((state) => state.cameraTargetRef)
 
     const chassisRef = useRef(null)
     const wheelRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
@@ -205,11 +205,11 @@ const Vehicle = (props) => {
 
     // Update camera target each frame
     useFrame(() => {
-        if (chassisRef.current) {
+        if (chassisRef.current && cameraTargetRef?.current) {
             // Get chassis position
             const { x, y, z } = chassisRef.current.translation()
             // Set camera target
-            setCameraTarget(x, y + 0.95, z)
+            cameraTargetRef.current.set(x, y + 0.95, z)
         }
     })
 

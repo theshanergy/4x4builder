@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
+import { useRef } from 'react'
+import { Vector3 } from 'three'
 import vehicleConfigs from '../vehicleConfigs'
 
 const useGameStore = create((set, get) => {
@@ -18,19 +20,10 @@ const useGameStore = create((set, get) => {
         hideNotification: () => set({ notification: null }),
 
         // Camera state
-        cameraTarget: { x: 0, y: 0, z: 0 },
+        cameraTargetRef: null,
         cameraControlsRef: null,
         cameraAutoRotate: false,
-        setCameraTarget: (x, y, z) => {
-            const state = get()
-            if (state.cameraTarget) {
-                state.cameraTarget.x = x
-                state.cameraTarget.y = y
-                state.cameraTarget.z = z
-            } else {
-                set({ cameraTarget: { x, y, z } })
-            }
-        },
+        setCameraTargetRef: (ref) => set({ cameraTargetRef: ref }),
         setCameraControlsRef: (ref) => set({ cameraControlsRef: ref }),
         setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
 
