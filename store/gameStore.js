@@ -67,10 +67,22 @@ const useGameStore = create((set, get) => {
         setVehicle: (updater) =>
             set(
                 produce((state) => {
+                    // Get previous vehicle id
+                    const prevId = state.currentVehicle.id
+
+                    // Update vehicle state
                     if (typeof updater === 'function') {
                         updater(state.currentVehicle)
                     } else {
                         Object.assign(state.currentVehicle, updater)
+                    }
+
+                    // Get new vehicle id
+                    const newId = state.currentVehicle.id
+
+                    // If vehicle body changed, reset addons
+                    if (newId !== prevId && updater.id) {
+                        state.currentVehicle.addons = vehicleConfigs.vehicles[newId]?.default_addons || {}
                     }
                 })
             ),

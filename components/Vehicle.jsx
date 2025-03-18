@@ -112,7 +112,7 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 })
 
 // Body.
-const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
+const Body = memo(({ id, height, color, roughness, addons }) => {
     const vehicle = useRef()
     const { setObjectMaterials } = useMaterialProperties()
 
@@ -120,11 +120,6 @@ const Body = memo(({ id, height, color, roughness, addons, setVehicle }) => {
     useEffect(() => {
         setObjectMaterials(vehicle.current, color, roughness)
     }, [setObjectMaterials, color, roughness, addons])
-
-    // Set default addons.
-    useEffect(() => {
-        setVehicle({ addons: vehicleConfigs.vehicles[id].default_addons })
-    }, [setVehicle, id])
 
     // Build array of addon paths.
     const addonPaths = useMemo(() => {
@@ -162,7 +157,6 @@ const Vehicle = (props) => {
     }
 
     // Get vehicle store
-    const setVehicle = useGameStore((state) => state.setVehicle)
     const setCameraTarget = useGameStore((state) => state.setCameraTarget)
 
     const chassisRef = useRef(null)
@@ -246,7 +240,7 @@ const Vehicle = (props) => {
         <RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false}>
             <CuboidCollider args={[1, 0.5, wheelbase / 2 + axleHeight]} position={[0, 1, 0]} />
             <group name='Vehicle'>
-                <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} setVehicle={setVehicle} />
+                <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
                 <Wheels
                     rim={rim}
                     rim_diameter={rim_diameter}
