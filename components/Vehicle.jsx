@@ -1,7 +1,7 @@
 import { memo, useMemo, useEffect, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
-import { useGLTF } from '@react-three/drei'
+import { useGLTF, Gltf } from '@react-three/drei'
 import { Vector3 } from 'three'
 
 import useGameStore from '../store/gameStore'
@@ -15,12 +15,6 @@ const linePoint = (a, b, length) => {
     let dir = b.clone().sub(a).normalize().multiplyScalar(length)
     return a.clone().add(dir)
 }
-
-// Model loader.
-const Model = memo(({ path, ...props }) => {
-    const model = useGLTF(path)
-    return <primitive object={model.scene} {...props} />
-})
 
 // Wheels.
 const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, color, roughness, wheelPositions, wheelRefs }) => {
@@ -136,11 +130,11 @@ const Body = memo(({ id, height, color, roughness, addons }) => {
 
     return (
         <group ref={vehicle} name='Body' key={id}>
-            <Model path={vehicleConfigs.vehicles[id].model} />
+            <Gltf src={vehicleConfigs.vehicles[id].model} />
             {addonPaths.length ? (
                 <group name='Addons'>
                     {addonPaths.map((addon) => (
-                        <Model key={addon} path={addon} />
+                        <Gltf key={addon} src={addon} />
                     ))}
                 </group>
             ) : null}
