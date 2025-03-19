@@ -1,7 +1,6 @@
 import { memo, useRef, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { TextureLoader, EquirectangularReflectionMapping } from 'three'
-import { Sky } from '@react-three/drei'
 
 import useGameStore from '../store/gameStore'
 import TerrainManager from './TerrainManager'
@@ -22,39 +21,32 @@ const EquirectEnvMap = ({ file }) => {
     return null
 }
 
-// User following light
-const UserFollow = () => {
-    const cameraTargetRef = useGameStore((state) => state.cameraTargetRef)
-
-    // Refs for light and sky
+// Camera target light
+const TargetLight = () => {
+    const cameraTargetRef = useGameStore((s) => s.cameraTargetRef)
     const lightRef = useRef()
 
-    // Update position on each frame
     useFrame(() => {
         if (lightRef.current && cameraTargetRef?.current) {
-            lightRef.current.position.set(cameraTargetRef.current.x + 10, 10, cameraTargetRef.current.z + 10)
+            const { x, z } = cameraTargetRef.current
+            Object.assign(lightRef.current.position, { x: x + 10, y: 10, z: z + 10 })
             lightRef.current.target.position.copy(cameraTargetRef.current)
             lightRef.current.target.updateMatrixWorld()
         }
     })
 
-    return (
-        <>
-            {/* Main light (updates dynamically) */}
-            <directionalLight ref={lightRef} castShadow intensity={1.5} position={[10, 10, 10]} shadow-camera-far={50} />
-        </>
-    )
+    return <directionalLight ref={lightRef} castShadow intensity={1.5} position={[10, 10, 10]} shadow-camera-far={50} />
 }
 
 // Environment component
 const SceneEnvironment = memo(() => {
     return (
         <>
-            {/* User following */}
-            <UserFollow />
+            {/* Camera target light */}
+            <TargetLight />
 
             {/* Blue sky */}
-            <Sky distance={450000} sunPosition={[10, 5, 10]} inclination={0.49} azimuth={0.25} rayleigh={0.5} />
+            <color attach='background' args={['#b8d9f9']} />
 
             {/* Distant fog for depth */}
             <fog attach='fog' args={['#b8d9f9', 80, 160]} />
