@@ -1,8 +1,9 @@
 import { useRef, useEffect } from 'react'
 import { useRapier, useAfterPhysicsStep } from '@react-three/rapier'
 import { useFrame } from '@react-three/fiber'
-import { useKeyboardControls } from '@react-three/drei'
 import * as THREE from 'three'
+
+import { useInput } from '../context/InputContext'
 
 // Constants
 const VECTORS = {
@@ -85,19 +86,18 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
         })
     })
 
-    // Get keyboard controls
-    const [, getKeys] = useKeyboardControls()
+    // Get input
+    const { leftStick, rightStick, leftTrigger, rightTrigger, buttons, keys } = useInput()
 
     // Handle input forces each frame
     useFrame(() => {
         if (!vehicleController.current) return
 
-        const { forward, backward, left, right, brake } = getKeys()
+        const clamp = (value) => Math.min(1, Math.max(-1, value))
 
-        // Calculate forces
-        const engineForce = (forward ? -FORCES.accelerate : 0) + (backward ? FORCES.accelerate : 0)
-        const steerForce = (left ? FORCES.steerAngle : 0) + (right ? -FORCES.steerAngle : 0)
-        const brakeForce = brake ? FORCES.brake : 0
+        const engineForce = FORCES.accelerate * clamp((keys.current?.['ArrowUp'] ? 1 : 0) + (rightStick.current?.y < 0 ? -rightStick.current.y : 0) + (rightTrigger.current || 0))
+        const steerForce = FORCES.steerAngle * clamp((keys.current?.['ArrowRight'] ? -1 : 0) + (keys.current?.['ArrowLeft'] ? 1 : 0) + (-leftStick.current?.x || 0))
+        const brakeForce = FORCES.brake * clamp((keys.current?.['ArrowDown'] ? 1 : 0) + (rightStick.current?.y > 0 ? rightStick.current.y : 0) + (leftTrigger.current || 0))
 
         // Front wheels steering (assuming first two wheels are front)
         for (let i = 0; i < 2 && i < wheels.length; i++) {
@@ -106,7 +106,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
         // Rear wheels driving (assuming last two wheels are rear)
         for (let i = 2; i < 4 && i < wheels.length; i++) {
-            vehicleController.current.setWheelEngineForce(i, engineForce)
+            vehicleController.current.setWheelEngineForce(i, -engineForce)
         }
 
         // All wheels braking

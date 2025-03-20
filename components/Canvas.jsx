@@ -1,8 +1,9 @@
 import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { PerformanceMonitor, KeyboardControls } from '@react-three/drei'
+import { PerformanceMonitor } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 
+import { InputProvider } from '../context/InputContext'
 import useGameStore from '../store/gameStore'
 import Environment from './Environment'
 import CameraControls from './CameraControls'
@@ -10,32 +11,16 @@ import Loader from './Loader'
 import VehicleManager from './VehicleManager'
 import Screenshot from './Screenshot'
 
-const keyMap = [
-    { name: 'forward', keys: ['ArrowUp'] },
-    { name: 'backward', keys: ['ArrowDown'] },
-    { name: 'left', keys: ['ArrowLeft'] },
-    { name: 'right', keys: ['ArrowRight'] },
-    { name: 'brake', keys: ['Space'] },
-]
-
 // Canvas component
 const ThreeCanvas = () => {
     const physicsEnabled = useGameStore((state) => state.physicsEnabled)
-    const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
-
-    // Handle key press
-    const handleKeyPress = (key) => {
-        if (key === 'forward' && !physicsEnabled) {
-            setPhysicsEnabled(true)
-        }
-    }
 
     return (
         <div id='canvas' className='absolute inset-0 overflow-hidden'>
             <Loader />
 
-            <KeyboardControls map={keyMap} onChange={handleKeyPress}>
+            <InputProvider>
                 <Canvas shadows>
                     <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 
@@ -51,7 +36,7 @@ const ThreeCanvas = () => {
 
                     <Screenshot />
                 </Canvas>
-            </KeyboardControls>
+            </InputProvider>
         </div>
     )
 }
