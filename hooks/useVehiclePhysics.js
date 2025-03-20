@@ -3,6 +3,7 @@ import { useRapier, useAfterPhysicsStep } from '@react-three/rapier'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
+import useGameStore from '../store/gameStore'
 import { useInput } from '../context/InputContext'
 
 // Constants
@@ -22,6 +23,9 @@ const FORCES = { accelerate: 30, brake: 0.5, steerAngle: Math.PI / 6 }
  * @returns {Object} - Vehicle controller
  */
 export const useVehiclePhysics = (vehicleRef, wheels) => {
+    const physicsEnabled = useGameStore((state) => state.physicsEnabled)
+    const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
+
     const { world } = useRapier()
 
     // Refs
@@ -112,6 +116,11 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
         // All wheels braking
         for (let i = 0; i < wheels.length; i++) {
             vehicleController.current.setWheelBrake(i, brakeForce)
+        }
+
+        // Up Arrow
+        if (!physicsEnabled && engineForce) {
+            setPhysicsEnabled(true)
         }
     })
 
