@@ -18,16 +18,15 @@ const DEFAULT_TERRAIN_CONFIG = {
 const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, noise }) => {
     // Load texture
     const textures = useTexture({
-        map: 'assets/images/ground/dirt_01.png',
-        normalMap: 'assets/images/ground/dirt_01_nrm.png',
+        map: 'assets/images/ground/sand.jpg',
+        normalMap: 'assets/images/ground/sand_normal.jpg',
     })
     // Apply texture settings
     useMemo(() => {
-        const textureRepeat = tileSize / 3
-        Object.values(textures).forEach((texture) => {
-            texture.wrapS = texture.wrapT = RepeatWrapping
-            texture.repeat.set(textureRepeat, textureRepeat)
-        })
+        textures.map.wrapS = textures.map.wrapT = RepeatWrapping
+        textures.map.repeat.set(tileSize, tileSize)
+        textures.normalMap.wrapS = textures.normalMap.wrapT = RepeatWrapping
+        textures.normalMap.repeat.set(tileSize / 3, tileSize / 3)
     }, [textures])
 
     // Generate heights
@@ -43,9 +42,9 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 
         for (let i = 0; i <= resolution; i++) {
             for (let j = 0; j <= resolution; j++) {
-                const worldX = position[0] + i * step - tileSize / 2;
-                const worldZ = position[2] + j * step - tileSize / 2;
-                
+                const worldX = position[0] + i * step - tileSize / 2
+                const worldZ = position[2] + j * step - tileSize / 2
+
                 const distSq = worldX * worldX + worldZ * worldZ
 
                 let height = 0
