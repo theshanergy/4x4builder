@@ -1,22 +1,19 @@
-import { memo, useRef, useEffect } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { memo, useRef } from 'react'
+import { useFrame, useThree, useLoader } from '@react-three/fiber'
 import { TextureLoader, EquirectangularReflectionMapping } from 'three'
 
 import useGameStore from '../store/gameStore'
 import TerrainManager from './TerrainManager'
 
 // Equirectangular environment map
-const EquirectEnvMap = ({ file }) => {
-    const { scene } = useThree()
+const EquirectEnvMap = () => {
+    const texture = useLoader(TextureLoader, '/assets/images/envmap/gainmap.webp')
+    texture.mapping = EquirectangularReflectionMapping
+    texture.needsUpdate = true
 
-    useEffect(() => {
-        const loader = new TextureLoader()
-        loader.load(file, (texture) => {
-            texture.mapping = EquirectangularReflectionMapping
-            texture.needsUpdate = true
-            scene.environment = texture
-        })
-    }, [file, scene])
+    useThree(({ scene }) => {
+        scene.environment = texture
+    })
 
     return null
 }
@@ -52,7 +49,7 @@ const SceneEnvironment = memo(() => {
             <fog attach='fog' args={['#b8d9f9', 80, 160]} />
 
             {/* Environment map for reflections */}
-            <EquirectEnvMap file='/assets/images/envmap/gainmap.webp' />
+            <EquirectEnvMap />
 
             {/* Terrain */}
             <TerrainManager />
