@@ -4,7 +4,6 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 import useGameStore from '../store/gameStore'
-import { useInput } from '../context/InputContext'
 
 // Constants
 const VECTORS = {
@@ -90,13 +89,15 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
         })
     })
 
-    // Get input
-    const { leftStick, rightStick, leftTrigger, rightTrigger, buttons, keys } = useInput()
-
     // Handle input forces each frame
     useFrame(() => {
         if (!vehicleController.current) return
 
+        // Get input refs from store
+        const inputRefs = useGameStore.getState().inputRefs
+        if (!inputRefs) return
+
+        const { leftStick, rightStick, leftTrigger, rightTrigger, keys } = inputRefs
         const clamp = (value) => Math.min(1, Math.max(-1, value))
 
         const engineForce = FORCES.accelerate * clamp((keys.current?.['ArrowUp'] ? 1 : 0) + (rightStick.current?.y < 0 ? -rightStick.current.y : 0) + (rightTrigger.current || 0))
