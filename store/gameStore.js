@@ -2,15 +2,11 @@ import { create } from 'zustand'
 import { produce } from 'immer'
 import vehicleConfigs from '../vehicleConfigs'
 
-// Preprocess vehicle configs to ensure body and id are set
+// Compatibility shim for legacy localStorage data, mapping old vehicle id field to body
 const preprocessVehicleConfig = (config) => {
     if (!config) return config
-    const body = config.body || config.id
-    return {
-        ...config,
-        body,
-        id: body, // ensure both fields exist and match
-    }
+    const { id, ...rest } = config
+    return { ...rest, ...(id && { body: id }) }
 }
 
 // Game store
