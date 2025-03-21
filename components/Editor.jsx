@@ -12,7 +12,7 @@ import GearIcon from '../assets/images/icons/Gear.svg'
 
 function Editor() {
     // Get vehicle state from store using granular selectors
-    const id = useGameStore((state) => state.currentVehicle?.id) || null
+    const body = useGameStore((state) => state.currentVehicle?.body) || null
     const color = useGameStore((state) => state.currentVehicle?.color)
     const roughness = useGameStore((state) => state.currentVehicle?.roughness) || 0
     const lift = useGameStore((state) => state.currentVehicle?.lift)
@@ -34,7 +34,7 @@ function Editor() {
 
     // Reconstruct currentVehicle for existing code
     const currentVehicle = {
-        id,
+        body,
         color,
         roughness,
         lift,
@@ -51,7 +51,7 @@ function Editor() {
 
     // Check if current vehicle has addons.
     function addonsExist() {
-        return currentVehicle.id && Object.keys(vehicleConfigs.vehicles[currentVehicle.id].addons).length > 0 ? true : false
+        return currentVehicle.body && Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons).length > 0 ? true : false
     }
 
     // Group object by key.
@@ -114,7 +114,7 @@ function Editor() {
                 {/* Vehicle */}
                 <div className='field field-vehicle'>
                     <label>Model</label>
-                    <GroupedSelect value={currentVehicle.id} itemList={vehicleConfigs.vehicles} groupBy={'make'} onChange={(e) => setVehicle({ id: e.target.value })} />
+                    <GroupedSelect value={currentVehicle.body} itemList={vehicleConfigs.vehicles} groupBy={'make'} onChange={(e) => setVehicle({ body: e.target.value })} />
                 </div>
             </EditorSection>
 
@@ -221,14 +221,14 @@ function Editor() {
             {/* Addons */}
             {addonsExist() && (
                 <EditorSection title='Addons' icon={<ToolIcon className='icon' />}>
-                    {Object.keys(vehicleConfigs.vehicles[currentVehicle.id].addons).map((addon) => (
+                    {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons).map((addon) => (
                         <div key={addon} className={`field field-${addon}`}>
-                            <label>{vehicleConfigs.vehicles[currentVehicle.id].addons[addon].name}</label>
+                            <label>{vehicleConfigs.vehicles[currentVehicle.body].addons[addon].name}</label>
                             <select value={currentVehicle.addons[addon]} required onChange={(e) => setVehicle({ addons: { ...currentVehicle.addons, [addon]: e.target.value } })}>
-                                {!vehicleConfigs.vehicles[currentVehicle.id].addons[addon].required && <option value=''>None</option>}
-                                {Object.keys(vehicleConfigs.vehicles[currentVehicle.id].addons[addon].options).map((option) => (
+                                {!vehicleConfigs.vehicles[currentVehicle.body].addons[addon].required && <option value=''>None</option>}
+                                {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons[addon].options).map((option) => (
                                     <option key={option} value={option}>
-                                        {vehicleConfigs.vehicles[currentVehicle.id].addons[addon].options[option].name}
+                                        {vehicleConfigs.vehicles[currentVehicle.body].addons[addon].options[option].name}
                                     </option>
                                 ))}
                             </select>
