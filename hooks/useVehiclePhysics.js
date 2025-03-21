@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 import useGameStore from '../store/gameStore'
+import useInputStore from '../store/inputStore'
 
 // Constants
 const VECTORS = {
@@ -94,15 +95,23 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
         if (!vehicleController.current) return
 
         // Get input refs from store
-        const inputRefs = useGameStore.getState().inputRefs
-        if (!inputRefs) return
+        const { keys, gamepadAxes, gamepadButtons } = useInputStore.getState()
 
-        const { leftStick, rightStick, leftTrigger, rightTrigger, keys } = inputRefs
+        // Get gamepad input
+        const leftStickX = gamepadAxes[0] || 0
+        const leftStickY = gamepadAxes[1] || 0
+        const rightStickX = gamepadAxes[2] || 0
+        const rightStickY = gamepadAxes[3] || 0
+
+        const leftTrigger = gamepadButtons[6] ? 1 : 0
+        const rightTrigger = gamepadButtons[7] ? 1 : 0
+
         const clamp = (value) => Math.min(1, Math.max(-1, value))
 
-        const engineForce = FORCES.accelerate * clamp((keys.current?.['ArrowUp'] ? 1 : 0) + (rightStick.current?.y < 0 ? -rightStick.current.y : 0) + (rightTrigger.current || 0))
-        const steerForce = FORCES.steerAngle * clamp((keys.current?.['ArrowRight'] ? -1 : 0) + (keys.current?.['ArrowLeft'] ? 1 : 0) + (-leftStick.current?.x || 0))
-        const brakeForce = FORCES.brake * clamp((keys.current?.['ArrowDown'] ? 1 : 0) + (rightStick.current?.y > 0 ? rightStick.current.y : 0) + (leftTrigger.current || 0))
+        // Calculate forces based on input
+        const engineForce = FORCES.accelerate * clamp((keys.has('ArrowUp') ? 1 : 0) + (rightStickY < 0 ? -rightStickY : 0) + rightTrigger)
+        const steerForce = FORCES.steerAngle * clamp((keys.has('ArrowRight') ? -1 : 0) + (keys.has('ArrowLeft') ? 1 : 0) + -leftStickX)
+        const brakeForce = FORCES.brake * clamp((keys.has('ArrowDown') ? 1 : 0) + (rightStickY > 0 ? rightStickY : 0) + leftTrigger)
 
         // Front wheels steering (assuming first two wheels are front)
         for (let i = 0; i < 2 && i < wheels.length; i++) {

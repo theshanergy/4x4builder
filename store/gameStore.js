@@ -20,10 +20,6 @@ const useGameStore = create((set, get) => {
         setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
         setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
 
-        // Input refs
-        inputRefs: null,
-        setInputRefs: (refs) => set({ inputRefs: refs }),
-
         // Notification state
         notification: null,
         showNotification: (notificationData) => set({ notification: { ...notificationData, id: Date.now() } }),
