@@ -1,6 +1,6 @@
 const vehicleConfigs = {
     defaults: {
-        id: 'toyota_4runner_5g',
+        body: 'toyota_4runner_5g',
         lift: 0,
         color: '#B91818',
         roughness: 0,

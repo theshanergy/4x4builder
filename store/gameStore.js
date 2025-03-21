@@ -1,9 +1,19 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
-import { useRef } from 'react'
-import { Vector3 } from 'three'
 import vehicleConfigs from '../vehicleConfigs'
 
+// Preprocess vehicle configs to ensure body and id are set
+const preprocessVehicleConfig = (config) => {
+    if (!config) return config
+    const body = config.body || config.id
+    return {
+        ...config,
+        body,
+        id: body, // ensure both fields exist and match
+    }
+}
+
+// Game store
 const useGameStore = create((set, get) => {
     return {
         // Game state
@@ -13,7 +23,7 @@ const useGameStore = create((set, get) => {
         setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
         setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
         setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
-        
+
         // Input refs
         inputRefs: null,
         setInputRefs: (refs) => set({ inputRefs: refs }),
@@ -35,7 +45,16 @@ const useGameStore = create((set, get) => {
         savedVehicles: (() => {
             // Get from local storage or null.
             const localStorageVehicles = localStorage.getItem('savedVehicles')
-            return localStorageVehicles ? JSON.parse(localStorageVehicles) : { current: null }
+            const vehicles = localStorageVehicles ? JSON.parse(localStorageVehicles) : { current: null }
+
+            // Normalize all saved configs
+            for (const key in vehicles) {
+                if (key !== 'current' && vehicles[key]?.config) {
+                    vehicles[key].config = preprocessVehicleConfig(vehicles[key].config)
+                }
+            }
+
+            return vehicles
         })(),
         setSavedVehicles: (updater) =>
             set((state) => {
@@ -69,31 +88,32 @@ const useGameStore = create((set, get) => {
 
         // Current vehicle config
         currentVehicle: (() => {
-            // Get current save.
             const localStorageVehicles = localStorage.getItem('savedVehicles')
             const savedVehicles = localStorageVehicles ? JSON.parse(localStorageVehicles) : { current: null }
             const defaultVehicleId = savedVehicles.current
-            return defaultVehicleId && savedVehicles[defaultVehicleId] ? savedVehicles[defaultVehicleId].config : vehicleConfigs.defaults
+            const config = defaultVehicleId && savedVehicles[defaultVehicleId] ? savedVehicles[defaultVehicleId].config : vehicleConfigs.defaults
+
+            return preprocessVehicleConfig(config)
         })(),
         setVehicle: (updater) =>
             set(
                 produce((state) => {
                     // Get previous vehicle id
-                    const prevId = state.currentVehicle.id
+                    const prevBodyId = state.currentVehicle.body
 
                     // Update vehicle state
                     if (typeof updater === 'function') {
                         updater(state.currentVehicle)
                     } else {
-                        Object.assign(state.currentVehicle, updater)
+                        Object.assign(state.currentVehicle, preprocessVehicleConfig(updater))
                     }
 
                     // Get new vehicle id
-                    const newId = state.currentVehicle.id
+                    const newBodyId = state.currentVehicle.body
 
                     // If vehicle body changed, reset addons
-                    if (newId !== prevId && updater.id) {
-                        state.currentVehicle.addons = vehicleConfigs.vehicles[newId]?.default_addons || {}
+                    if (newBodyId !== prevBodyId && updater.body) {
+                        state.currentVehicle.addons = vehicleConfigs.vehicles[newBodyId]?.default_addons || {}
                     }
                 })
             ),
@@ -106,7 +126,7 @@ const useGameStore = create((set, get) => {
             if (encodedConfig) {
                 console.log('Loading vehicle from shared url.')
                 const jsonString = decodeURIComponent(encodedConfig)
-                const config = JSON.parse(jsonString)
+                const config = preprocessVehicleConfig(JSON.parse(jsonString))
 
                 // Overwrite current vehicle from URL parameter
                 set({ currentVehicle: config })
