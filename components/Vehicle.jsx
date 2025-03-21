@@ -145,7 +145,7 @@ const Body = memo(({ id, height, color, roughness, addons }) => {
 // Vehicle component with physics
 const Vehicle = (props) => {
     // Get vehicle properties from props or defaults
-    const { id, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, addons } = {
+    const { body, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, addons } = {
         ...vehicleConfigs.defaults,
         ...props,
     }
@@ -166,8 +166,8 @@ const Vehicle = (props) => {
     const vehicleHeight = useMemo(() => axleHeight + liftHeight, [axleHeight, liftHeight])
 
     // Get wheel offset and wheelbase
-    const offset = vehicleConfigs.vehicles[id]['wheel_offset'] + parseFloat(wheel_offset)
-    const wheelbase = vehicleConfigs.vehicles[id]['wheelbase']
+    const offset = vehicleConfigs.vehicles[body]['wheel_offset'] + parseFloat(wheel_offset)
+    const wheelbase = vehicleConfigs.vehicles[body]['wheelbase']
 
     // Get wheel rotation
     const rotation = (Math.PI * 90) / 180
@@ -211,7 +211,7 @@ const Vehicle = (props) => {
         <RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false}>
             <CuboidCollider args={[1, 0.5, wheelbase / 2 + axleHeight]} position={[0, 1, 0]} />
             <group name='Vehicle'>
-                <Body key={id} id={id} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
+                <Body key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
                 <Wheels
                     rim={rim}
                     rim_diameter={rim_diameter}

@@ -4,7 +4,7 @@ import Vehicle from './Vehicle'
 // Vehicle manager component
 const VehicleManager = () => {
     // Get current vehicle config
-    const id = useGameStore((state) => state.currentVehicle.id)
+    const body = useGameStore((state) => state.currentVehicle.body)
     const color = useGameStore((state) => state.currentVehicle.color)
     const roughness = useGameStore((state) => state.currentVehicle.roughness)
     const lift = useGameStore((state) => state.currentVehicle.lift)
@@ -21,7 +21,7 @@ const VehicleManager = () => {
     return (
         <>
             <Vehicle
-                id={id}
+                body={body}
                 color={color}
                 roughness={roughness}
                 lift={lift}
