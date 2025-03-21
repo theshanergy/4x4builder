@@ -17,7 +17,7 @@ const vehicleConfigs = {
     },
     vehicles: {
         toyota_4runner_5g_late: {
-            name: 'Toyota 4Runner (2014+)',
+            name: 'Toyota 4Runner (2014-2024)',
             make: 'Toyota',
             model: 'assets/models/vehicles/toyota/4runner/5g/4runner_late.glb',
             wheel_offset: 0.8,
@@ -106,6 +106,15 @@ const vehicleConfigs = {
             model: 'assets/models/vehicles/toyota/tacoma/2g/tacoma.glb',
             wheel_offset: 0.81,
             wheelbase: 3.245,
+            default_addons: {},
+            addons: {},
+        },
+        toyota_j250: {
+            name: 'Toyota Land Cruiser (2024+)',
+            make: 'Toyota',
+            model: 'assets/models/vehicles/toyota/land_cruiser/j250/j250.glb',
+            wheel_offset: 0.81,
+            wheelbase: 2.85,
             default_addons: {},
             addons: {},
         },
