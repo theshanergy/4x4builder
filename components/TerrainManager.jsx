@@ -1,9 +1,11 @@
 import { useState, useRef, useMemo } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
-import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
+import { useFrame } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
-import { Vector2, RepeatWrapping, PlaneGeometry } from 'three'
+import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
+import { Vector2, RepeatWrapping, PlaneGeometry, Vector3 } from 'three'
 import { Noise } from 'noisejs'
+
+import useGameStore from '../store/gameStore'
 
 // Default terrain configuration
 const DEFAULT_TERRAIN_CONFIG = {
@@ -78,9 +80,14 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
         return geom
     }, [heights, tileSize, resolution])
 
+    // Set collider arguments
+    const colliderArgs = useMemo(() => {
+        return [resolution, resolution, heights.values, { x: tileSize, y: maxHeight, z: tileSize }]
+    }, [resolution, heights, tileSize, maxHeight])
+
     return (
         <RigidBody type='fixed' position={position} colliders={false}>
-            <HeightfieldCollider args={[resolution, resolution, heights.values, { x: tileSize, y: maxHeight, z: tileSize }]} name={`Tile-${position[0]}-${position[2]}`} />
+            <HeightfieldCollider args={colliderArgs} name={`Tile-${position[0]}-${position[2]}`} />
             <mesh geometry={geometry} receiveShadow>
                 <meshStandardMaterial {...textures} />
             </mesh>
@@ -91,23 +98,23 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 // Main TerrainManager component
 const TerrainManager = () => {
     const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
-    const { camera } = useThree()
+    const cameraTargetRef = useGameStore((state) => state.cameraTargetRef)
     const [activeTiles, setActiveTiles] = useState([])
     const loadedTiles = useRef(new Map())
-    const seed = useRef(Math.random())
     const tilesInViewDistance = Math.ceil(viewDistance / tileSize)
     const lastTileCoord = useRef({ x: null, z: null })
 
     // Generate noise instance
-    const noise = useMemo(() => new Noise(seed.current), [])
+    const noise = useMemo(() => new Noise(123), [])
 
-    // Update tiles based on camera position
+    // Update tiles based on camera target position
     useFrame(() => {
-        const cameraPosition = camera.position
-        const currentTileX = Math.floor(cameraPosition.x / tileSize)
-        const currentTileZ = Math.floor(cameraPosition.z / tileSize)
+        // Use camera target position if available, otherwise fall back to scene center
+        const centerPosition = cameraTargetRef?.current || new Vector3(0, 0, 0)
+        const currentTileX = Math.floor(centerPosition.x / tileSize)
+        const currentTileZ = Math.floor(centerPosition.z / tileSize)
 
-        // Only update tiles if the camera moved to a new tile
+        // Only update tiles if the center position moved to a new tile
         if (currentTileX === lastTileCoord.current.x && currentTileZ === lastTileCoord.current.z) {
             return
         }
@@ -124,9 +131,9 @@ const TerrainManager = () => {
                 const position = [tileX * tileSize, 0, tileZ * tileSize]
                 const tileKey = `${tileX},${tileZ}`
 
-                // Calculate distance from camera to tile center
+                // Calculate distance from center position to tile center
                 const tileCenter = new Vector2(tileX * tileSize + tileSize / 2, tileZ * tileSize + tileSize / 2)
-                const distanceToTile = new Vector2(cameraPosition.x, cameraPosition.z).distanceTo(tileCenter)
+                const distanceToTile = new Vector2(centerPosition.x, centerPosition.z).distanceTo(tileCenter)
 
                 // Add tile if within view distance
                 if (distanceToTile <= viewDistance) {
