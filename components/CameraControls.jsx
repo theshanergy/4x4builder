@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect } from 'react'
+import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { Vector3, Raycaster } from 'three'
@@ -11,7 +11,6 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
 
     //const camera = useThree((state) => state.camera)
     const scene = useThree((state) => state.scene)
-    const size = useThree((state) => state.size)
 
     const cameraRef = useRef()
     const cameraControlsRef = useRef()
@@ -20,10 +19,8 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
     const downDirection = useRef(new Vector3(0, -1, 0))
     const cameraPosition = useRef(new Vector3())
 
-    // Determine if the device is in portrait mode
-    const isPortrait = useMemo(() => size.width / size.height < 1, [size])
-
     // Set default camera position based on aspect ratio
+    const isPortrait = window.innerWidth / window.innerHeight < 1
     const defaultCameraPosition = isPortrait ? [-2, 1, 12] : [-4, 1, 6.5]
 
     useFrame(() => {
