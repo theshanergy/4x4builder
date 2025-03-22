@@ -1,20 +1,26 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useRapier, useAfterPhysicsStep } from '@react-three/rapier'
 import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
+import { Vector3, Quaternion } from 'three'
 
 import useGameStore from '../store/gameStore'
 import useInputStore from '../store/inputStore'
 
 // Constants
 const VECTORS = {
-    UP: new THREE.Vector3(0, 1, 0),
-    RIGHT: new THREE.Vector3(1, 0, 0),
-    DOWN: new THREE.Vector3(0, -1, 0),
+    UP: new Vector3(0, 1, 0),
+    RIGHT: new Vector3(1, 0, 0),
+    DOWN: new Vector3(0, -1, 0),
+    FORWARD: new Vector3(0, 0, 1),
 }
 
 // Physics
-const FORCES = { accelerate: 30, brake: 0.5, steerAngle: Math.PI / 6 }
+const FORCES = {
+    accelerate: 30,
+    brake: 0.5,
+    steerAngle: Math.PI / 6,
+    airControl: 0.1, // Subtle air control force
+}
 
 /**
  * Generic vehicle physics hook for wheeled vehicles
@@ -30,6 +36,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
     // Refs
     const vehicleController = useRef()
+
+    // Track airborne state
+    const [isAirborne, setIsAirborne] = useState(false)
 
     // Setup vehicle physics
     useEffect(() => {
@@ -70,6 +79,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
         // Update the vehicle with safe timestep
         controller.updateVehicle(world.timestep)
 
+        // Check if all wheels are not in contact with the ground (airborne)
+        let wheelsInContact = 0
+
         // Update each wheel
         wheels.forEach((wheel, index) => {
             const wheelRef = wheel.ref.current
@@ -82,12 +94,23 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
             const steering = controller.wheelSteering(index) || 0
             const rotation = controller.wheelRotation(index) || 0
 
+            // Check if the wheel is in contact with the ground
+            if (controller.wheelIsInContact(index)) {
+                wheelsInContact++
+            }
+
             // Update position
             wheelRef.position.y = connection?.y - suspension
 
             // Apply steering and rotation
-            wheelRef.quaternion.multiplyQuaternions(new THREE.Quaternion().setFromAxisAngle(VECTORS.UP, steering), new THREE.Quaternion().setFromAxisAngle(wheelAxleCs, rotation))
+            wheelRef.quaternion.multiplyQuaternions(new Quaternion().setFromAxisAngle(VECTORS.UP, steering), new Quaternion().setFromAxisAngle(wheelAxleCs, rotation))
         })
+
+        // Update airborne state
+        const newAirborneState = wheelsInContact === 0
+        if (newAirborneState !== isAirborne) {
+            setIsAirborne(newAirborneState)
+        }
     })
 
     // Handle input forces each frame
@@ -113,22 +136,39 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
         const steerForce = FORCES.steerAngle * clamp((keys.has('ArrowRight') ? -1 : 0) + (keys.has('ArrowLeft') ? 1 : 0) + -leftStickX)
         const brakeForce = FORCES.brake * clamp((keys.has('ArrowDown') ? 1 : 0) + (rightStickY > 0 ? rightStickY : 0) + leftTrigger)
 
-        // Front wheels steering (assuming first two wheels are front)
-        for (let i = 0; i < 2 && i < wheels.length; i++) {
-            vehicleController.current.setWheelSteering(i, steerForce)
+        if (!isAirborne) {
+            // Front wheels steering (assuming first two wheels are front)
+            for (let i = 0; i < 2 && i < wheels.length; i++) {
+                vehicleController.current.setWheelSteering(i, steerForce)
+            }
+
+            // Rear wheels driving (assuming last two wheels are rear)
+            for (let i = 2; i < 4 && i < wheels.length; i++) {
+                vehicleController.current.setWheelEngineForce(i, -engineForce)
+            }
+
+            // All wheels braking
+            for (let i = 0; i < wheels.length; i++) {
+                vehicleController.current.setWheelBrake(i, brakeForce)
+            }
+        } else {
+            // Airborne controls when all wheels are not in contact
+            const vehicle = vehicleRef.current
+            if (vehicle) {
+                const pitch = clamp((keys.has('ArrowUp') ? -1 : 0) + (keys.has('ArrowDown') ? 1 : 0) - leftStickY)
+                const roll = clamp((keys.has('ArrowLeft') ? -1 : 0) + (keys.has('ArrowRight') ? 1 : 0) + leftStickX)
+                const yaw = clamp(-rightStickX)
+
+                // Construct torque vector in world space
+                const localTorque = new Vector3(pitch, yaw, roll)
+                const worldTorque = localTorque.applyQuaternion(new Quaternion().copy(vehicle.rotation()))
+
+                // Apply impulse
+                vehicle.applyTorqueImpulse(worldTorque.multiplyScalar(FORCES.airControl), true)
+            }
         }
 
-        // Rear wheels driving (assuming last two wheels are rear)
-        for (let i = 2; i < 4 && i < wheels.length; i++) {
-            vehicleController.current.setWheelEngineForce(i, -engineForce)
-        }
-
-        // All wheels braking
-        for (let i = 0; i < wheels.length; i++) {
-            vehicleController.current.setWheelBrake(i, brakeForce)
-        }
-
-        // Up Arrow
+        // Enable physics if not already enabled
         if (!physicsEnabled && engineForce) {
             setPhysicsEnabled(true)
         }
