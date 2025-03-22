@@ -207,9 +207,13 @@ const Vehicle = (props) => {
         }
     })
 
+    // Collider props
+    const colliderArgs = useMemo(() => [1, 0.5, wheelbase / 2 + axleHeight], [wheelbase, axleHeight])
+    const colliderPosition = useMemo(() => [0, 1, 0], [])
+
     return (
         <RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false} angularDamping={1}>
-            <CuboidCollider args={[1, 0.5, wheelbase / 2 + axleHeight]} position={[0, 1, 0]} />
+            <CuboidCollider args={colliderArgs} position={colliderPosition} />
             <group name='Vehicle'>
                 <Body key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
                 <Wheels
