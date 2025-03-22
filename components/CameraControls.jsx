@@ -7,7 +7,6 @@ import useGameStore from '../store/gameStore'
 
 // Camera controls and chase cam logic
 const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
-    const setCameraTargetRef = useGameStore((state) => state.setCameraTargetRef)
     const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 
     //const camera = useThree((state) => state.camera)
@@ -15,7 +14,6 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
     const size = useThree((state) => state.size)
 
     const cameraRef = useRef()
-    const targetPosition = useRef(new Vector3(0, 0.95, 0))
     const cameraControlsRef = useRef()
 
     const raycaster = useRef(new Raycaster())
@@ -28,16 +26,11 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
     // Set default camera position based on aspect ratio
     const defaultCameraPosition = isPortrait ? [-2, 1, 12] : [-4, 1, 6.5]
 
-    useEffect(() => {
-        // Set the camera target
-        setCameraTargetRef(targetPosition)
-    }, [targetPosition])
-
     useFrame(() => {
         if (!cameraControlsRef.current) return
 
         // Smoothly update the orbit controls target
-        cameraControlsRef.current.target.lerp(targetPosition.current, followSpeed)
+        cameraControlsRef.current.target.lerp(useGameStore.getState().cameraTarget, followSpeed)
         cameraControlsRef.current.update()
 
         // Ground avoidance logic

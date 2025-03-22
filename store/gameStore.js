@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
+import { Vector3 } from 'three'
 import vehicleConfigs from '../vehicleConfigs'
 
 // Compatibility shim for legacy localStorage data, mapping old vehicle id field to body
@@ -26,10 +27,13 @@ const useGameStore = create((set, get) => {
         hideNotification: () => set({ notification: null }),
 
         // Camera state
-        cameraTargetRef: null,
+        cameraTarget: new Vector3(0, 0, 0),
         cameraControlsRef: null,
         cameraAutoRotate: false,
-        setCameraTargetRef: (ref) => set({ cameraTargetRef: ref }),
+        setCameraTarget: (x, y, z) => {
+            // mutate in place
+            useGameStore.getState().cameraTarget.set(x, y, z)
+        },
         setCameraControlsRef: (ref) => set({ cameraControlsRef: ref }),
         setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
 

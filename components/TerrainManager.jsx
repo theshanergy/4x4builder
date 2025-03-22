@@ -98,7 +98,6 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 // Main TerrainManager component
 const TerrainManager = () => {
     const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
-    const cameraTargetRef = useGameStore((state) => state.cameraTargetRef)
     const [activeTiles, setActiveTiles] = useState([])
     const loadedTiles = useRef(new Map())
     const tilesInViewDistance = Math.ceil(viewDistance / tileSize)
@@ -110,7 +109,7 @@ const TerrainManager = () => {
     // Update tiles based on camera target position
     useFrame(() => {
         // Use camera target position if available, otherwise fall back to scene center
-        const centerPosition = cameraTargetRef?.current || new Vector3(0, 0, 0)
+        const centerPosition = useGameStore.getState().cameraTarget
         const currentTileX = Math.floor(centerPosition.x / tileSize)
         const currentTileZ = Math.floor(centerPosition.z / tileSize)
 

@@ -20,16 +20,16 @@ const EquirectEnvMap = () => {
 
 // Camera target light
 const TargetLight = () => {
-    const cameraTargetRef = useGameStore((s) => s.cameraTargetRef)
     const lightRef = useRef()
 
     useFrame(() => {
-        if (lightRef.current && cameraTargetRef?.current) {
-            const { x, z } = cameraTargetRef.current
-            Object.assign(lightRef.current.position, { x: x + 10, y: 10, z: z + 10 })
-            lightRef.current.target.position.copy(cameraTargetRef.current)
-            lightRef.current.target.updateMatrixWorld()
-        }
+        const light = lightRef.current
+        const cameraTarget = useGameStore.getState().cameraTarget
+
+        if (!light) return
+        light.position.set(cameraTarget.x + 10, 10, cameraTarget.z + 10)
+        light.target.position.copy(cameraTarget)
+        light.target.updateMatrixWorld()
     })
 
     return <directionalLight ref={lightRef} castShadow intensity={1.5} position={[10, 10, 10]} shadow-camera-far={50} />
