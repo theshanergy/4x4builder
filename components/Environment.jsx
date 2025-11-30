@@ -69,7 +69,7 @@ const SceneEnvironment = memo(() => {
 			<AtmosphericSky sunPosition={[sunDirection.x, sunDirection.y, sunDirection.z]} />
 
 			{/* Distant fog for depth - match horizon color */}
-			<fog attach='fog' args={['#c5d5e8', 150, 350]} />
+			<fog attach='fog' args={['#c5d5e8', 150, 450]} />
 
 			{/* Environment map for reflections */}
 			<EquirectEnvMap />
