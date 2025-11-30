@@ -24,6 +24,11 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
     const rimGltf = useGLTF(vehicleConfigs.wheels.rims[rim].model)
     const tireGltf = useGLTF(vehicleConfigs.wheels.tires[tire].model)
 
+    // Clone rim scenes
+    const rimScenes = useMemo(() => {
+        return wheelPositions.map(() => rimGltf.scene.clone())
+    }, [rimGltf.scene, wheelPositions.length])
+
     // Scale tires.
     const tireGeometry = useMemo(() => {
         // Determine y scale as a percentage of width.
@@ -94,7 +99,7 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
                 <group key={key} ref={wheelRefs[index]} {...transform}>
                     {/* Add an inner group with the correct visual rotation */}
                     <group rotation={rotation}>
-                        <primitive name='Rim' object={rimGltf.scene.clone()} scale={[odScale, odScale, widthScale]} />
+                        <primitive name='Rim' object={rimScenes[index]} scale={[odScale, odScale, widthScale]} />
                         <mesh name='Tire' geometry={tireGeometry} castShadow>
                             <meshStandardMaterial color='#121212' />
                         </mesh>
@@ -173,12 +178,12 @@ const Vehicle = (props) => {
     const rotation = (Math.PI * 90) / 180
 
     // Set wheel positions
-    const wheelPositions = [
+    const wheelPositions = useMemo(() => [
         { key: 'FL', name: 'FL', position: [offset, axleHeight, wheelbase / 2], rotation: [0, rotation, 0] },
         { key: 'FR', name: 'FR', position: [-offset, axleHeight, wheelbase / 2], rotation: [0, -rotation, 0] },
         { key: 'RL', name: 'RL', position: [offset, axleHeight, -wheelbase / 2], rotation: [0, rotation, 0] },
         { key: 'RR', name: 'RR', position: [-offset, axleHeight, -wheelbase / 2], rotation: [0, -rotation, 0] },
-    ]
+    ], [offset, axleHeight, wheelbase, rotation])
 
     // Create wheel configurations
     const physicsWheels = useMemo(() => {
@@ -192,7 +197,7 @@ const Vehicle = (props) => {
             suspensionStiffness: 28,
             radius: (tire_diameter * 2.54) / 100 / 2,
         }))
-    }, [offset, axleHeight, wheelbase, tire_diameter])
+    }, [wheelPositions, tire_diameter])
 
     // Use vehicle physics
     useVehiclePhysics(chassisRef, physicsWheels)

@@ -22,6 +22,7 @@ const EquirectEnvMap = () => {
 // Camera target light
 const TargetLight = ({ sunDirection }) => {
 	const lightRef = useRef()
+	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 
 	useFrame(() => {
 		const light = lightRef.current
@@ -40,11 +41,11 @@ const TargetLight = ({ sunDirection }) => {
 	return (
 		<directionalLight
 			ref={lightRef}
-			castShadow
+			castShadow={!performanceDegraded}
 			intensity={2.5}
 			color='#fff5e6'
 			position={[10, 10, 10]}
-			shadow-mapSize={[2048, 2048]}
+			shadow-mapSize={performanceDegraded ? [512, 512] : [1024, 1024]}
 			shadow-camera-far={100}
 			shadow-camera-left={-30}
 			shadow-camera-right={30}

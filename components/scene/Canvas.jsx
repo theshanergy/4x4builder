@@ -14,6 +14,7 @@ import Screenshot from '../ui/Screenshot'
 // Canvas component
 const ThreeCanvas = () => {
     const physicsEnabled = useGameStore((state) => state.physicsEnabled)
+    const performanceDegraded = useGameStore((state) => state.performanceDegraded)
     const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
     
     // Initialize input handling
@@ -23,7 +24,7 @@ const ThreeCanvas = () => {
         <div id='canvas' className='absolute inset-0 overflow-hidden'>
             <Loader />
 
-            <Canvas shadows>
+            <Canvas shadows={!performanceDegraded} dpr={performanceDegraded ? 1 : [1, 1.5]}>
                 <PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 
                 <CameraControls />

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import { useRapier, useAfterPhysicsStep } from '@react-three/rapier'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
@@ -38,7 +38,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
     const vehicleController = useRef()
 
     // Track airborne state
-    const [isAirborne, setIsAirborne] = useState(false)
+    const isAirborne = useRef(false)
 
     // Setup vehicle physics
     useEffect(() => {
@@ -108,8 +108,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
         // Update airborne state
         const newAirborneState = wheelsInContact === 0
-        if (newAirborneState !== isAirborne) {
-            setIsAirborne(newAirborneState)
+        if (newAirborneState !== isAirborne.current) {
+            isAirborne.current = newAirborneState
         }
     })
 
@@ -136,7 +136,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
         const steerForce = FORCES.steerAngle * clamp((keys.has('ArrowRight') ? -1 : 0) + (keys.has('ArrowLeft') ? 1 : 0) + -leftStickX)
         const brakeForce = FORCES.brake * clamp((keys.has('ArrowDown') ? 1 : 0) + (rightStickY > 0 ? rightStickY : 0) + leftTrigger)
 
-        if (!isAirborne) {
+        if (!isAirborne.current) {
             // Front wheels steering (assuming first two wheels are front)
             for (let i = 0; i < 2 && i < wheels.length; i++) {
                 vehicleController.current.setWheelSteering(i, steerForce)
