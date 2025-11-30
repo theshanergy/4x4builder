@@ -4,7 +4,7 @@ import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 import { RepeatWrapping, PlaneGeometry, RingGeometry, Color, BufferAttribute, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
-import useGameStore from '../store/gameStore'
+import useGameStore from '../../store/gameStore'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01

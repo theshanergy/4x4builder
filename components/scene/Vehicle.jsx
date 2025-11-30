@@ -4,11 +4,11 @@ import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { useGLTF, Gltf } from '@react-three/drei'
 import { Vector3 } from 'three'
 
-import useGameStore from '../store/gameStore'
-import vehicleConfigs from '../vehicleConfigs'
-import useAnimateHeight from '../hooks/useAnimateHeight'
-import useVehiclePhysics from '../hooks/useVehiclePhysics'
-import useMaterialProperties from '../hooks/useMaterialProperties'
+import useGameStore from '../../store/gameStore'
+import vehicleConfigs from '../../vehicleConfigs'
+import useAnimateHeight from '../../hooks/useAnimateHeight'
+import useVehiclePhysics from '../../hooks/useVehiclePhysics'
+import useMaterialProperties from '../../hooks/useMaterialProperties'
 
 // Calculate point on line (a to b, at length).
 const linePoint = (a, b, length) => {

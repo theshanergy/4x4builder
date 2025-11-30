@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import useGameStore from '../store/gameStore'
+import useGameStore from '../../store/gameStore'
 
 const Actions = () => {
     // Get vehicle state from store using selectors

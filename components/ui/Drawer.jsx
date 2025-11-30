@@ -1,8 +1,8 @@
 import { useState, useRef, useLayoutEffect } from 'react'
 import classNames from 'classnames'
 
-import GearIcon from '../assets/images/icons/Gear.svg'
-import CloseIcon from '../assets/images/icons/Close.svg'
+import GearIcon from '../../assets/images/icons/Gear.svg'
+import CloseIcon from '../../assets/images/icons/Close.svg'
 
 // Drawer component
 const Drawer = ({ id, open: controlledOpen, defaultOpen = true, onToggle, className = '', isVertical = true, children }) => {

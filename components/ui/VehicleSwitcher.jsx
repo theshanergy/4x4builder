@@ -1,9 +1,9 @@
 import { useRef, useState, useEffect } from 'react'
 import classNames from 'classnames'
 
-import useGameStore from '../store/gameStore'
-import ChevronIcon from '../assets/images/icons/Chevron.svg'
-import TrashIcon from '../assets/images/icons/Trash.svg'
+import useGameStore from '../../store/gameStore'
+import ChevronIcon from '../../assets/images/icons/Chevron.svg'
+import TrashIcon from '../../assets/images/icons/Trash.svg'
 
 // Vehicle switcher component
 const VehicleSwitcher = () => {

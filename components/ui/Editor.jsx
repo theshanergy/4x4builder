@@ -1,14 +1,14 @@
-import vehicleConfigs from '../vehicleConfigs'
+import vehicleConfigs from '../../vehicleConfigs'
 import EditorSection from './EditorSection'
-import useGameStore from '../store/gameStore'
+import useGameStore from '../../store/gameStore'
 
-import VehicleIcon from '../assets/images/icons/Vehicle.svg'
-import SuspensionIcon from '../assets/images/icons/Suspension.svg'
-import PaintIcon from '../assets/images/icons/Paint.svg'
-import RimIcon from '../assets/images/icons/Rim.svg'
-import TireIcon from '../assets/images/icons/Tire.svg'
-import ToolIcon from '../assets/images/icons/Tool.svg'
-import GearIcon from '../assets/images/icons/Gear.svg'
+import VehicleIcon from '../../assets/images/icons/Vehicle.svg'
+import SuspensionIcon from '../../assets/images/icons/Suspension.svg'
+import PaintIcon from '../../assets/images/icons/Paint.svg'
+import RimIcon from '../../assets/images/icons/Rim.svg'
+import TireIcon from '../../assets/images/icons/Tire.svg'
+import ToolIcon from '../../assets/images/icons/Tool.svg'
+import GearIcon from '../../assets/images/icons/Gear.svg'
 
 function Editor() {
     // Get vehicle state from store using granular selectors

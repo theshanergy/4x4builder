@@ -2,7 +2,7 @@ import { memo, useRef, useMemo } from 'react'
 import { useFrame, useThree, useLoader } from '@react-three/fiber'
 import { TextureLoader, EquirectangularReflectionMapping, Vector3 } from 'three'
 
-import useGameStore from '../store/gameStore'
+import useGameStore from '../../store/gameStore'
 import TerrainManager from './TerrainManager'
 import AtmosphericSky from './Sky'
 

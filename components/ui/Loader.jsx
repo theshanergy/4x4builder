@@ -1,6 +1,6 @@
 import React from 'react'
-import useGameStore from '../store/gameStore'
-import useLoadingManager from '../hooks/useLoadingManager'
+import useGameStore from '../../store/gameStore'
+import useLoadingManager from '../../hooks/useLoadingManager'
 
 export default function Loader() {
     const sceneLoaded = useGameStore((state) => state.sceneLoaded)

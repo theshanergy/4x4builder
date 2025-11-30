@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { Vector3, Raycaster } from 'three'
 
-import useGameStore from '../store/gameStore'
+import useGameStore from '../../store/gameStore'
 
 // Camera controls and chase cam logic
 const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {

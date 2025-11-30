@@ -1,5 +1,5 @@
 import VehicleSwitcher from './VehicleSwitcher'
-import GitHubIcon from '../assets/images/icons/GitHub.svg'
+import GitHubIcon from '../../assets/images/icons/GitHub.svg'
 
 function Header() {
     return (

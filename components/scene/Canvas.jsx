@@ -3,13 +3,13 @@ import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 
-import useGameStore from '../store/gameStore'
-import useInput from '../hooks/useInput'
+import useGameStore from '../../store/gameStore'
+import useInput from '../../hooks/useInput'
 import Environment from './Environment'
 import CameraControls from './CameraControls'
-import Loader from './Loader'
+import Loader from '../ui/Loader'
 import VehicleManager from './VehicleManager'
-import Screenshot from './Screenshot'
+import Screenshot from '../ui/Screenshot'
 
 // Canvas component
 const ThreeCanvas = () => {

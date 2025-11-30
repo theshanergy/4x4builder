@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import useGameStore from '../store/gameStore'
+import useGameStore from '../../store/gameStore'
 
 // Notification component
 const Notification = () => {
