@@ -1,60 +1,83 @@
-import { memo, useRef } from 'react'
+import { memo, useRef, useMemo } from 'react'
 import { useFrame, useThree, useLoader } from '@react-three/fiber'
-import { TextureLoader, EquirectangularReflectionMapping } from 'three'
+import { TextureLoader, EquirectangularReflectionMapping, Vector3 } from 'three'
 
 import useGameStore from '../store/gameStore'
 import TerrainManager from './TerrainManager'
+import AtmosphericSky from './Sky'
 
 // Equirectangular environment map
 const EquirectEnvMap = () => {
-    const texture = useLoader(TextureLoader, '/assets/images/envmap/gainmap.webp')
-    texture.mapping = EquirectangularReflectionMapping
-    texture.needsUpdate = true
+	const texture = useLoader(TextureLoader, '/assets/images/envmap/gainmap.webp')
+	texture.mapping = EquirectangularReflectionMapping
+	texture.needsUpdate = true
 
-    useThree(({ scene }) => {
-        scene.environment = texture
-    })
+	useThree(({ scene }) => {
+		scene.environment = texture
+	})
 
-    return null
+	return null
 }
 
 // Camera target light
-const TargetLight = () => {
-    const lightRef = useRef()
+const TargetLight = ({ sunDirection }) => {
+	const lightRef = useRef()
 
-    useFrame(() => {
-        const light = lightRef.current
-        const cameraTarget = useGameStore.getState().cameraTarget
+	useFrame(() => {
+		const light = lightRef.current
+		const cameraTarget = useGameStore.getState().cameraTarget
 
-        if (!light) return
-        light.position.set(cameraTarget.x + 10, 10, cameraTarget.z + 10)
-        light.target.position.copy(cameraTarget)
-        light.target.updateMatrixWorld()
-    })
+		if (!light) return
 
-    return <directionalLight ref={lightRef} castShadow intensity={1.5} position={[10, 10, 10]} shadow-camera-far={50} />
+		// Position light based on sun direction relative to camera target
+		const lightDistance = 50
+		light.position.set(cameraTarget.x + sunDirection.x * lightDistance, sunDirection.y * lightDistance, cameraTarget.z + sunDirection.z * lightDistance)
+		light.target.position.copy(cameraTarget)
+		light.target.updateMatrixWorld()
+	})
+
+	// Warm sunlight color
+	return (
+		<directionalLight
+			ref={lightRef}
+			castShadow
+			intensity={2.5}
+			color='#fff5e6'
+			position={[10, 10, 10]}
+			shadow-mapSize={[2048, 2048]}
+			shadow-camera-far={100}
+			shadow-camera-left={-30}
+			shadow-camera-right={30}
+			shadow-camera-top={30}
+			shadow-camera-bottom={-30}
+			shadow-bias={-0.0001}
+		/>
+	)
 }
 
 // Environment component
 const SceneEnvironment = memo(() => {
-    return (
-        <>
-            {/* Camera target light */}
-            <TargetLight />
+	// Sun direction - normalized vector pointing toward sun
+	const sunDirection = useMemo(() => new Vector3(0.6, 0.45, 0.5).normalize(), [])
 
-            {/* Blue sky */}
-            <color attach='background' args={['#b8d9f9']} />
+	return (
+		<>
+			{/* Camera target light */}
+			<TargetLight sunDirection={sunDirection} />
 
-            {/* Distant fog for depth */}
-            <fog attach='fog' args={['#b8d9f9', 80, 160]} />
+			{/* Atmospheric sky with procedural clouds */}
+			<AtmosphericSky sunPosition={[sunDirection.x, sunDirection.y, sunDirection.z]} />
 
-            {/* Environment map for reflections */}
-            <EquirectEnvMap />
+			{/* Distant fog for depth - match horizon color */}
+			<fog attach='fog' args={['#c5d5e8', 150, 350]} />
 
-            {/* Terrain */}
-            <TerrainManager />
-        </>
-    )
+			{/* Environment map for reflections */}
+			<EquirectEnvMap />
+
+			{/* Terrain */}
+			<TerrainManager />
+		</>
+	)
 })
 
 export default SceneEnvironment
