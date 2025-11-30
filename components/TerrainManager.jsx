@@ -1,8 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { useTexture } from '@react-three/drei'
+import { useFrame, useLoader } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
-import { RepeatWrapping, PlaneGeometry, RingGeometry, Color, BufferAttribute, Vector3 } from 'three'
+import { RepeatWrapping, PlaneGeometry, RingGeometry, Color, BufferAttribute, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
 import useGameStore from '../store/gameStore'
@@ -35,7 +34,7 @@ const DISTANT_TERRAIN_CONFIG = {
 }
 
 // TerrainTile component
-const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, noise, shouldFade = true }) => {
+const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, noise, map, normalMap, shouldFade = true }) => {
 	const materialRef = useRef()
 	const opacityRef = useRef(shouldFade ? 0 : 1)
 
@@ -48,18 +47,17 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 		}
 	})
 
-	// Load texture
-	const textures = useTexture({
-		map: 'assets/images/ground/sand.jpg',
-		normalMap: 'assets/images/ground/sand_normal.jpg',
-	})
 	// Apply texture settings - UVs are now in world coordinates, so repeat controls texture density
 	useMemo(() => {
-		textures.map.wrapS = textures.map.wrapT = RepeatWrapping
-		textures.map.repeat.set(1, 1) // 1 texture unit per world unit
-		textures.normalMap.wrapS = textures.normalMap.wrapT = RepeatWrapping
-		textures.normalMap.repeat.set(0.33, 0.33) // Larger scale for normal map details
-	}, [textures])
+		if (map) {
+			map.wrapS = map.wrapT = RepeatWrapping
+			map.repeat.set(1, 1) // 1 texture unit per world unit
+		}
+		if (normalMap) {
+			normalMap.wrapS = normalMap.wrapT = RepeatWrapping
+			normalMap.repeat.set(0.33, 0.33) // Larger scale for normal map details
+		}
+	}, [map, normalMap])
 
 	// Helper to compute height at any world position (for gradient calculation)
 	const getHeightAtPosition = (worldX, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) => {
@@ -156,25 +154,26 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 		<RigidBody type='fixed' position={position} colliders={false}>
 			<HeightfieldCollider args={colliderArgs} name={`Tile-${position[0]}-${position[2]}`} />
 			<mesh geometry={geometry} receiveShadow>
-				<meshStandardMaterial ref={materialRef} {...textures} transparent={opacityRef.current < 1} opacity={opacityRef.current} />
+				<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} transparent={opacityRef.current < 1} opacity={opacityRef.current} />
 			</mesh>
 		</RigidBody>
 	)
 }
 
 // DistantTerrain component - creates a ring of distant mountains/dunes that follow the camera
-const DistantTerrain = ({ noise }) => {
+const DistantTerrain = ({ noise, map }) => {
 	const { innerRadius, outerRadius, segments, rings, maxHeight, baseHeight, noiseScale, peakSharpness } = DISTANT_TERRAIN_CONFIG
 	const meshRef = useRef()
 	const baseColor = new Color(0xc2a278),
 		peakColor = new Color(0xd4c4a8),
 		shadowColor = new Color(0x8b7355)
 
-	const texture = useTexture('assets/images/ground/sand.jpg')
 	useMemo(() => {
-		texture.wrapS = texture.wrapT = RepeatWrapping
-		texture.repeat.set(32, 32)
-	}, [texture])
+		if (map) {
+			map.wrapS = map.wrapT = RepeatWrapping
+			map.repeat.set(32, 32)
+		}
+	}, [map])
 
 	// Helper to compute height at any position (for gradient calculation)
 	const getDistantHeight = (x, z) => {
@@ -241,7 +240,7 @@ const DistantTerrain = ({ noise }) => {
 
 	return (
 		<mesh ref={meshRef} geometry={geometry} receiveShadow>
-			<meshStandardMaterial map={texture} vertexColors roughness={0.9} metalness={0} />
+			<meshStandardMaterial map={map} vertexColors roughness={0.9} metalness={0} />
 		</mesh>
 	)
 }
@@ -250,13 +249,14 @@ const DistantTerrain = ({ noise }) => {
 const TerrainManager = () => {
 	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
 	const [activeTiles, setActiveTiles] = useState([])
-	const loadedTiles = useRef(new Map())
-	const tilesInViewDistance = Math.ceil(viewDistance / tileSize)
 	const lastTileCoord = useRef({ x: null, z: null })
-	const initialLoad = useRef(true)
 
 	// Generate noise instance
 	const noise = useMemo(() => new Noise(1234), [])
+
+	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
+
+	const distantTexture = useMemo(() => sandTexture.clone(), [sandTexture])
 
 	// Update tiles based on camera target position
 	useFrame(() => {
@@ -272,7 +272,8 @@ const TerrainManager = () => {
 		lastTileCoord.current = { x: currentTileX, z: currentTileZ }
 
 		const newActiveTiles = []
-		const tilesToLoad = new Map()
+		const tilesInViewDistance = Math.ceil(viewDistance / tileSize)
+		const isInitialLoad = activeTiles.length === 0
 
 		// Check which tiles should be active
 		for (let x = -tilesInViewDistance; x <= tilesInViewDistance; x++) {
@@ -291,45 +292,22 @@ const TerrainManager = () => {
 
 				// Add tile if within view distance
 				if (distanceToTile <= viewDistance) {
-					newActiveTiles.push(tileKey)
-					if (!loadedTiles.current.has(tileKey)) {
-						tilesToLoad.set(tileKey, position)
-					}
+					newActiveTiles.push({
+						key: tileKey,
+						position,
+						shouldFade: !isInitialLoad,
+					})
 				}
 			}
 		}
 
-		// Update loaded tiles if changes detected
-		if (tilesToLoad.size > 0 || loadedTiles.current.size !== newActiveTiles.length) {
-			// Create new map with only active tiles
-			const updatedLoadedTiles = new Map()
-
-			// Keep existing tiles that are still active
-			for (const key of newActiveTiles) {
-				if (loadedTiles.current.has(key)) {
-					updatedLoadedTiles.set(key, loadedTiles.current.get(key))
-				}
-			}
-
-			// Add new tiles
-			tilesToLoad.forEach((position, key) => {
-				updatedLoadedTiles.set(key, { position, shouldFade: !initialLoad.current })
-			})
-
-			if (initialLoad.current && updatedLoadedTiles.size > 0) {
-				initialLoad.current = false
-			}
-
-			// Update state
-			loadedTiles.current = updatedLoadedTiles
-			setActiveTiles([...updatedLoadedTiles.entries()])
-		}
+		setActiveTiles(newActiveTiles)
 	})
 
 	return (
 		<group name='TerrainManager'>
-			<DistantTerrain noise={noise} />
-			{activeTiles.map(([key, { position, shouldFade }]) => (
+			<DistantTerrain noise={noise} map={distantTexture} />
+			{activeTiles.map(({ key, position, shouldFade }) => (
 				<TerrainTile
 					key={key}
 					position={position}
@@ -339,6 +317,8 @@ const TerrainManager = () => {
 					smoothness={smoothness}
 					maxHeight={maxHeight}
 					noise={noise}
+					map={sandTexture}
+					normalMap={sandNormalMap}
 				/>
 			))}
 		</group>
