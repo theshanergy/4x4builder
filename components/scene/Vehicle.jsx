@@ -36,8 +36,8 @@ const Rim = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary
 
 	// Set rim color.
 	useEffect(() => {
-		setObjectMaterials(rimGltf.scene, color, roughness, rim_color, rim_color_secondary)
-	}, [rimGltf.scene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
+		setObjectMaterials(rimScene, color, roughness, rim_color, rim_color_secondary)
+	}, [rimScene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
 
 	return <primitive name='Rim' object={rimScene} scale={[odScale, odScale, widthScale]} />
 })
