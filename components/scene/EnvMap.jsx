@@ -5,14 +5,14 @@ import { CubeCamera, WebGLCubeRenderTarget, HalfFloatType, LinearMipmapLinearFil
 import useGameStore from '../../store/gameStore'
 
 // Dynamic environment map using CubeCamera - captures sky and terrain for reflections
-// Only renders once after initial scene load since the environment looks the same everywhere
+// Renders in realtime during initial load to avoid flash, then locks in after scene is loaded
 const EnvMap = () => {
 	const { gl, scene } = useThree()
 	const cubeCameraRef = useRef()
 	const renderTargetRef = useRef()
-	const frameCount = useRef(0)
-	const capturedRef = useRef(false)
+	const lockedRef = useRef(false)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
+	const sceneLoaded = useGameStore((state) => state.sceneLoaded)
 
 	// Create cube camera and render target
 	useEffect(() => {
@@ -27,24 +27,18 @@ const EnvMap = () => {
 		const cubeCamera = new CubeCamera(1, 1000, renderTarget)
 		cubeCameraRef.current = cubeCamera
 
-		// Reset captured flag when resources change
-		capturedRef.current = false
-		frameCount.current = 0
+		// Reset locked flag when resources change
+		lockedRef.current = false
 
 		return () => {
 			renderTarget.dispose()
 		}
 	}, [performanceDegraded])
 
-	// Capture environment map once after scene is loaded
+	// Update environment map - realtime during load, then lock after scene is loaded
 	useFrame(() => {
-		// Skip if already captured or resources not ready
-		if (capturedRef.current || !cubeCameraRef.current || !renderTargetRef.current) return
-
-		frameCount.current++
-
-		// Wait a few frames for scene to fully load before capturing
-		if (frameCount.current < 10) return
+		// Skip if already locked or resources not ready
+		if (lockedRef.current || !cubeCameraRef.current || !renderTargetRef.current) return
 
 		// Position cube camera at origin with some height for good sky/terrain capture
 		cubeCameraRef.current.position.set(0, 5, 0)
@@ -63,8 +57,10 @@ const EnvMap = () => {
 		scene.environment = renderTargetRef.current.texture
 		scene.environmentIntensity = 0.4
 
-		// Mark as captured - won't run again
-		capturedRef.current = true
+		// Lock in once scene is fully loaded - won't update again
+		if (sceneLoaded) {
+			lockedRef.current = true
+		}
 	})
 
 	return null
