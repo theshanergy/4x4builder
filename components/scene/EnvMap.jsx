@@ -55,7 +55,7 @@ const EnvMap = () => {
 
 		// Set environment map on the scene
 		scene.environment = renderTargetRef.current.texture
-		scene.environmentIntensity = 0.4
+		scene.environmentIntensity = 0.8
 
 		// Lock in once scene is fully loaded - won't update again
 		if (sceneLoaded) {

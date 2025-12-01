@@ -13,9 +13,6 @@ const SceneEnvironment = memo(() => {
 
 	return (
 		<>
-			{/* Hemisphere light for natural sky/ground lighting */}
-			<hemisphereLight skyColor="#87ceeb" groundColor="#c0b492" intensity={0.6} />
-
 			{/* Sun directional light */}
 			<Sun sunDirection={sunDirection} />
 

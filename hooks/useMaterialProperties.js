@@ -15,7 +15,7 @@ const setMaterials = (material, color, roughness, rim_color, rim_color_secondary
     switch (material.name) {
         case 'body':
             material.color.setStyle(color)
-            material.metalness = 0.4
+            material.metalness = 0.5
             material.roughness = roughness
             break
         case 'chrome':
