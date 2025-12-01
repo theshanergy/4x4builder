@@ -26,7 +26,7 @@ const Sun = ({ sunDirection }) => {
 		<directionalLight
 			ref={lightRef}
 			castShadow={!performanceDegraded}
-			intensity={2.5}
+			intensity={3.5}
 			color='#fff5e6'
 			position={[10, 10, 10]}
 			shadow-mapSize={performanceDegraded ? [512, 512] : [1024, 1024]}
