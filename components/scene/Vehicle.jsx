@@ -9,6 +9,7 @@ import vehicleConfigs from '../../vehicleConfigs'
 import useAnimateHeight from '../../hooks/useAnimateHeight'
 import useVehiclePhysics from '../../hooks/useVehiclePhysics'
 import useMaterialProperties from '../../hooks/useMaterialProperties'
+import useTireDirtMaterial from '../../hooks/useTireDirtMaterial'
 
 // Calculate point on line (a to b, at length).
 const linePoint = (a, b, length) => {
@@ -88,6 +89,13 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
     // Calculate rim width.
     const widthScale = useMemo(() => (rim_width * 2.54) / 100 / vehicleConfigs.wheels.rims[rim].width, [rim, rim_width])
 
+    // Calculate tire radius for shader
+    const tireRadius = useMemo(() => (tire_diameter * 2.54) / 100 / 2, [tire_diameter])
+    const rimRadius = useMemo(() => (rim_diameter * 2.54) / 100 / 2, [rim_diameter])
+    
+    // Create dirt shader callback
+    const dirtShaderCallback = useTireDirtMaterial({ tireRadius, rimRadius })
+
     // Set rim color.
     useEffect(() => {
         setObjectMaterials(rimGltf.scene, color, roughness, rim_color, rim_color_secondary)
@@ -100,8 +108,8 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
                     {/* Add an inner group with the correct visual rotation */}
                     <group rotation={rotation}>
                         <primitive name='Rim' object={rimScenes[index]} scale={[odScale, odScale, widthScale]} />
-                        <mesh name='Tire' geometry={tireGeometry} castShadow>
-                            <meshStandardMaterial color='#121212' />
+                        <mesh name='Tire' geometry={tireGeometry} castShadow receiveShadow>
+                            <meshStandardMaterial color='#121212' onBeforeCompile={dirtShaderCallback} />
                         </mesh>
                     </group>
                 </group>
