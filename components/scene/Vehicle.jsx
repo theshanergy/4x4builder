@@ -18,17 +18,15 @@ const linePoint = (a, b, length) => {
 	return a.clone().add(dir)
 }
 
-// Rims component - loads and renders rim models
-const Rims = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, color, roughness, wheelPositions }) => {
+// Rim component - loads and renders a single rim
+const Rim = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, color, roughness }) => {
 	const { setObjectMaterials } = useMaterialProperties()
 
 	// Load rim model
 	const rimGltf = useGLTF(vehicleConfigs.wheels.rims[rim].model)
 
-	// Clone rim scenes
-	const rimScenes = useMemo(() => {
-		return wheelPositions.map(() => rimGltf.scene.clone())
-	}, [rimGltf.scene, wheelPositions.length])
+	// Clone rim scene
+	const rimScene = useMemo(() => rimGltf.scene.clone(), [rimGltf.scene])
 
 	// Calculate rim scale as a percentage of diameter.
 	const odScale = useMemo(() => ((rim_diameter * 2.54) / 100 + 0.03175) / vehicleConfigs.wheels.rims[rim].od, [rim, rim_diameter])
@@ -41,21 +39,15 @@ const Rims = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondar
 		setObjectMaterials(rimGltf.scene, color, roughness, rim_color, rim_color_secondary)
 	}, [rimGltf.scene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
 
-	return (
-		<>
-			{wheelPositions.map(({ key }, index) => (
-				<primitive key={key} name='Rim' object={rimScenes[index]} scale={[odScale, odScale, widthScale]} />
-			))}
-		</>
-	)
+	return <primitive name='Rim' object={rimScene} scale={[odScale, odScale, widthScale]} />
 })
 
-// Tires component - loads and renders tire models
-const Tires = memo(({ tire, tire_diameter, tire_muddiness, rim_diameter, rim_width, wheelPositions }) => {
+// Tire component - loads and renders a single tire
+const Tire = memo(({ tire, tire_diameter, tire_muddiness, rim_diameter, rim_width }) => {
 	// Load tire model
 	const tireGltf = useGLTF(vehicleConfigs.wheels.tires[tire].model)
 
-	// Scale tires.
+	// Scale tire.
 	const tireGeometry = useMemo(() => {
 		// Determine y scale as a percentage of width.
 		const wheelWidth = (rim_width * 2.54) / 100
@@ -116,13 +108,9 @@ const Tires = memo(({ tire, tire_diameter, tire_muddiness, rim_diameter, rim_wid
 	const dirtShaderCallback = useTireDirtMaterial({ tireRadius, rimRadius, coverage: tire_muddiness })
 
 	return (
-		<>
-			{wheelPositions.map(({ key }) => (
-				<mesh key={key} name='Tire' geometry={tireGeometry} castShadow receiveShadow>
-					<meshStandardMaterial color='#121212' onBeforeCompile={dirtShaderCallback} />
-				</mesh>
-			))}
-		</>
+		<mesh name='Tire' geometry={tireGeometry} castShadow receiveShadow>
+			<meshStandardMaterial color='#121212' onBeforeCompile={dirtShaderCallback} />
+		</mesh>
 	)
 })
 
@@ -135,7 +123,7 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 					{/* Add an inner group with the correct visual rotation */}
 					<group rotation={rotation}>
 						<Suspense fallback={null}>
-							<Rims
+							<Rim
 								rim={rim}
 								rim_diameter={rim_diameter}
 								rim_width={rim_width}
@@ -143,18 +131,10 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 								rim_color_secondary={rim_color_secondary}
 								color={color}
 								roughness={roughness}
-								wheelPositions={[{ key }]}
 							/>
 						</Suspense>
 						<Suspense fallback={null}>
-							<Tires
-								tire={tire}
-								tire_diameter={tire_diameter}
-								tire_muddiness={tire_muddiness}
-								rim_diameter={rim_diameter}
-								rim_width={rim_width}
-								wheelPositions={[{ key }]}
-							/>
+							<Tire tire={tire} tire_diameter={tire_diameter} tire_muddiness={tire_muddiness} rim_diameter={rim_diameter} rim_width={rim_width} />
 						</Suspense>
 					</group>
 				</group>
@@ -213,7 +193,8 @@ const Vehicle = (props) => {
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 
 	const chassisRef = useRef(null)
-	const wheelRefs = [useRef(null), useRef(null), useRef(null), useRef(null)]
+	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
+	const wheelRefs = wheelRefsArray.current
 
 	// Get wheel (axle) height
 	const axleHeight = useMemo(() => (tire_diameter * 2.54) / 100 / 2, [tire_diameter])

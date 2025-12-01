@@ -29,9 +29,6 @@ const FORCES = {
  * @returns {Object} - Vehicle controller
  */
 export const useVehiclePhysics = (vehicleRef, wheels) => {
-    const physicsEnabled = useGameStore((state) => state.physicsEnabled)
-    const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
-
     const { world } = useRapier()
 
     // Refs
@@ -169,8 +166,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
         }
 
         // Enable physics if not already enabled
-        if (!physicsEnabled && engineForce) {
-            setPhysicsEnabled(true)
+        if (!useGameStore.getState().physicsEnabled && engineForce) {
+            useGameStore.getState().setPhysicsEnabled(true)
         }
     })
 

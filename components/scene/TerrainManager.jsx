@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, memo } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 import { RepeatWrapping, PlaneGeometry, RingGeometry, Color, BufferAttribute, Vector3, TextureLoader } from 'three'
@@ -34,7 +34,7 @@ const DISTANT_TERRAIN_CONFIG = {
 }
 
 // TerrainTile component
-const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, noise, map, normalMap, shouldFade = true }) => {
+const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeight, noise, map, normalMap, shouldFade = true }) => {
 	const materialRef = useRef()
 	const opacityRef = useRef(shouldFade ? 0 : 1)
 
@@ -158,7 +158,7 @@ const TerrainTile = ({ position, tileSize, resolution, smoothness, maxHeight, no
 			</mesh>
 		</RigidBody>
 	)
-}
+})
 
 // DistantTerrain component - creates a ring of distant mountains/dunes that follow the camera
 const DistantTerrain = ({ noise, map }) => {
@@ -250,6 +250,7 @@ const TerrainManager = () => {
 	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
 	const [activeTiles, setActiveTiles] = useState([])
 	const lastTileCoord = useRef({ x: null, z: null })
+	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
 
 	// Generate noise instance
 	const noise = useMemo(() => new Noise(1234), [])
@@ -271,16 +272,15 @@ const TerrainManager = () => {
 		}
 		lastTileCoord.current = { x: currentTileX, z: currentTileZ }
 
-		const newActiveTiles = []
+		const newActiveTileKeys = new Set()
 		const tilesInViewDistance = Math.ceil(viewDistance / tileSize)
-		const isInitialLoad = activeTiles.length === 0
+		const isInitialLoad = tileCache.current.size === 0
 
 		// Check which tiles should be active
 		for (let x = -tilesInViewDistance; x <= tilesInViewDistance; x++) {
 			for (let z = -tilesInViewDistance; z <= tilesInViewDistance; z++) {
 				const tileX = currentTileX + x
 				const tileZ = currentTileZ + z
-				const position = [tileX * tileSize, 0, tileZ * tileSize]
 				const tileKey = `${tileX},${tileZ}`
 
 				// Calculate distance from center position to tile center using simple math
@@ -292,15 +292,29 @@ const TerrainManager = () => {
 
 				// Add tile if within view distance
 				if (distanceToTile <= viewDistance) {
-					newActiveTiles.push({
-						key: tileKey,
-						position,
-						shouldFade: !isInitialLoad,
-					})
+					newActiveTileKeys.add(tileKey)
+
+					// Only create new tile data if not already cached
+					if (!tileCache.current.has(tileKey)) {
+						tileCache.current.set(tileKey, {
+							key: tileKey,
+							position: [tileX * tileSize, 0, tileZ * tileSize], // Stable reference
+							shouldFade: !isInitialLoad,
+						})
+					}
 				}
 			}
 		}
 
+		// Remove tiles that are no longer in view from cache
+		for (const key of tileCache.current.keys()) {
+			if (!newActiveTileKeys.has(key)) {
+				tileCache.current.delete(key)
+			}
+		}
+
+		// Build active tiles array from cache (stable references)
+		const newActiveTiles = Array.from(newActiveTileKeys).map((key) => tileCache.current.get(key))
 		setActiveTiles(newActiveTiles)
 	})
 
