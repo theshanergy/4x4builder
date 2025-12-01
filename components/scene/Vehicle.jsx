@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect, useRef } from 'react'
+import { memo, useMemo, useEffect, useRef, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { useGLTF, Gltf } from '@react-three/drei'
@@ -18,18 +18,42 @@ const linePoint = (a, b, length) => {
 	return a.clone().add(dir)
 }
 
-// Wheels.
-const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, color, roughness, wheelPositions, wheelRefs }) => {
+// Rims component - loads and renders rim models
+const Rims = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, color, roughness, wheelPositions }) => {
 	const { setObjectMaterials } = useMaterialProperties()
 
-	// Load models.
+	// Load rim model
 	const rimGltf = useGLTF(vehicleConfigs.wheels.rims[rim].model)
-	const tireGltf = useGLTF(vehicleConfigs.wheels.tires[tire].model)
 
 	// Clone rim scenes
 	const rimScenes = useMemo(() => {
 		return wheelPositions.map(() => rimGltf.scene.clone())
 	}, [rimGltf.scene, wheelPositions.length])
+
+	// Calculate rim scale as a percentage of diameter.
+	const odScale = useMemo(() => ((rim_diameter * 2.54) / 100 + 0.03175) / vehicleConfigs.wheels.rims[rim].od, [rim, rim_diameter])
+
+	// Calculate rim width.
+	const widthScale = useMemo(() => (rim_width * 2.54) / 100 / vehicleConfigs.wheels.rims[rim].width, [rim, rim_width])
+
+	// Set rim color.
+	useEffect(() => {
+		setObjectMaterials(rimGltf.scene, color, roughness, rim_color, rim_color_secondary)
+	}, [rimGltf.scene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
+
+	return (
+		<>
+			{wheelPositions.map(({ key }, index) => (
+				<primitive key={key} name='Rim' object={rimScenes[index]} scale={[odScale, odScale, widthScale]} />
+			))}
+		</>
+	)
+})
+
+// Tires component - loads and renders tire models
+const Tires = memo(({ tire, tire_diameter, tire_muddiness, rim_diameter, rim_width, wheelPositions }) => {
+	// Load tire model
+	const tireGltf = useGLTF(vehicleConfigs.wheels.tires[tire].model)
 
 	// Scale tires.
 	const tireGeometry = useMemo(() => {
@@ -84,12 +108,6 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 		return geometry
 	}, [tireGltf.scene.children, rim_diameter, rim_width, tire, tire_diameter])
 
-	// Calculate rim scale as a percentage of diameter.
-	const odScale = useMemo(() => ((rim_diameter * 2.54) / 100 + 0.03175) / vehicleConfigs.wheels.rims[rim].od, [rim, rim_diameter])
-
-	// Calculate rim width.
-	const widthScale = useMemo(() => (rim_width * 2.54) / 100 / vehicleConfigs.wheels.rims[rim].width, [rim, rim_width])
-
 	// Calculate tire radius for shader
 	const tireRadius = useMemo(() => (tire_diameter * 2.54) / 100 / 2, [tire_diameter])
 	const rimRadius = useMemo(() => (rim_diameter * 2.54) / 100 / 2, [rim_diameter])
@@ -97,21 +115,47 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 	// Create dirt shader callback
 	const dirtShaderCallback = useTireDirtMaterial({ tireRadius, rimRadius, coverage: tire_muddiness })
 
-	// Set rim color.
-	useEffect(() => {
-		setObjectMaterials(rimGltf.scene, color, roughness, rim_color, rim_color_secondary)
-	}, [rimGltf.scene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
+	return (
+		<>
+			{wheelPositions.map(({ key }) => (
+				<mesh key={key} name='Tire' geometry={tireGeometry} castShadow receiveShadow>
+					<meshStandardMaterial color='#121212' onBeforeCompile={dirtShaderCallback} />
+				</mesh>
+			))}
+		</>
+	)
+})
 
+// Wheels - container component that positions wheel groups
+const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, color, roughness, wheelPositions, wheelRefs }) => {
 	return (
 		<group name='Wheels'>
 			{wheelPositions.map(({ key, rotation, ...transform }, index) => (
 				<group key={key} ref={wheelRefs[index]} {...transform}>
 					{/* Add an inner group with the correct visual rotation */}
 					<group rotation={rotation}>
-						<primitive name='Rim' object={rimScenes[index]} scale={[odScale, odScale, widthScale]} />
-						<mesh name='Tire' geometry={tireGeometry} castShadow receiveShadow>
-							<meshStandardMaterial color='#121212' onBeforeCompile={dirtShaderCallback} />
-						</mesh>
+						<Suspense fallback={null}>
+							<Rims
+								rim={rim}
+								rim_diameter={rim_diameter}
+								rim_width={rim_width}
+								rim_color={rim_color}
+								rim_color_secondary={rim_color_secondary}
+								color={color}
+								roughness={roughness}
+								wheelPositions={[{ key }]}
+							/>
+						</Suspense>
+						<Suspense fallback={null}>
+							<Tires
+								tire={tire}
+								tire_diameter={tire_diameter}
+								tire_muddiness={tire_muddiness}
+								rim_diameter={rim_diameter}
+								rim_width={rim_width}
+								wheelPositions={[{ key }]}
+							/>
+						</Suspense>
 					</group>
 				</group>
 			))}
@@ -234,7 +278,9 @@ const Vehicle = (props) => {
 			<RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false} angularDamping={1}>
 				<CuboidCollider args={colliderArgs} position={colliderPosition} />
 				<group name='Vehicle'>
-					<Body key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
+					<Suspense fallback={null}>
+						<Body key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
+					</Suspense>
 					<Wheels
 						rim={rim}
 						rim_diameter={rim_diameter}
