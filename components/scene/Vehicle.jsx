@@ -18,7 +18,7 @@ const linePoint = (a, b, length) => {
 }
 
 // Wheels.
-const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, color, roughness, wheelPositions, wheelRefs }) => {
+const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, color, roughness, wheelPositions, wheelRefs }) => {
     const { setObjectMaterials } = useMaterialProperties()
 
     // Load models.
@@ -94,7 +94,7 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
     const rimRadius = useMemo(() => (rim_diameter * 2.54) / 100 / 2, [rim_diameter])
     
     // Create dirt shader callback
-    const dirtShaderCallback = useTireDirtMaterial({ tireRadius, rimRadius })
+    const dirtShaderCallback = useTireDirtMaterial({ tireRadius, rimRadius, coverage: tire_muddiness })
 
     // Set rim color.
     useEffect(() => {
@@ -158,7 +158,7 @@ const Body = memo(({ id, height, color, roughness, addons }) => {
 // Vehicle component with physics
 const Vehicle = (props) => {
     // Get vehicle properties from props or defaults
-    const { body, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, addons } = {
+    const { body, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, addons } = {
         ...vehicleConfigs.defaults,
         ...props,
     }
@@ -237,6 +237,7 @@ const Vehicle = (props) => {
                     rim_color_secondary={rim_color_secondary}
                     tire={tire}
                     tire_diameter={tire_diameter}
+                    tire_muddiness={tire_muddiness}
                     color={color}
                     roughness={roughness}
                     wheelPositions={wheelPositions}

@@ -13,6 +13,7 @@ const vehicleConfigs = {
         rim_width: 10,
         tire: 'bfg_at',
         tire_diameter: 32,
+        tire_muddiness: 0,
         spare: true,
     },
     vehicles: {

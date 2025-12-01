@@ -24,6 +24,7 @@ function Editor() {
     const rim_width = useGameStore((state) => state.currentVehicle?.rim_width)
     const tire = useGameStore((state) => state.currentVehicle?.tire)
     const tire_diameter = useGameStore((state) => state.currentVehicle?.tire_diameter)
+    const tire_muddiness = useGameStore((state) => state.currentVehicle?.tire_muddiness) || 0
     const addons = useGameStore((state) => state.currentVehicle?.addons) || {}
 
     const setVehicle = useGameStore((state) => state.setVehicle)
@@ -46,6 +47,7 @@ function Editor() {
         rim_width,
         tire,
         tire_diameter,
+        tire_muddiness,
         addons,
     }
 
@@ -215,6 +217,12 @@ function Editor() {
                         <label>Size</label>
                         <InchRangeSelect value={currentVehicle.tire_diameter} min={30} max={40} onChange={(e) => setVehicle({ tire_diameter: e.target.value })} />
                     </div>
+                </div>
+
+                {/* Tire Muddiness */}
+                <div className='field field-tire-muddiness'>
+                    <label>Muddiness</label>
+                    <input type='range' min='0' max='1' step='0.05' value={currentVehicle.tire_muddiness || 0} onChange={(e) => setVehicle({ tire_muddiness: parseFloat(e.target.value) })} />
                 </div>
             </EditorSection>
 

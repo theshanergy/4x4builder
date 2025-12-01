@@ -16,6 +16,7 @@ const VehicleManager = () => {
     const rim_color_secondary = useGameStore((state) => state.currentVehicle.rim_color_secondary)
     const tire = useGameStore((state) => state.currentVehicle.tire)
     const tire_diameter = useGameStore((state) => state.currentVehicle.tire_diameter)
+    const tire_muddiness = useGameStore((state) => state.currentVehicle.tire_muddiness)
     const addons = useGameStore((state) => state.currentVehicle.addons)
 
     return (
@@ -33,6 +34,7 @@ const VehicleManager = () => {
                 rim_color_secondary={rim_color_secondary}
                 tire={tire}
                 tire_diameter={tire_diameter}
+                tire_muddiness={tire_muddiness}
                 addons={addons}
             />
         </>
