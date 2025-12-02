@@ -2,6 +2,7 @@ import { memo, useMemo, useEffect, useRef, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { useGLTF, Gltf } from '@react-three/drei'
+import { useXR } from '@react-three/xr'
 import { Vector3 } from 'three'
 
 import useGameStore from '../../store/gameStore'
@@ -192,6 +193,9 @@ const Vehicle = (props) => {
 	const setCameraTarget = useGameStore((state) => state.setCameraTarget)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 
+	// Check if in XR session
+	const isInXR = useXR((state) => state.mode !== null)
+
 	const chassisRef = useRef(null)
 	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
 	const wheelRefs = wheelRefsArray.current
@@ -278,7 +282,7 @@ const Vehicle = (props) => {
 					/>
 				</group>
 			</RigidBody>
-			{!performanceDegraded && <Dust vehicleController={vehicleController} wheelRefs={wheelRefs} />}
+			{!performanceDegraded && !isInXR && <Dust vehicleController={vehicleController} wheelRefs={wheelRefs} />}
 		</>
 	)
 }
