@@ -1,6 +1,6 @@
 import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
+import { Vector3, Color, NormalBlending } from 'three'
 
 const MAX_PARTICLES = 1000
 
@@ -18,8 +18,8 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
 		for (let i = 0; i < MAX_PARTICLES; i++) {
 			data.push({
 				active: false,
-				position: new THREE.Vector3(),
-				velocity: new THREE.Vector3(),
+				position: new Vector3(),
+				velocity: new Vector3(),
 				life: 0,
 				maxLife: 0,
 				size: 0,
@@ -38,7 +38,7 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
 	const shader = useMemo(
 		() => ({
 			uniforms: {
-				uColor: { value: new THREE.Color(color) },
+				uColor: { value: new Color(color) },
 			},
 			vertexShader: `
             attribute float size;
@@ -183,7 +183,7 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
 				ref={materialRef}
 				transparent
 				depthWrite={false}
-				blending={THREE.NormalBlending}
+				blending={NormalBlending}
 				uniforms={shader.uniforms}
 				vertexShader={shader.vertexShader}
 				fragmentShader={shader.fragmentShader}

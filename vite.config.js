@@ -19,4 +19,7 @@ export default defineConfig({
     server: {
         host: true,
     },
+    resolve: {
+        dedupe: ['three', 'three-stdlib'],
+    },
 })
