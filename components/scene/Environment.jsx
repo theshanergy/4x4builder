@@ -16,11 +16,14 @@ const SceneEnvironment = memo(() => {
 			{/* Sun directional light */}
 			<Sun sunDirection={sunDirection} />
 
+			{/* Ambient light for better fill - cool sky, warm ground */}
+			<hemisphereLight args={['#b1e1ff', '#d4c4a8', 0.6]} />
+
 			{/* Atmospheric sky with procedural clouds */}
 			<Sky sunPosition={[sunDirection.x, sunDirection.y, sunDirection.z]} />
 
 			{/* Distant fog for depth - match horizon color */}
-			<fog attach='fog' args={['#c5d5e8', 150, 450]} />
+			<fog attach='fog' args={['#dbebf9', 150, 450]} />
 
 			{/* Environment map for reflections - captures sky and terrain once */}
 			<EnvMap />

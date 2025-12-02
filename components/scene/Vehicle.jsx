@@ -111,7 +111,7 @@ const Tire = memo(({ tire, tire_diameter, tire_muddiness, rim_diameter, rim_widt
 
 	return (
 		<mesh name='Tire' geometry={tireGeometry} castShadow receiveShadow>
-			<meshStandardMaterial color='#121212' onBeforeCompile={dirtShaderCallback} />
+			<meshStandardMaterial color='#121212' metalness={0} roughness={0.75} flatShading={true} onBeforeCompile={dirtShaderCallback} />
 		</mesh>
 	)
 })

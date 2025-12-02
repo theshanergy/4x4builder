@@ -164,9 +164,9 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 const DistantTerrain = ({ noise, map }) => {
 	const { innerRadius, outerRadius, segments, rings, maxHeight, baseHeight, noiseScale, peakSharpness } = DISTANT_TERRAIN_CONFIG
 	const meshRef = useRef()
-	const baseColor = new Color(0xc2a278),
-		peakColor = new Color(0xd4c4a8),
-		shadowColor = new Color(0x8b7355)
+	const baseColor = new Color(0xbea888),
+		peakColor = new Color(0xdccbb3),
+		shadowColor = new Color(0x8a7660)
 
 	useMemo(() => {
 		if (map) {

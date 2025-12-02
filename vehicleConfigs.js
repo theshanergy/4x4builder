@@ -2,7 +2,7 @@ const vehicleConfigs = {
     defaults: {
         body: 'toyota_4runner_5g',
         lift: 0,
-        color: '#B91818',
+        color: '#c81414',
         roughness: 0,
         addons: {},
         wheel_offset: 0,
