@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from 'react'
+import { Suspense, useMemo, useRef, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { PerformanceMonitor } from '@react-three/drei'
@@ -23,6 +23,16 @@ const ThreeCanvas = () => {
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
+	const setXrOriginRef = useGameStore((state) => state.setXrOriginRef)
+
+	// XROrigin ref - will be updated by vehicle physics when inside vehicle
+	const xrOriginRef = useRef(null)
+
+	// Store the ref in gameStore so vehicle can access it
+	useEffect(() => {
+		setXrOriginRef(xrOriginRef)
+		return () => setXrOriginRef(null)
+	}, [setXrOriginRef])
 
 	// Set default camera position based on aspect ratio
 	const cameraConfig = useMemo(() => {
@@ -42,7 +52,8 @@ const ThreeCanvas = () => {
 
 					<CameraControls />
 
-					<XROrigin position={[0, 0, 5]} scale={1} />
+					{/* XR origin - position updated by vehicle when insideVehicle is true */}
+					<XROrigin ref={xrOriginRef} position={[0, 0, 5]} />
 
 					<Physics paused={!physicsEnabled}>
 						<Suspense fallback={null}>
