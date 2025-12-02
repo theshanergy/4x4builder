@@ -1,36 +1,37 @@
 {
-    "name": "4x4builder",
-    "version": "2.0.0",
-    "private": true,
-    "description": "4x4builder.com",
-    "author": "Shane Vincent",
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "preview": "vite preview"
-    },
-    "dependencies": {
-        "@react-three/drei": "^10.7.7",
-        "@react-three/fiber": "^9.4.2",
-        "@react-three/rapier": "^2.2.0",
-        "@tailwindcss/vite": "^4.1.17",
-        "classnames": "^2.5.1",
-        "immer": "^11.0.1",
-        "noisejs": "^2.1.0",
-        "react": "^19.2.0",
-        "react-dom": "^19.2.0",
-        "tailwindcss": "^4.1.17",
-        "three": "^0.181.2",
-        "three-stdlib": "^2.36.1",
-        "vite-plugin-svgr": "^4.5.0",
-        "zustand": "^5.0.9"
-    },
-    "devDependencies": {
-        "@types/react": "^19.2.7",
-        "@types/react-dom": "^19.2.3",
-        "@vitejs/plugin-react": "^5.1.1",
-        "vite": "^7.2.4",
-        "vite-plugin-glsl": "^1.5.5"
-    }
+	"name": "4x4builder",
+	"version": "2.0.0",
+	"private": true,
+	"description": "4x4builder.com",
+	"author": "Shane Vincent",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview"
+	},
+	"dependencies": {
+		"@react-three/drei": "^10.7.7",
+		"@react-three/fiber": "^9.4.2",
+		"@react-three/rapier": "^2.2.0",
+		"@react-three/xr": "^6.6.28",
+		"@tailwindcss/vite": "^4.1.17",
+		"classnames": "^2.5.1",
+		"immer": "^11.0.1",
+		"noisejs": "^2.1.0",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"tailwindcss": "^4.1.17",
+		"three": "^0.181.2",
+		"three-stdlib": "^2.36.1",
+		"vite-plugin-svgr": "^4.5.0",
+		"zustand": "^5.0.9"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.7",
+		"@types/react-dom": "^19.2.3",
+		"@vitejs/plugin-react": "^5.1.1",
+		"vite": "^7.2.4",
+		"vite-plugin-glsl": "^1.5.5"
+	}
 }
