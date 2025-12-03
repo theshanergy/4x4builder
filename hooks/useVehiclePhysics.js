@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRapier, useAfterPhysicsStep } from '@react-three/rapier'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
@@ -57,6 +57,15 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	
 	// Track current friction stiffness for smooth transitions
 	const currentFrictionStiffness = useRef(null)
+
+	// Reusable objects to avoid GC pressure
+	const tempVelocity = useMemo(() => new Vector3(), [])
+	const tempForward = useMemo(() => new Vector3(), [])
+	const tempLocalTorque = useMemo(() => new Vector3(), [])
+	const tempWorldTorque = useMemo(() => new Vector3(), [])
+	const tempQuat = useMemo(() => new Quaternion(), [])
+	const wheelQuat1 = useMemo(() => new Quaternion(), [])
+	const wheelQuat2 = useMemo(() => new Quaternion(), [])
 
 	// Reset vehicle function
 	const resetVehicle = useCallback(() => {
@@ -145,8 +154,10 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			// Update position
 			wheelRef.position.y = connection?.y - suspension
 
-			// Apply steering and rotation
-			wheelRef.quaternion.multiplyQuaternions(new Quaternion().setFromAxisAngle(VECTORS.UP, steering), new Quaternion().setFromAxisAngle(wheelAxleCs, rotation))
+			// Apply steering and rotation using reusable quaternions
+			wheelQuat1.setFromAxisAngle(VECTORS.UP, steering)
+			wheelQuat2.setFromAxisAngle(wheelAxleCs, rotation)
+			wheelRef.quaternion.multiplyQuaternions(wheelQuat1, wheelQuat2)
 		})
 
 		// Update airborne state
@@ -199,8 +210,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		let forwardSpeed = 0
 		if (vehicle) {
 			const velocity = vehicle.linvel()
-			const forward = VECTORS.FORWARD.clone().applyQuaternion(vehicle.rotation())
-			forwardSpeed = new Vector3(velocity.x, velocity.y, velocity.z).dot(forward)
+			tempForward.copy(VECTORS.FORWARD).applyQuaternion(vehicle.rotation())
+			tempVelocity.set(velocity.x, velocity.y, velocity.z)
+			forwardSpeed = tempVelocity.dot(tempForward)
 		}
 
 		// Determine reverse state
@@ -250,12 +262,13 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 				const roll = clamp(((keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) ? -1 : 0) + ((keys.has('ArrowRight') || keys.has('d') || keys.has('D')) ? 1 : 0) + input.leftStickX)
 				const yaw = clamp(-input.rightStickX)
 
-				// Construct torque vector in world space
-				const localTorque = new Vector3(pitch, yaw, roll)
-				const worldTorque = localTorque.applyQuaternion(new Quaternion().copy(vehicle.rotation()))
+				// Construct torque vector in world space using reusable objects
+				tempLocalTorque.set(pitch, yaw, roll)
+				tempQuat.copy(vehicle.rotation())
+				tempWorldTorque.copy(tempLocalTorque).applyQuaternion(tempQuat).multiplyScalar(FORCES.airControl)
 
 				// Apply impulse
-				vehicle.applyTorqueImpulse(worldTorque.multiplyScalar(FORCES.airControl), true)
+				vehicle.applyTorqueImpulse(tempWorldTorque, true)
 			}
 		}
 

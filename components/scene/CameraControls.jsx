@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useCallback } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { Vector3, Raycaster } from 'three'
@@ -17,8 +17,11 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
 	const raycaster = useRef(new Raycaster())
 	const downDirection = useRef(new Vector3(0, -1, 0))
 	const cameraPosition = useRef(new Vector3())
+	const terrainMeshesCache = useRef([])
+	const lastTerrainCacheFrame = useRef(0)
+	const TERRAIN_CACHE_INTERVAL = 60 // Refresh terrain mesh cache every 60 frames
 
-	useFrame(() => {
+	useFrame((state) => {
 		if (!cameraControlsRef.current) return
 
 		// Smoothly update the orbit controls target
@@ -29,23 +32,26 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
 		camera.getWorldPosition(cameraPosition.current)
 		raycaster.current.set(cameraPosition.current, downDirection.current)
 
-		// Filter for terrain objects
-		const terrainObjects = scene.children.filter(
-			(obj) => obj.name === 'TerrainManager' || obj.name.includes('Terrain') || (obj.children && obj.children.some((child) => child.name.includes('Terrain')))
-		)
-
-		// Get all meshes from terrain objects
-		const terrainMeshes = []
-		terrainObjects.forEach((obj) => {
-			obj.traverse((child) => {
-				if (child.isMesh) {
-					terrainMeshes.push(child)
+		// Refresh terrain mesh cache periodically instead of every frame
+		const frameCount = state.clock.elapsedTime * 60 | 0
+		if (frameCount - lastTerrainCacheFrame.current > TERRAIN_CACHE_INTERVAL || terrainMeshesCache.current.length === 0) {
+			lastTerrainCacheFrame.current = frameCount
+			terrainMeshesCache.current.length = 0
+			
+			for (let i = 0; i < scene.children.length; i++) {
+				const obj = scene.children[i]
+				if (obj.name === 'TerrainManager' || obj.name.includes('Terrain')) {
+					obj.traverse((child) => {
+						if (child.isMesh) {
+							terrainMeshesCache.current.push(child)
+						}
+					})
 				}
-			})
-		})
+			}
+		}
 
 		// Check for intersections with terrain
-		const intersects = raycaster.current.intersectObjects(terrainMeshes, true)
+		const intersects = raycaster.current.intersectObjects(terrainMeshesCache.current, true)
 
 		if (intersects.length > 0) {
 			// Get the distance to the ground

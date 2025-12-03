@@ -262,6 +262,7 @@ const Vehicle = (props) => {
 	// Reusable vectors/quaternions to avoid GC pressure
 	const tempWorldPos = useMemo(() => new Vector3(), [])
 	const tempQuat = useMemo(() => new Quaternion(), [])
+	const tempSeatOffset = useMemo(() => new Vector3(), [])
 
 	// Update camera target and XR origin each frame
 	// Use the visual group's world position which is interpolated by Rapier
@@ -286,12 +287,12 @@ const Vehicle = (props) => {
 		// Update XR origin to follow vehicle when inside
 		if (insideVehicle && xrOriginRef?.current) {
 			// Calculate seat world position (offset is relative to body, add vehicleHeight)
-			const worldSeatOffset = seatOffset.clone().applyQuaternion(tempQuat)
+			tempSeatOffset.copy(seatOffset).applyQuaternion(tempQuat)
 
 			xrOriginRef.current.position.set(
-				tempWorldPos.x + worldSeatOffset.x,
-				tempWorldPos.y + worldSeatOffset.y + vehicleHeight,
-				tempWorldPos.z + worldSeatOffset.z
+				tempWorldPos.x + tempSeatOffset.x,
+				tempWorldPos.y + tempSeatOffset.y + vehicleHeight,
+				tempWorldPos.z + tempSeatOffset.z
 			)
 			// Apply chassis rotation plus 180° yaw to face forward
 			xrOriginRef.current.quaternion.copy(tempQuat).multiply(seatYawOffset)

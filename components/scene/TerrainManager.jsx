@@ -1,10 +1,11 @@
-import { useState, useRef, useMemo, memo } from 'react'
+import { useState, useRef, useMemo, memo, useCallback } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 import { RepeatWrapping, PlaneGeometry, RingGeometry, Color, BufferAttribute, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
 import useGameStore from '../../store/gameStore'
+import GrassManager from './GrassManager'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
@@ -160,13 +161,17 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 	)
 })
 
+// Pre-computed colors for distant terrain (avoid creating in render)
+const DISTANT_COLORS = {
+	base: new Color(0xbea888),
+	peak: new Color(0xdccbb3),
+	shadow: new Color(0x8a7660),
+}
+
 // DistantTerrain component - creates a ring of distant mountains/dunes that follow the camera
 const DistantTerrain = ({ noise, map }) => {
 	const { innerRadius, outerRadius, segments, rings, maxHeight, baseHeight, noiseScale, peakSharpness } = DISTANT_TERRAIN_CONFIG
 	const meshRef = useRef()
-	const baseColor = new Color(0xbea888),
-		peakColor = new Color(0xdccbb3),
-		shadowColor = new Color(0x8a7660)
 
 	useMemo(() => {
 		if (map) {
@@ -199,6 +204,7 @@ const DistantTerrain = ({ noise, map }) => {
 		const normals = geom.getAttribute('normal')
 		const colors = new Float32Array(positions.count * 3)
 		const normal = new Vector3()
+		const tempColor = new Color() // Reusable color object
 
 		for (let i = 0; i < positions.count; i++) {
 			const x = positions.getX(i),
@@ -219,10 +225,12 @@ const DistantTerrain = ({ noise, map }) => {
 
 			normals.setXYZ(i, normal.x, normal.y, normal.z)
 
-			// Height-based coloring
+			// Height-based coloring using reusable color object
 			const heightFactor = height / maxHeight
-			const color = baseColor.clone().lerp(heightFactor > 0.5 ? peakColor : shadowColor, heightFactor > 0.5 ? (heightFactor - 0.5) * 2 : (0.5 - heightFactor) * 0.5)
-			colors.set([color.r, color.g, color.b], i * 3)
+			const targetColor = heightFactor > 0.5 ? DISTANT_COLORS.peak : DISTANT_COLORS.shadow
+			const lerpFactor = heightFactor > 0.5 ? (heightFactor - 0.5) * 2 : (0.5 - heightFactor) * 0.5
+			tempColor.copy(DISTANT_COLORS.base).lerp(targetColor, lerpFactor)
+			colors.set([tempColor.r, tempColor.g, tempColor.b], i * 3)
 		}
 
 		geom.setAttribute('color', new BufferAttribute(colors, 3))
@@ -252,12 +260,56 @@ const TerrainManager = () => {
 	const lastTileCoord = useRef({ x: null, z: null })
 	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
 
+	// Pre-compute view distance tile count
+	const tilesInViewDistance = useMemo(() => Math.ceil(viewDistance / tileSize), [viewDistance, tileSize])
+
 	// Generate noise instance
 	const noise = useMemo(() => new Noise(1234), [])
 
 	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
 
 	const distantTexture = useMemo(() => sandTexture.clone(), [sandTexture])
+
+	// Flat area and transition parameters (same as used in TerrainTile)
+	const flatAreaRadius = tileSize * 0.5
+	const transitionEndDist = tileSize * 2
+
+	// Get raw height value at any world position (normalized 0-1)
+	const getRawHeight = useCallback((worldX, worldZ) => {
+		const distSq = worldX * worldX + worldZ * worldZ
+		const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
+		const transitionEndDistSq = transitionEndDist * transitionEndDist
+
+		if (distSq < flatAreaRadiusSq) return 0
+
+		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
+		const normalizedHeight = (noiseValue + 1) / 2
+
+		if (distSq < transitionEndDistSq) {
+			const t = (Math.sqrt(distSq) - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
+			return normalizedHeight * (t * t * (3 - 2 * t))
+		}
+		return normalizedHeight
+	}, [noise, smoothness, flatAreaRadius, transitionEndDist])
+
+	// Get terrain height at any world position (in world units)
+	const getTerrainHeight = useCallback((worldX, worldZ) => {
+		return getRawHeight(worldX, worldZ) * maxHeight
+	}, [getRawHeight, maxHeight])
+
+	// Get terrain normal at any world position
+	const getTerrainNormal = useCallback((worldX, worldZ) => {
+		const hL = getRawHeight(worldX - GRADIENT_EPSILON, worldZ) * maxHeight
+		const hR = getRawHeight(worldX + GRADIENT_EPSILON, worldZ) * maxHeight
+		const hD = getRawHeight(worldX, worldZ - GRADIENT_EPSILON) * maxHeight
+		const hU = getRawHeight(worldX, worldZ + GRADIENT_EPSILON) * maxHeight
+
+		const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
+		const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
+
+		const normal = new Vector3(-dhdx, 1, -dhdz).normalize()
+		return normal
+	}, [getRawHeight, maxHeight])
 
 	// Update tiles based on camera target position
 	useFrame(() => {
@@ -270,10 +322,10 @@ const TerrainManager = () => {
 		if (currentTileX === lastTileCoord.current.x && currentTileZ === lastTileCoord.current.z) {
 			return
 		}
-		lastTileCoord.current = { x: currentTileX, z: currentTileZ }
+		lastTileCoord.current.x = currentTileX
+		lastTileCoord.current.z = currentTileZ
 
 		const newActiveTileKeys = new Set()
-		const tilesInViewDistance = Math.ceil(viewDistance / tileSize)
 		const isInitialLoad = tileCache.current.size === 0
 
 		// Check which tiles should be active
@@ -335,6 +387,12 @@ const TerrainManager = () => {
 					normalMap={sandNormalMap}
 				/>
 			))}
+			<GrassManager 
+				activeTiles={activeTiles}
+				tileSize={tileSize}
+				getTerrainHeight={getTerrainHeight} 
+				getTerrainNormal={getTerrainNormal} 
+			/>
 		</group>
 	)
 }

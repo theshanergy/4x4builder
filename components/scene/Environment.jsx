@@ -28,7 +28,7 @@ const SceneEnvironment = memo(() => {
 			{/* Environment map for reflections - captures sky and terrain once */}
 			<EnvMap />
 
-			{/* Terrain */}
+			{/* Terrain with integrated grass */}
 			<TerrainManager />
 		</>
 	)
