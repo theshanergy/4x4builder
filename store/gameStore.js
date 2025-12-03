@@ -17,9 +17,11 @@ const useGameStore = create((set, get) => {
         sceneLoaded: false,
         physicsEnabled: false,
         performanceDegraded: false,
+        controlsVisible: false,
         setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
         setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
         setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
+        setControlsVisible: (visible) => set({ controlsVisible: visible }),
 
         // Notification state
         notification: null,

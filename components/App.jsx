@@ -7,6 +7,7 @@ import Sidebar from './ui/Sidebar'
 import Canvas from './scene/Canvas'
 import Actions from './ui/Actions'
 import Notification from './ui/Notification'
+import ControlsOverlay from './ui/ControlsOverlay'
 
 export default function App() {
     // Get vehicle state from game store
@@ -23,6 +24,7 @@ export default function App() {
             <Canvas />
             <Sidebar />
             <Actions />
+            <ControlsOverlay />
             <Notification />
         </div>
     )

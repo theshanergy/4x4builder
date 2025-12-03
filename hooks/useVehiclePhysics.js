@@ -161,9 +161,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		const clamp = (value) => Math.min(1, Math.max(-1, value))
 
 		// Calculate raw input values
-		const throttleInput = clamp((keys.has('ArrowUp') ? 1 : 0) + (input.rightStickY < 0 ? -input.rightStickY : 0))
-		const brakeInput = clamp((keys.has('ArrowDown') ? 1 : 0) + (input.rightStickY > 0 ? input.rightStickY : 0))
-		const steerForce = FORCES.steerAngle * clamp((keys.has('ArrowRight') ? -1 : 0) + (keys.has('ArrowLeft') ? 1 : 0) + -input.leftStickX)
+		const throttleInput = clamp(((keys.has('ArrowUp') || keys.has('w') || keys.has('W')) ? 1 : 0) + (input.rightStickY < 0 ? -input.rightStickY : 0))
+		const brakeInput = clamp(((keys.has('ArrowDown') || keys.has('s') || keys.has('S')) ? 1 : 0) + (input.rightStickY > 0 ? input.rightStickY : 0))
+		const steerForce = FORCES.steerAngle * clamp(((keys.has('ArrowRight') || keys.has('d') || keys.has('D')) ? -1 : 0) + ((keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) ? 1 : 0) + -input.leftStickX)
 
 		// Get current vehicle speed (forward velocity)
 		const vehicle = vehicleRef.current
@@ -217,8 +217,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			// Airborne controls when all wheels are not in contact
 			const vehicle = vehicleRef.current
 			if (vehicle) {
-				const pitch = clamp((keys.has('ArrowUp') ? -1 : 0) + (keys.has('ArrowDown') ? 1 : 0) - input.leftStickY)
-				const roll = clamp((keys.has('ArrowLeft') ? -1 : 0) + (keys.has('ArrowRight') ? 1 : 0) + input.leftStickX)
+				const pitch = clamp(((keys.has('ArrowUp') || keys.has('w') || keys.has('W')) ? -1 : 0) + ((keys.has('ArrowDown') || keys.has('s') || keys.has('S')) ? 1 : 0) - input.leftStickY)
+				const roll = clamp(((keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) ? -1 : 0) + ((keys.has('ArrowRight') || keys.has('d') || keys.has('D')) ? 1 : 0) + input.leftStickX)
 				const yaw = clamp(-input.rightStickX)
 
 				// Construct torque vector in world space

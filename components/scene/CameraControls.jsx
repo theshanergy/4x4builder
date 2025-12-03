@@ -70,6 +70,7 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
 				maxPolarAngle={Math.PI / 2} // Prevent camera from going above the target
 				autoRotate={cameraAutoRotate}
 				autoRotateSpeed={-0.3}
+				enableKeys={false}
 			/>
 		</>
 	)

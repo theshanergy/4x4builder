@@ -64,9 +64,13 @@ button,
 .button {
     @apply flex items-center gap-2 h-11 px-5 py-0 text-white font-medium text-sm bg-red-700 hover:bg-red-600 border-none rounded shadow-md cursor-pointer;
 }
+button.active,
+.button.active {
+    @apply bg-red-500 ring-2 ring-red-400;
+}
 button.secondary,
 .button.secondary {
-    @apply bg-stone-700 hover:bg-stone-600;
+    @apply bg-black/50 hover:bg-stone-600 backdrop-blur-sm;
 }
 button.success,
 .button.success {
