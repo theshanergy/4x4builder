@@ -52,13 +52,12 @@ const InputManager = () => {
 
 	// Poll all input sources every frame and combine them
 	useFrame(() => {
-		// Start with current input (preserves touch joystick values)
-		const currentInput = useInputStore.getState().input
+		// Start with zero values - each input source will set its own values
 		let input = {
-			leftStickX: currentInput.leftStickX,
-			leftStickY: currentInput.leftStickY,
-			rightStickX: currentInput.rightStickX,
-			rightStickY: currentInput.rightStickY,
+			leftStickX: 0,
+			leftStickY: 0,
+			rightStickX: 0,
+			rightStickY: 0,
 			leftTrigger: 0,
 			rightTrigger: 0,
 			buttonA: false,

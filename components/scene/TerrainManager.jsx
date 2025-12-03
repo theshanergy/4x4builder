@@ -3,6 +3,7 @@ import { useFrame, useLoader } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 import { RepeatWrapping, PlaneGeometry, RingGeometry, Color, BufferAttribute, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
+import { useXR } from '@react-three/xr'
 
 import useGameStore from '../../store/gameStore'
 import GrassManager from './GrassManager'
@@ -260,6 +261,11 @@ const TerrainManager = () => {
 	const lastTileCoord = useRef({ x: null, z: null })
 	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
 
+	// Check if grass should be disabled (XR mode or performance degraded)
+	const isInXR = useXR((state) => state.mode !== null)
+	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
+	const showGrass = !isInXR && !performanceDegraded
+
 	// Pre-compute view distance tile count
 	const tilesInViewDistance = useMemo(() => Math.ceil(viewDistance / tileSize), [viewDistance, tileSize])
 
@@ -387,12 +393,14 @@ const TerrainManager = () => {
 					normalMap={sandNormalMap}
 				/>
 			))}
-			<GrassManager 
-				activeTiles={activeTiles}
-				tileSize={tileSize}
-				getTerrainHeight={getTerrainHeight} 
-				getTerrainNormal={getTerrainNormal} 
-			/>
+			{showGrass && (
+				<GrassManager 
+					activeTiles={activeTiles}
+					tileSize={tileSize}
+					getTerrainHeight={getTerrainHeight} 
+					getTerrainNormal={getTerrainNormal} 
+				/>
+			)}
 		</group>
 	)
 }
