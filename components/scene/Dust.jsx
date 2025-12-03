@@ -1,15 +1,21 @@
-import { useRef, useMemo, useEffect } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { Vector3, Color, NormalBlending } from 'three'
+import { useRef, useMemo } from 'react'
+import { useFrame, useLoader } from '@react-three/fiber'
+import { Vector3, NormalBlending, TextureLoader } from 'three'
 
 const MAX_PARTICLES = 1000
 
-const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
+const Dust = ({ vehicleController, wheelRefs }) => {
+	const sandTexture = useLoader(TextureLoader, '/assets/images/ground/sand.jpg')
 	const geometryRef = useRef()
 	const materialRef = useRef()
 
 	// Track particle pool with index-based allocation (avoids O(n) find())
 	const nextParticleIndex = useRef(0)
+
+	// Store previous wheel positions for interpolation (continuous dust trail)
+	const prevWheelPositions = useRef(wheelRefs.map(() => new Vector3()))
+	const tempVec = useMemo(() => new Vector3(), [])
+	const wheelVelocity = useMemo(() => new Vector3(), [])
 
 	// Particle data structure
 	// We use a plain object pool to avoid garbage collection
@@ -38,7 +44,7 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
 	const shader = useMemo(
 		() => ({
 			uniforms: {
-				uColor: { value: new Color(color) },
+				uTexture: { value: sandTexture },
 			},
 			vertexShader: `
             attribute float size;
@@ -52,7 +58,7 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
             }
         `,
 			fragmentShader: `
-            uniform vec3 uColor;
+            uniform sampler2D uTexture;
             varying float vOpacity;
             
             void main() {
@@ -60,23 +66,29 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
                 float r = length(uv);
                 if (r > 0.5) discard;
                 
-                // Soft particle edge with gentler falloff
-                float alpha = 1.0 - smoothstep(0.0, 0.5, r);
+                // Sample texture at multiple points to get average color
+                vec3 texColor = vec3(0.0);
+                texColor += texture2D(uTexture, vec2(0.25, 0.25)).rgb;
+                texColor += texture2D(uTexture, vec2(0.75, 0.25)).rgb;
+                texColor += texture2D(uTexture, vec2(0.25, 0.75)).rgb;
+                texColor += texture2D(uTexture, vec2(0.75, 0.75)).rgb;
+                texColor += texture2D(uTexture, vec2(0.5, 0.5)).rgb;
+                texColor /= 5.0;
                 
-                float finalAlpha = vOpacity * alpha * 0.35;
-                gl_FragColor = vec4(uColor, finalAlpha);
+                // Desaturate to simulate airborne dust
+                float luminance = dot(texColor, vec3(0.299, 0.587, 0.114));
+                vec3 finalColor = mix(texColor, vec3(luminance), 0.3);
+                
+                // Very soft gaussian-like falloff for smoother blending
+                float alpha = exp(-r * r * 8.0);
+                
+                float finalAlpha = vOpacity * alpha * 0.1;
+                gl_FragColor = vec4(finalColor, finalAlpha);
             }
         `,
 		}),
-		[]
+		[sandTexture]
 	)
-
-	// Update color uniform when prop changes
-	useEffect(() => {
-		if (materialRef.current) {
-			materialRef.current.uniforms.uColor.value.set(color)
-		}
-	}, [color])
 
 	useFrame((state, delta) => {
 		if (!vehicleController.current || !geometryRef.current) return
@@ -86,9 +98,10 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
 		// Get vehicle speed
 		// Note: Rapier's linvel() returns the linear velocity of the rigid body
 		let speed = 0
+		let chassisVel = null
 		try {
-			const vel = controller.chassis().linvel()
-			speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z)
+			chassisVel = controller.chassis().linvel()
+			speed = Math.sqrt(chassisVel.x * chassisVel.x + chassisVel.y * chassisVel.y + chassisVel.z * chassisVel.z)
 		} catch (e) {
 			// Handle case where chassis might not be ready
 			return
@@ -100,41 +113,57 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
 			for (let wi = 0; wi < wheelRefs.length; wi++) {
 				const wheelRef = wheelRefs[wi]
 				// Check if wheel is touching ground
-				if (controller.wheelIsInContact(wi)) {
-					// Spawn probability increases with speed
-					const spawnChance = Math.min(speed * 0.1, 0.8) * (delta * 60) // Normalize to 60fps
+				if (controller.wheelIsInContact(wi) && wheelRef.current) {
+					// Get current wheel position
+					wheelRef.current.getWorldPosition(tempVec)
+					tempVec.y -= 0.3 // Lower to ground level
 
-					if (Math.random() < spawnChance) {
+					const prevPos = prevWheelPositions.current[wi]
+
+					// Calculate wheel velocity for this frame
+					wheelVelocity.copy(tempVec).sub(prevPos)
+					const wheelSpeed = wheelVelocity.length() / Math.max(delta, 0.001)
+
+					// Spawn rate based on speed - continuous spawning
+					// Higher speed = more particles per frame for denser trail
+					const speedFactor = Math.min((speed - 2) / 15, 1.0)
+					const particlesPerFrame = Math.floor(speedFactor * speedFactor * 2 + 0.5) // 0-2 particles per wheel per frame
+
+					for (let s = 0; s < particlesPerFrame; s++) {
 						// Get next particle using round-robin index (O(1) instead of O(n) find)
 						const p = particles[nextParticleIndex.current]
 						nextParticleIndex.current = (nextParticleIndex.current + 1) % MAX_PARTICLES
 
 						p.active = true
 						p.life = 0
-						p.maxLife = 1.0 + Math.random() * 1.5 // 1-2.5 seconds
+						p.maxLife = 1.5 + Math.random() * 2.0 // 1.5-3.5 seconds
 
-						// Get wheel position
-						if (wheelRef.current) {
-							wheelRef.current.getWorldPosition(p.position)
-							// Lower it to ground level (wheel position is center of wheel)
-							p.position.y -= 0.3
+						// Interpolate position along wheel path for continuous trail
+						const t = particlesPerFrame > 1 ? s / (particlesPerFrame - 1) : 0.5
+						p.position.lerpVectors(prevPos, tempVec, t)
 
-							// Add some randomness to position
-							p.position.x += (Math.random() - 0.5) * 0.2
-							p.position.z += (Math.random() - 0.5) * 0.2
-						}
+						// Add small random offset for width - spread more to the sides
+						const sideOffset = (Math.random() - 0.5) * 0.6
+						p.position.x += sideOffset
+						p.position.z += (Math.random() - 0.5) * 0.6
+						p.position.y += Math.random() * 0.05
 
-						// Velocity: slightly up, random direction but mostly opposite to movement?
-						// Actually dust just puffs up and lingers.
+						// Velocity: inherit vehicle velocity to trail behind + spread outward
+						// Dust gets left behind and spreads to sides, minimal upward rise
+						const inheritFactor = 0.3 + Math.random() * 0.15
 						p.velocity.set(
-							(Math.random() - 0.5) * 1.5,
-							Math.random() * 1.5 + 1.0, // Stronger upward puff
-							(Math.random() - 0.5) * 1.5
+							-chassisVel.x * inheritFactor + sideOffset * 2.0, // Push outward to sides
+							Math.random() * 0.3 + 0.1, // Very gentle upward
+							-chassisVel.z * inheritFactor + (Math.random() - 0.5) * 0.5
 						)
 
-						p.initialSize = Math.random() * 5.0 + 3.0 // Bigger particles
+						// Smaller particles that grow more
+						p.initialSize = Math.random() * 2.5 + 1.5
 						p.size = p.initialSize
 					}
+
+					// Update previous position
+					prevPos.copy(tempVec)
 				}
 			}
 		}
@@ -151,9 +180,11 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
 				} else {
 					// Move particle
 					p.position.addScaledVector(p.velocity, delta)
-					p.velocity.x *= 0.98
-					p.velocity.y *= 0.98
-					p.velocity.z *= 0.98
+					// Gradual slowdown (air resistance)
+					const drag = 0.97
+					p.velocity.x *= drag
+					p.velocity.y *= drag
+					p.velocity.z *= drag
 
 					// Update attributes
 					positions[i * 3] = p.position.x
@@ -161,8 +192,10 @@ const Dust = ({ vehicleController, wheelRefs, color = '#d9d0ba' }) => {
 					positions[i * 3 + 2] = p.position.z
 
 					const lifeRatio = p.life / p.maxLife
-					sizes[i] = p.initialSize * (1 + lifeRatio * 4.0) // Grow even more
-					opacities[i] = 1.0 - Math.pow(lifeRatio, 0.5) // Fade out
+					// Grow significantly over lifetime for that billowing cloud effect
+					sizes[i] = p.initialSize * (1 + lifeRatio * 6.0)
+					// Smooth fade out using ease-out curve
+					opacities[i] = 1.0 - lifeRatio * lifeRatio
 				}
 			}
 		}
