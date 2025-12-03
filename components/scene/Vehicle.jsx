@@ -299,7 +299,7 @@ const Vehicle = (props) => {
 	})
 
 	// Collider props
-	const colliderArgs = useMemo(() => [1, 0.5, wheelbase / 2 + axleHeight], [wheelbase, axleHeight])
+	const colliderArgs = useMemo(() => [0.9, 0.5, wheelbase / 2 + axleHeight], [wheelbase, axleHeight])
 	const colliderPosition = useMemo(() => [0, 1, 0], [])
 
 	return (

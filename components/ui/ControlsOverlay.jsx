@@ -3,40 +3,34 @@ import useInputStore from '../../store/inputStore'
 import useGameStore from '../../store/gameStore'
 import Joystick from './Joystick'
 
-const Key = ({ children, keyName, setKey }) => {
-	const handlers = {
-		onMouseDown: () => setKey(keyName, true),
-		onMouseUp: () => setKey(keyName, false),
-		onMouseLeave: () => setKey(keyName, false),
-	}
+const Key = ({ children, keyName, setKey, onClick, active, wide }) => {
+	const handlers = onClick
+		? { onClick }
+		: {
+				onMouseDown: () => setKey(keyName, true),
+				onMouseUp: () => setKey(keyName, false),
+				onMouseLeave: () => setKey(keyName, false),
+		  }
 	return (
 		<div
-			className='w-12 h-12 flex items-center justify-center border border-white/20 rounded-md bg-black/40 text-white text-lg font-bold backdrop-blur-sm cursor-pointer hover:bg-white/20 active:bg-white/30 transition-colors'
+			className={`${
+				wide ? 'px-3 text-xs flex-col' : 'w-12'
+			} h-12 flex items-center justify-center border rounded-md text-white font-bold backdrop-blur-sm cursor-pointer transition-colors ${
+				active ? 'border-amber-400/60 bg-amber-500/40 text-amber-200' : 'border-white/20 bg-black/40 hover:bg-white/20 active:bg-white/30'
+			}`}
 			{...handlers}>
 			{children}
 		</div>
 	)
 }
 
-const ResetButton = ({ onClick, className = '' }) => (
-	<div
-		className={`text-white/80 text-xs bg-black/40 px-3.5 py-1.5 rounded-full backdrop-blur-sm border border-white/10 cursor-pointer hover:bg-white/20 transition-colors ${className}`}
-		onClick={onClick}>
-		{className ? (
-			'Press to Reset'
-		) : (
-			<>
-				Press <span className='font-bold text-white'>R</span> to Reset
-			</>
-		)}
-	</div>
-)
-
 const ControlsOverlay = () => {
 	const [isMobile, setIsMobile] = useState(false)
 	const setInput = useInputStore((state) => state.setInput)
 	const setKey = useInputStore((state) => state.setKey)
+	const keys = useInputStore((state) => state.keys)
 	const controlsVisible = useGameStore((state) => state.controlsVisible)
+	const isDrifting = keys.has('Shift')
 
 	const resetVehicle = () => {
 		setKey('r', true)
@@ -54,17 +48,20 @@ const ControlsOverlay = () => {
 
 	if (isMobile) {
 		return (
-			<>
-				<div className='fixed bottom-24 left-8 z-40'>
-					<Joystick label='Steer' onMove={(val) => setInput({ leftStickX: val.x, leftStickY: val.y })} />
+			<div className='fixed inset-x-4 bottom-20 flex justify-between items-end z-40 pointer-events-none text-sm text-white/50 font-semibold'>
+				<div className='flex flex-col items-center gap-4 pointer-events-auto'>
+					<div onClick={resetVehicle}>
+						<span className='text-lg font-black'>↺</span> Reset
+					</div>
+					<Joystick onMove={(val) => setInput({ leftStickX: val.x, leftStickY: val.y })} />
 				</div>
-				<div className='fixed bottom-24 right-8 z-40'>
-					<Joystick label='Drive' onMove={(val) => setInput({ rightStickX: val.x, rightStickY: val.y })} />
+				<div className='flex flex-col items-center gap-4 pointer-events-auto'>
+					<div onTouchStart={() => setKey('Shift', true)} onTouchEnd={() => setKey('Shift', false)}>
+						<span className='text-lg font-black'>⇧</span> Drift
+					</div>
+					<Joystick onMove={(val) => setInput({ rightStickX: val.x, rightStickY: val.y })} />
 				</div>
-				<div className='fixed top-5 right-15 z-90'>
-					<ResetButton onClick={resetVehicle} className='mobile' />
-				</div>
-			</>
+			</div>
 		)
 	}
 
@@ -76,20 +73,27 @@ const ControlsOverlay = () => {
 	]
 
 	return (
-		<div className='fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-col gap-1 items-center select-none opacity-60 z-40'>
-			<Key keyName={arrows[0].key} setKey={setKey}>
-				{arrows[0].symbol}
+		<div className='fixed bottom-4 left-1/2 -translate-x-1/2 flex items-end gap-3 select-none opacity-60 z-40'>
+			<Key onClick={resetVehicle} active={keys.has('r')} wide>
+				<span>Reset</span>
+				<span className='text-[10px] text-white/50'>↺ R</span>
 			</Key>
-			<div className='flex gap-1'>
-				{arrows.slice(1).map((a) => (
-					<Key key={a.key} keyName={a.key} setKey={setKey}>
-						{a.symbol}
-					</Key>
-				))}
+			<div className='flex flex-col gap-1 items-center'>
+				<Key keyName={arrows[0].key} setKey={setKey} active={keys.has(arrows[0].key)}>
+					{arrows[0].symbol}
+				</Key>
+				<div className='flex gap-1'>
+					{arrows.slice(1).map((a) => (
+						<Key key={a.key} keyName={a.key} setKey={setKey} active={keys.has(a.key)}>
+							{a.symbol}
+						</Key>
+					))}
+				</div>
 			</div>
-			<div className='mt-2'>
-				<ResetButton onClick={resetVehicle} />
-			</div>
+			<Key keyName='Shift' setKey={setKey} active={isDrifting} wide>
+				<span>Drift</span>
+				<span className='text-[10px] text-white/50'>⇧ Shift</span>
+			</Key>
 		</div>
 	)
 }

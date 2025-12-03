@@ -52,6 +52,12 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Track reset button state to detect press (not hold)
 	const resetPressedLastFrame = useRef(false)
 
+	// Track default side friction stiffness
+	const defaultSideFrictionStiffness = useRef(null)
+	
+	// Track current friction stiffness for smooth transitions
+	const currentFrictionStiffness = useRef(null)
+
 	// Reset vehicle function
 	const resetVehicle = useCallback(() => {
 		const vehicle = vehicleRef.current
@@ -93,6 +99,12 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 		// Store controller reference
 		vehicleController.current = vehicle
+
+		// Store default side friction stiffness from the first wheel if not already set
+		if (defaultSideFrictionStiffness.current === null) {
+			defaultSideFrictionStiffness.current = vehicle.wheelSideFrictionStiffness(0) || 1.0
+			currentFrictionStiffness.current = defaultSideFrictionStiffness.current
+		}
 
 		return () => {
 			if (vehicleController.current) {
@@ -157,6 +169,23 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			resetVehicle()
 		}
 		resetPressedLastFrame.current = resetPressed
+		
+		// Handle drift mode (Shift key) with smooth transition
+		const isDrifting = keys.has('Shift')
+		const targetFriction = isDrifting ? 0.05 : (defaultSideFrictionStiffness.current || 1.0)
+		
+		// Smoothly interpolate friction with different rates for entering/exiting drift
+		// Faster transition into drift (0.15), slower transition out (0.05) for smoother recovery
+		const lerpFactor = isDrifting ? 0.15 : 0.0015
+		if (currentFrictionStiffness.current === null) {
+			currentFrictionStiffness.current = targetFriction
+		} else {
+			currentFrictionStiffness.current += (targetFriction - currentFrictionStiffness.current) * lerpFactor
+		}
+		
+		// Apply side friction to rear wheels (indices 2 and 3)
+		if (wheels.length > 2) vehicleController.current.setWheelSideFrictionStiffness(2, currentFrictionStiffness.current)
+		if (wheels.length > 3) vehicleController.current.setWheelSideFrictionStiffness(3, currentFrictionStiffness.current)
 
 		const clamp = (value) => Math.min(1, Math.max(-1, value))
 
