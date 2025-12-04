@@ -32,6 +32,7 @@
 		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-basic-ssl": "^2.1.0",
 		"@vitejs/plugin-react": "^5.1.1",
+		"r3f-perf": "^7.2.3",
 		"vite": "^7.2.4",
 		"vite-plugin-glsl": "^1.5.5"
 	}

@@ -261,6 +261,15 @@ const GrassTile = memo(({ tileKey, tilePosition, tileSize, getTerrainHeight, get
 		return mesh
 	}, [bladeMatrices, sharedGeometry, sharedMaterial])
 
+	// Dispose InstancedMesh when tile unmounts (geometry/material are shared, so don't dispose those)
+	useEffect(() => {
+		return () => {
+			if (instancedMesh) {
+				instancedMesh.dispose()
+			}
+		}
+	}, [instancedMesh])
+
 	if (!instancedMesh) return null
 
 	return <primitive ref={meshRef} object={instancedMesh} />

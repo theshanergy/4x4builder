@@ -12,6 +12,11 @@ import Loader from '../ui/Loader'
 import VehicleManager from './VehicleManager'
 import Screenshot from '../ui/Screenshot'
 
+// Dev-only performance monitor - completely excluded from production bundle
+const PerfMonitor = import.meta.env.DEV
+	? (await import('./PerformanceMonitor')).default
+	: () => null
+
 // Canvas component
 const ThreeCanvas = () => {
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
@@ -31,6 +36,7 @@ const ThreeCanvas = () => {
 
 			<Canvas shadows={!performanceDegraded} dpr={performanceDegraded ? 1 : [1, 1.5]} camera={cameraConfig}>
 				<PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
+				<PerfMonitor />
 				<XRManager>
 					<InputManager />
 

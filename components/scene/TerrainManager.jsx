@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, memo, useCallback } from 'react'
+import { useState, useRef, useMemo, useEffect, memo, useCallback } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 import { RepeatWrapping, PlaneGeometry, RingGeometry, Color, BufferAttribute, Vector3, TextureLoader } from 'three'
@@ -146,6 +146,13 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 
 		return geom
 	}, [heights, tileSize, resolution])
+
+	// Dispose geometry when component unmounts or geometry changes
+	useEffect(() => {
+		return () => {
+			geometry.dispose()
+		}
+	}, [geometry])
 
 	// Set collider arguments
 	const colliderArgs = useMemo(() => {
