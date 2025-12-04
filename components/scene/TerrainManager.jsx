@@ -290,6 +290,9 @@ const TerrainManager = () => {
 	const flatAreaRadius = tileSize * 0.5
 	const transitionEndDist = tileSize * 2
 
+	// Scratch vector for normal calculations (reused to avoid allocations)
+	const normalScratch = useMemo(() => new Vector3(), [])
+
 	// Get raw height value at any world position (normalized 0-1)
 	const getRawHeight = useCallback((worldX, worldZ) => {
 		const distSq = worldX * worldX + worldZ * worldZ
@@ -313,8 +316,8 @@ const TerrainManager = () => {
 		return getRawHeight(worldX, worldZ) * maxHeight
 	}, [getRawHeight, maxHeight])
 
-	// Get terrain normal at any world position
-	const getTerrainNormal = useCallback((worldX, worldZ) => {
+	// Get terrain normal at any world position (optionally pass target vector to avoid allocation)
+	const getTerrainNormal = useCallback((worldX, worldZ, target = normalScratch) => {
 		const hL = getRawHeight(worldX - GRADIENT_EPSILON, worldZ) * maxHeight
 		const hR = getRawHeight(worldX + GRADIENT_EPSILON, worldZ) * maxHeight
 		const hD = getRawHeight(worldX, worldZ - GRADIENT_EPSILON) * maxHeight
@@ -323,9 +326,8 @@ const TerrainManager = () => {
 		const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
 		const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
 
-		const normal = new Vector3(-dhdx, 1, -dhdz).normalize()
-		return normal
-	}, [getRawHeight, maxHeight])
+		return target.set(-dhdx, 1, -dhdz).normalize()
+	}, [getRawHeight, maxHeight, normalScratch])
 
 	// Update tiles based on camera target position
 	useFrame(() => {

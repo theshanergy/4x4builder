@@ -35,10 +35,10 @@ const hashCoords = (x, z, salt = 0) => {
 
 // Blade configuration (tuned for realistic scale)
 const BLADE_CONFIG = {
-	height: 0.16,
+	height: 0.18, // Increased from 0.16 to compensate for ground sinking
 	baseWidth: 0.005,
 	tipWidth: 0.002,
-	segments: 8,
+	segments: 3, // Reduced from 8 for performance (65% fewer triangles)
 	curvature: 0.35,
 	twist: 0.15,
 	colorBase: '#c9b896',
@@ -56,7 +56,7 @@ const GRASS_CONFIG = {
 	bladesPerPatch: { min: 50, max: 150 },
 	slopeThreshold: 0.85,
 	flatAreaRadius: 12,
-	heightOffset: 0.0,
+	heightOffset: -0.02, // Sink blades slightly into ground to prevent floating on hilltops
 	scaleRange: { min: 0.7, max: 1.3 },
 	// Patch-level blade distribution settings
 	scaleVariation: 0.3,
@@ -144,7 +144,10 @@ const createGrassBladeGeometry = (config) => {
 	return geom
 }
 
-// Generate all blade instances for a tile (returns instance matrices and count)
+// Reusable scratch vector for terrain normal calculations (avoids allocations)
+const _normalScratch = new Vector3()
+
+// Generate all blade instances for a tile (returns Float32Array of matrices and count)
 const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainHeight, getTerrainNormal) => {
 	const { patchesPerTile, patchRadius, bladesPerPatch, slopeThreshold, flatAreaRadius, scaleRange, heightOffset, scaleVariation, rotationVariation } = GRASS_CONFIG
 
@@ -153,7 +156,8 @@ const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainH
 	const tileSeed = hashCoords(tileX, tileZ, 42069)
 	const random = createSeededRandom(tileSeed)
 
-	const matrices = []
+	// Pre-allocate array for matrix elements (will be trimmed at end)
+	const matrixElements = []
 	const dummy = new Object3D()
 	const up = new Vector3(0, 1, 0)
 	const quaternion = new Quaternion()
@@ -209,7 +213,8 @@ const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainH
 
 			// Sample terrain height at blade's world position
 			const bladeTerrainY = getTerrainHeight(bladeWorldX, bladeWorldZ)
-			const bladeTerrainNormal = getTerrainNormal(bladeWorldX, bladeWorldZ)
+			// Use scratch vector to avoid allocation
+			const bladeTerrainNormal = getTerrainNormal(bladeWorldX, bladeWorldZ, _normalScratch)
 
 			// Determine base rotation (inward curve strategy, same as before)
 			const baseRotY = -angle + Math.PI
@@ -229,37 +234,41 @@ const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainH
 			dummy.scale.setScalar(bladeScale)
 			dummy.updateMatrix()
 
-			matrices.push(dummy.matrix.clone())
+			// Push matrix elements directly (avoid clone allocation)
+			matrixElements.push(...dummy.matrix.elements)
 		}
 	}
 
-	return matrices
+	// Return as Float32Array for direct use with InstancedMesh
+	return {
+		array: new Float32Array(matrixElements),
+		count: matrixElements.length / 16
+	}
 }
 
 // GrassTile component - single InstancedMesh for all blades in a tile
 const GrassTile = memo(({ tileKey, tilePosition, tileSize, getTerrainHeight, getTerrainNormal, sharedGeometry, sharedMaterial }) => {
 	const meshRef = useRef()
 
-	// Generate all blade matrices for this tile
-	const bladeMatrices = useMemo(() => {
+	// Generate all blade matrices for this tile (returns {array: Float32Array, count: number})
+	const bladeData = useMemo(() => {
 		return generateTileBladeInstances(tileKey, tilePosition, tileSize, getTerrainHeight, getTerrainNormal)
 	}, [tileKey, tilePosition, tileSize, getTerrainHeight, getTerrainNormal])
 
 	// Create a single InstancedMesh for the entire tile
 	const instancedMesh = useMemo(() => {
-		if (bladeMatrices.length === 0) return null
+		if (bladeData.count === 0) return null
 
-		const mesh = new InstancedMesh(sharedGeometry, sharedMaterial, bladeMatrices.length)
+		const mesh = new InstancedMesh(sharedGeometry, sharedMaterial, bladeData.count)
 		
-		for (let i = 0; i < bladeMatrices.length; i++) {
-			mesh.setMatrixAt(i, bladeMatrices[i])
-		}
-		
+		// Copy matrix data directly from Float32Array (no per-instance loop)
+		mesh.instanceMatrix.array.set(bladeData.array)
 		mesh.instanceMatrix.needsUpdate = true
 		mesh.frustumCulled = true
+		mesh.castShadow = false // Grass shouldn't cast shadows for performance
 		
 		return mesh
-	}, [bladeMatrices, sharedGeometry, sharedMaterial])
+	}, [bladeData, sharedGeometry, sharedMaterial])
 
 	// Dispose InstancedMesh when tile unmounts (geometry/material are shared, so don't dispose those)
 	useEffect(() => {
