@@ -25,6 +25,7 @@ const useGameStore = create((set, get) => {
 		isMobile: checkIsMobile(),
 		sceneLoaded: false,
 		physicsEnabled: false,
+		physicsEnabledOnce: false, // Track if physics has ever been enabled
 		performanceDegraded: false,
 		controlsVisible: false,
 		muted: true, // Audio muted by default
@@ -40,7 +41,15 @@ const useGameStore = create((set, get) => {
 		},
 		
 		setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
-		setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
+		setPhysicsEnabled: (enabled) => set((state) => {
+			// Unmute audio the first time physics is enabled
+			const shouldUnmute = enabled && !state.physicsEnabledOnce
+			return {
+				physicsEnabled: enabled,
+				physicsEnabledOnce: state.physicsEnabledOnce || enabled,
+				...(shouldUnmute && { muted: false }),
+			}
+		}),
 		setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
 		setControlsVisible: (visible) => set({ controlsVisible: visible }),
 		toggleMute: () => set((state) => ({ muted: !state.muted })),
