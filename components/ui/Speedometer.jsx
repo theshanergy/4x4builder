@@ -2,20 +2,12 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import useGameStore from '../../store/gameStore'
 
 const Speedometer = () => {
-	const [isMobile, setIsMobile] = useState(false)
 	const [displaySpeed, setDisplaySpeed] = useState(0)
+	const isMobile = useGameStore((state) => state.isMobile)
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
 	const vehicleSpeedRef = useGameStore((state) => state.vehicleSpeedRef)
 	const rafRef = useRef()
 	const lastUpdateRef = useRef(0)
-
-	// Check for mobile/desktop
-	useEffect(() => {
-		const checkMobile = () => setIsMobile(window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 1024)
-		checkMobile()
-		window.addEventListener('resize', checkMobile)
-		return () => window.removeEventListener('resize', checkMobile)
-	}, [])
 
 	// Update speed display at a throttled rate (10fps is plenty for UI)
 	useEffect(() => {

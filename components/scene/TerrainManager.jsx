@@ -158,9 +158,6 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 	)
 })
 
-// Detect mobile/touch devices (check once at module load)
-const isMobile = typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 1024)
-
 // Main TerrainManager component
 const TerrainManager = () => {
 	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
@@ -170,6 +167,7 @@ const TerrainManager = () => {
 
 	// Check if grass should be disabled (XR mode, performance degraded, or mobile device)
 	const isInXR = useXR((state) => state.mode !== null)
+	const isMobile = useGameStore((state) => state.isMobile)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const showGrass = !isInXR && !performanceDegraded && !isMobile
 

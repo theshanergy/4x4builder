@@ -5,154 +5,163 @@ import vehicleConfigs from '../vehicleConfigs'
 
 // Compatibility shim for legacy localStorage data, mapping old vehicle id field to body
 const preprocessVehicleConfig = (config) => {
-    if (!config) return config
-    const { id, ...rest } = config
-    return { ...rest, ...(id && { body: id }) }
+	if (!config) return config
+	const { id, ...rest } = config
+	return { ...rest, ...(id && { body: id }) }
 }
+
+// Check if device is mobile (touch device or small screen)
+const checkIsMobile = () => typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 1024)
 
 // Game store
 const useGameStore = create((set, get) => {
-    return {
-        // Game state
-        sceneLoaded: false,
-        physicsEnabled: false,
-        performanceDegraded: false,
-        controlsVisible: false,
-        vehicleSpeedRef: { current: 0 }, // Mutable ref to avoid re-renders
-        setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
-        setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
-        setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
-        setControlsVisible: (visible) => set({ controlsVisible: visible }),
+	// Set up resize listener for isMobile detection
+	if (typeof window !== 'undefined') {
+		window.addEventListener('resize', () => set({ isMobile: checkIsMobile() }))
+	}
 
-        // Notification state
-        notification: null,
-        showNotification: (notificationData) => set({ notification: { ...notificationData, id: Date.now() } }),
-        hideNotification: () => set({ notification: null }),
+	return {
+		// Game state
+		isMobile: checkIsMobile(),
+		sceneLoaded: false,
+		physicsEnabled: false,
+		performanceDegraded: false,
+		controlsVisible: false,
+		vehicleSpeedRef: { current: 0 }, // Mutable ref to avoid re-renders
+		setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
+		setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
+		setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
+		setControlsVisible: (visible) => set({ controlsVisible: visible }),
 
-        // Camera state
-        cameraTarget: new Vector3(0, 0, 0),
-        cameraControlsRef: null,
-        cameraAutoRotate: false,
-        setCameraTarget: (x, y, z) => {
-            // mutate in place
-            useGameStore.getState().cameraTarget.set(x, y, z)
-        },
-        setCameraControlsRef: (ref) => set({ cameraControlsRef: ref }),
-        setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
+		// Notification state
+		notification: null,
+		showNotification: (notificationData) => set({ notification: { ...notificationData, id: Date.now() } }),
+		hideNotification: () => set({ notification: null }),
 
-        // XR state
-        xrOriginRef: null,
-        insideVehicle: false,
-        setXrOriginRef: (ref) => set({ xrOriginRef: ref }),
-        setInsideVehicle: (inside) => set({ insideVehicle: inside }),
+		// Camera state
+		cameraTarget: new Vector3(0, 0, 0),
+		cameraControlsRef: null,
+		cameraAutoRotate: false,
+		setCameraTarget: (x, y, z) => {
+			// mutate in place
+			useGameStore.getState().cameraTarget.set(x, y, z)
+		},
+		setCameraControlsRef: (ref) => set({ cameraControlsRef: ref }),
+		setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
 
-        // Saved vehicles
-        savedVehicles: (() => {
-            // Get from local storage or null.
-            const localStorageVehicles = localStorage.getItem('savedVehicles')
-            const vehicles = localStorageVehicles ? JSON.parse(localStorageVehicles) : { current: null }
+		// XR state
+		xrOriginRef: null,
+		insideVehicle: false,
+		setXrOriginRef: (ref) => set({ xrOriginRef: ref }),
+		setInsideVehicle: (inside) => set({ insideVehicle: inside }),
 
-            // Normalize all saved configs
-            for (const key in vehicles) {
-                if (key !== 'current' && vehicles[key]?.config) {
-                    vehicles[key].config = preprocessVehicleConfig(vehicles[key].config)
-                }
-            }
+		// Saved vehicles
+		savedVehicles: (() => {
+			// Get from local storage or null.
+			const localStorageVehicles = localStorage.getItem('savedVehicles')
+			const vehicles = localStorageVehicles ? JSON.parse(localStorageVehicles) : { current: null }
 
-            return vehicles
-        })(),
-        setSavedVehicles: (updater) =>
-            set((state) => {
-                const newSavedVehicles = typeof updater === 'function' ? updater(state.savedVehicles) : updater
-                localStorage.setItem('savedVehicles', JSON.stringify(newSavedVehicles))
+			// Normalize all saved configs
+			for (const key in vehicles) {
+				if (key !== 'current' && vehicles[key]?.config) {
+					vehicles[key].config = preprocessVehicleConfig(vehicles[key].config)
+				}
+			}
 
-                // Force state to reinitialize `currentVehicle`
-                return {
-                    savedVehicles: newSavedVehicles,
-                    currentVehicle:
-                        newSavedVehicles.current && newSavedVehicles[newSavedVehicles.current] ? newSavedVehicles[newSavedVehicles.current].config : vehicleConfigs.defaults,
-                }
-            }),
+			return vehicles
+		})(),
+		setSavedVehicles: (updater) =>
+			set((state) => {
+				const newSavedVehicles = typeof updater === 'function' ? updater(state.savedVehicles) : updater
+				localStorage.setItem('savedVehicles', JSON.stringify(newSavedVehicles))
 
-        // Delete a vehicle from saved vehicles
-        deleteSavedVehicle: (vehicleId) => {
-            set((state) => {
-                const updatedVehicles = { ...state.savedVehicles }
-                delete updatedVehicles[vehicleId]
+				// Force state to reinitialize `currentVehicle`
+				return {
+					savedVehicles: newSavedVehicles,
+					currentVehicle:
+						newSavedVehicles.current && newSavedVehicles[newSavedVehicles.current] ? newSavedVehicles[newSavedVehicles.current].config : vehicleConfigs.defaults,
+				}
+			}),
 
-                if (state.savedVehicles.current === vehicleId) {
-                    const remainingIds = Object.keys(updatedVehicles).filter((key) => key !== 'current')
-                    updatedVehicles.current = remainingIds[0] || null
-                }
+		// Delete a vehicle from saved vehicles
+		deleteSavedVehicle: (vehicleId) => {
+			set((state) => {
+				const updatedVehicles = { ...state.savedVehicles }
+				delete updatedVehicles[vehicleId]
 
-                return { savedVehicles: updatedVehicles }
-            })
+				if (state.savedVehicles.current === vehicleId) {
+					const remainingIds = Object.keys(updatedVehicles).filter((key) => key !== 'current')
+					updatedVehicles.current = remainingIds[0] || null
+				}
 
-            get().setSavedVehicles((vehicles) => vehicles) // Forces resync with localStorage
-        },
+				return { savedVehicles: updatedVehicles }
+			})
 
-        // Current vehicle config
-        currentVehicle: (() => {
-            const localStorageVehicles = localStorage.getItem('savedVehicles')
-            const savedVehicles = localStorageVehicles ? JSON.parse(localStorageVehicles) : { current: null }
-            const defaultVehicleId = savedVehicles.current
-            const config = defaultVehicleId && savedVehicles[defaultVehicleId] ? savedVehicles[defaultVehicleId].config : vehicleConfigs.defaults
+			get().setSavedVehicles((vehicles) => vehicles) // Forces resync with localStorage
+		},
 
-            return preprocessVehicleConfig(config)
-        })(),
-        setVehicle: (updater) =>
-            set(
-                produce((state) => {
-                    // Get previous vehicle id
-                    const prevBodyId = state.currentVehicle.body
+		// Current vehicle config
+		currentVehicle: (() => {
+			const localStorageVehicles = localStorage.getItem('savedVehicles')
+			const savedVehicles = localStorageVehicles ? JSON.parse(localStorageVehicles) : { current: null }
+			const defaultVehicleId = savedVehicles.current
+			const config = defaultVehicleId && savedVehicles[defaultVehicleId] ? savedVehicles[defaultVehicleId].config : vehicleConfigs.defaults
 
-                    // Update vehicle state
-                    if (typeof updater === 'function') {
-                        updater(state.currentVehicle)
-                    } else {
-                        Object.assign(state.currentVehicle, preprocessVehicleConfig(updater))
-                    }
+			return preprocessVehicleConfig(config)
+		})(),
+		setVehicle: (updater) =>
+			set(
+				produce((state) => {
+					// Get previous vehicle id
+					const prevBodyId = state.currentVehicle.body
 
-                    // Get new vehicle id
-                    const newBodyId = state.currentVehicle.body
+					// Update vehicle state
+					if (typeof updater === 'function') {
+						updater(state.currentVehicle)
+					} else {
+						Object.assign(state.currentVehicle, preprocessVehicleConfig(updater))
+					}
 
-                    // If vehicle body changed, reset addons
-                    if (newBodyId !== prevBodyId && updater.body) {
-                        state.currentVehicle.addons = vehicleConfigs.vehicles[newBodyId]?.default_addons || {}
-                    }
-                })
-            ),
+					// Get new vehicle id
+					const newBodyId = state.currentVehicle.body
 
-        // Load vehicle from URL parameters
-        loadVehicleFromUrl: () => {
-            const urlParams = new URLSearchParams(window.location.search)
-            const encodedConfig = urlParams.get('config')
+					// If vehicle body changed, reset addons
+					if (newBodyId !== prevBodyId && updater.body) {
+						state.currentVehicle.addons = vehicleConfigs.vehicles[newBodyId]?.default_addons || {}
+					}
+				})
+			),
 
-            if (encodedConfig) {
-                console.log('Loading vehicle from shared url.')
-                const jsonString = decodeURIComponent(encodedConfig)
-                const config = preprocessVehicleConfig(JSON.parse(jsonString))
+		// Load vehicle from URL parameters
+		loadVehicleFromUrl: () => {
+			const urlParams = new URLSearchParams(window.location.search)
+			const encodedConfig = urlParams.get('config')
 
-                // Overwrite current vehicle from URL parameter
-                set({ currentVehicle: config })
+			if (encodedConfig) {
+				console.log('Loading vehicle from shared url.')
+				const jsonString = decodeURIComponent(encodedConfig)
+				const config = preprocessVehicleConfig(JSON.parse(jsonString))
 
-                // Clear current saved vehicle
-                set((state) => ({
-                    savedVehicles: {
-                        ...state.savedVehicles,
-                        current: null,
-                    },
-                }))
+				// Overwrite current vehicle from URL parameter
+				set({ currentVehicle: config })
 
-                // Clear URL parameters
-                window.history.replaceState({}, '', window.location.pathname)
+				// Clear current saved vehicle
+				set((state) => ({
+					savedVehicles: {
+						...state.savedVehicles,
+						current: null,
+					},
+				}))
 
-                return true
-            }
+				// Clear URL parameters
+				window.history.replaceState({}, '', window.location.pathname)
 
-            return false
-        },
-    }
+				return true
+			}
+
+			return false
+		},
+	}
 })
 
 export default useGameStore

@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import useInputStore from '../../store/inputStore'
 import useGameStore from '../../store/gameStore'
 import Joystick from './Joystick'
@@ -25,10 +24,10 @@ const Key = ({ children, keyName, setKey, onClick, active, wide }) => {
 }
 
 const ControlsOverlay = () => {
-	const [isMobile, setIsMobile] = useState(false)
 	const setTouchInput = useInputStore((state) => state.setTouchInput)
 	const setKey = useInputStore((state) => state.setKey)
 	const keys = useInputStore((state) => state.keys)
+	const isMobile = useGameStore((state) => state.isMobile)
 	const controlsVisible = useGameStore((state) => state.controlsVisible)
 	const isDrifting = keys.has('Shift')
 
@@ -36,13 +35,6 @@ const ControlsOverlay = () => {
 		setKey('r', true)
 		setTimeout(() => setKey('r', false), 100)
 	}
-
-	useEffect(() => {
-		const checkMobile = () => setIsMobile(window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 1024)
-		checkMobile()
-		window.addEventListener('resize', checkMobile)
-		return () => window.removeEventListener('resize', checkMobile)
-	}, [])
 
 	if (!controlsVisible) return null
 
