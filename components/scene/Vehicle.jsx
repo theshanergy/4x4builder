@@ -12,6 +12,7 @@ import useAnimateHeight from '../../hooks/useAnimateHeight'
 import useVehiclePhysics from '../../hooks/useVehiclePhysics'
 import useMaterialProperties from '../../hooks/useMaterialProperties'
 import useTireDirtMaterial from '../../hooks/useTireDirtMaterial'
+import useEngineAudio from '../../hooks/useEngineAudio'
 import Dust from './Dust'
 
 // Calculate point on line (a to b, at length).
@@ -258,6 +259,9 @@ const Vehicle = (props) => {
 
 	// Use vehicle physics
 	const { vehicleController } = useVehiclePhysics(chassisRef, physicsWheels)
+
+	// Use engine audio
+	useEngineAudio()
 
 	// Reusable vectors/quaternions to avoid GC pressure
 	const tempWorldPos = useMemo(() => new Vector3(), [])

@@ -3,9 +3,12 @@ import useGameStore from '../../store/gameStore'
 
 const Speedometer = () => {
 	const [displaySpeed, setDisplaySpeed] = useState(0)
+	const [displayRpm, setDisplayRpm] = useState(850)
+	const [displayGear, setDisplayGear] = useState(1)
 	const isMobile = useGameStore((state) => state.isMobile)
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
 	const vehicleSpeedRef = useGameStore((state) => state.vehicleSpeedRef)
+	const engineRef = useGameStore((state) => state.engineRef)
 	const rafRef = useRef()
 	const lastUpdateRef = useRef(0)
 
@@ -18,6 +21,8 @@ const Speedometer = () => {
 			if (timestamp - lastUpdateRef.current >= 100) {
 				const speedKmh = Math.abs(vehicleSpeedRef.current * 3.6)
 				setDisplaySpeed(Math.round(speedKmh))
+				setDisplayRpm(Math.round(engineRef.rpm))
+				setDisplayGear(engineRef.gear)
 				lastUpdateRef.current = timestamp
 			}
 			rafRef.current = requestAnimationFrame(updateSpeed)
@@ -27,7 +32,7 @@ const Speedometer = () => {
 		return () => {
 			if (rafRef.current) cancelAnimationFrame(rafRef.current)
 		}
-	}, [isMobile, physicsEnabled, vehicleSpeedRef])
+	}, [isMobile, physicsEnabled, vehicleSpeedRef, engineRef])
 
 	// Generate tick marks
 	const ticks = useMemo(() => {
@@ -51,100 +56,126 @@ const Speedometer = () => {
 	const normalizedSpeed = Math.min(displaySpeed / maxSpeed, 1)
 	const needleRotation = -135 + normalizedSpeed * 270
 
+	// RPM calculations (matching TRANSMISSION constants from useVehiclePhysics)
+	const maxRpm = 6200
+	const redlineRpm = 5800
+	const normalizedRpm = Math.min(displayRpm / maxRpm, 1)
+	const isRedline = normalizedRpm > 0.9 // Above 90% of max RPM
+
 	return (
 		<div className='absolute bottom-22 right-8 z-30 select-none pointer-events-none'>
+			{/* Speedometer Gauge */}
 			<div className='relative w-56 h-56'>
-				{/* Outer Bezel/Background */}
-				<div className='absolute inset-0 rounded-full bg-black/50 shadow-2xl backdrop-blur-md' />
+					{/* Outer Bezel/Background */}
+					<div className='absolute inset-0 rounded-full bg-black/50 shadow-2xl backdrop-blur-md' />
 
-				{/* Speed arc background */}
-				<svg className='absolute inset-0 w-full h-full' viewBox='0 0 100 100'>
-					<defs>
-						<linearGradient id='speedGradient' x1='0%' y1='0%' x2='100%' y2='0%'>
-							<stop offset='0%' stopColor='#ef4444' />
-							<stop offset='60%' stopColor='#22c55e' />
-							<stop offset='100%' stopColor='#3b82f6' />
-						</linearGradient>
-						<filter id='glow'>
-							<feGaussianBlur stdDeviation='1.5' result='coloredBlur' />
-							<feMerge>
-								<feMergeNode in='coloredBlur' />
-								<feMergeNode in='SourceGraphic' />
-							</feMerge>
-						</filter>
-					</defs>
+					{/* Speed arc background */}
+					<svg className='absolute inset-0 w-full h-full' viewBox='0 0 100 100'>
+						<defs>
+							<filter id='glow'>
+								<feGaussianBlur stdDeviation='1.5' result='coloredBlur' />
+								<feMerge>
+									<feMergeNode in='coloredBlur' />
+									<feMergeNode in='SourceGraphic' />
+								</feMerge>
+							</filter>
+						</defs>
 
-					{/* Background arc */}
-					<circle
-						cx='50'
-						cy='50'
-						r='42'
-						fill='none'
-						stroke='rgba(255,255,255,0.1)'
-						strokeWidth='6'
-						strokeDasharray='198 264'
-						strokeDashoffset='0'
-						strokeLinecap='round'
-						transform='rotate(135 50 50)'
-					/>
+						{/* Background arc */}
+						<circle
+							cx='50'
+							cy='50'
+							r='42'
+							fill='none'
+							stroke='rgba(255,255,255,0.1)'
+							strokeWidth='6'
+							strokeDasharray='198 264'
+							strokeDashoffset='0'
+							strokeLinecap='round'
+							transform='rotate(135 50 50)'
+						/>
 
-					{/* Active arc */}
-					<circle
-						cx='50'
-						cy='50'
-						r='42'
-						fill='none'
-						stroke='url(#speedGradient)'
-						strokeWidth='4'
-						strokeDasharray={`${normalizedSpeed * 198} 264`}
-						strokeDashoffset='0'
-						strokeLinecap='round'
-						className='transition-all duration-100'
-						transform='rotate(135 50 50)'
-						filter='url(#glow)'
-					/>
-				</svg>
-
-				{/* Tick marks and Numbers */}
-				{ticks.map(({ angle, value, isMajor }, index) => (
-					<div key={index} className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 origin-center' style={{ transform: `rotate(${angle}deg)` }}>
-						{/* Tick Line */}
-						<div className={`absolute bg-white/60 rounded-full ${isMajor ? 'w-1 h-3' : 'w-0.5 h-2'}`} style={{ top: '-84px', left: '-50%' }} />
-
-						{/* Number */}
-						{isMajor && (
-							<div
-								className='absolute -top-[60px] -left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-white/80 font-mono text-center'
-								style={{ transform: `rotate(${-angle}deg)` }}>
-								{value}
-							</div>
-						)}
-					</div>
-				))}
-
-				{/* Needle */}
-				<div
-					className='absolute left-1/2 top-1/2 origin-center transition-transform duration-100'
-					style={{
-						transform: `translate(-50%, -50%) rotate(${needleRotation}deg)`,
-						filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.5))',
-					}}>
-					<svg width='20' height='120' viewBox='0 0 20 120' style={{ transform: 'translateY(-45px)' }}>
-						<path d='M 8 120 L 12 120 L 10 0 Z' fill='#ef4444' />
+						{/* RPM arc - color based on current RPM level */}
+						<circle
+							cx='50'
+							cy='50'
+							r='42'
+							fill='none'
+							stroke={normalizedRpm > 0.9 ? '#ef4444' : normalizedRpm > 0.8 ? '#f97316' : '#22c55e'}
+							strokeWidth='4'
+							strokeDasharray={`${normalizedRpm * 198} 264`}
+							strokeDashoffset='0'
+							strokeLinecap='round'
+							transform='rotate(135 50 50)'
+							filter='url(#glow)'
+							style={{ transition: 'stroke 0.15s ease' }}
+						/>
 					</svg>
-				</div>
 
-				{/* Center cap */}
-				<div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-stone-800 shadow-lg z-10' />
+					{/* Tick marks and Numbers */}
+					{ticks.map(({ angle, value, isMajor }, index) => (
+						<div key={index} className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 origin-center' style={{ transform: `rotate(${angle}deg)` }}>
+							{/* Tick Line */}
+							<div className={`absolute bg-white/60 rounded-full ${isMajor ? 'w-1 h-3' : 'w-0.5 h-2'}`} style={{ top: '-84px', left: '-50%' }} />
 
-				{/* Speed display */}
-				<div className='absolute inset-0 flex flex-col items-center justify-end pb-8'>
-					<div className='flex items-baseline gap-1'>
-						<span className='text-4xl font-black text-white tabular-nums tracking-tighter drop-shadow-lg'>{displaySpeed}</span>
-						<span className='text-xs font-bold text-white/60 uppercase'>km/h</span>
+							{/* Number */}
+							{isMajor && (
+								<div
+									className='absolute -top-[60px] -left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-white/80 font-mono text-center'
+									style={{ transform: `rotate(${-angle}deg)` }}>
+									{value}
+								</div>
+							)}
+						</div>
+					))}
+
+					{/* Needle */}
+					<div
+						className='absolute left-1/2 top-1/2 origin-center transition-transform duration-100'
+						style={{
+							transform: `translate(-50%, -50%) rotate(${needleRotation}deg)`,
+							filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.5))',
+						}}>
+						<svg width='20' height='120' viewBox='0 0 20 120' style={{ transform: 'translateY(-45px)' }}>
+							<path d='M 8 120 L 12 120 L 10 0 Z' fill='#ef4444' />
+						</svg>
+					</div>
+
+					{/* Center cap */}
+					<div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-stone-800 shadow-lg z-10' />
+
+					{/* Gear indicator - R12345 display */}
+					<div className='absolute inset-0 flex items-center justify-center' style={{ marginTop: '-28px' }}>
+						<div className='flex gap-1.5 text-sm font-bold font-mono'>
+							{['R', '1', '2', '3', '4', '5'].map((gear) => {
+								const isActive = (gear === 'R' && displayGear === -1) || (gear !== 'R' && parseInt(gear) === displayGear)
+								return (
+									<span
+										key={gear}
+										className={`transition-all duration-150 ${
+											isActive
+												? gear === 'R'
+													? 'text-red-500 scale-110'
+													: isRedline
+														? 'text-red-500 scale-110'
+														: 'text-green-500 scale-110'
+												: 'text-white/30'
+										}`}>
+										{gear}
+									</span>
+								)
+							})}
+						</div>
+					</div>
+
+					{/* Speed display */}
+					<div className='absolute inset-0 flex flex-col items-center justify-end pb-8'>
+						<div className='flex items-baseline gap-1'>
+							<span className='text-4xl font-black text-white tabular-nums tracking-tighter drop-shadow-lg'>{displaySpeed}</span>
+							<span className='text-xs font-bold text-white/60 uppercase'>km/h</span>
+						</div>
 					</div>
 				</div>
-			</div>
 		</div>
 	)
 }

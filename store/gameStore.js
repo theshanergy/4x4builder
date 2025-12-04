@@ -27,11 +27,23 @@ const useGameStore = create((set, get) => {
 		physicsEnabled: false,
 		performanceDegraded: false,
 		controlsVisible: false,
+		muted: true, // Audio muted by default
 		vehicleSpeedRef: { current: 0 }, // Mutable ref to avoid re-renders
+		
+		// Engine/Transmission state (mutable refs for performance)
+		engineRef: {
+			rpm: 850,
+			throttle: 0,
+			gear: 1,
+			clutchEngaged: true,
+			load: 0.2, // Engine load (0 = no load/airborne, 1 = max load/climbing)
+		},
+		
 		setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
 		setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
 		setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
 		setControlsVisible: (visible) => set({ controlsVisible: visible }),
+		toggleMute: () => set((state) => ({ muted: !state.muted })),
 
 		// Notification state
 		notification: null,
