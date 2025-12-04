@@ -28,6 +28,9 @@ class AudioEngine {
 		} catch (e) {
 			console.error('Failed to load worklet', e)
 			throw e
+		} finally {
+			// Revoke the blob URL immediately after the module is loaded to prevent memory leak
+			URL.revokeObjectURL(url)
 		}
 
 		this.workletNode = new AudioWorkletNode(this.context, 'aerosonic-processor', {
@@ -118,6 +121,34 @@ class AudioEngine {
 
 	resume() {
 		this.context?.resume()
+	}
+
+	destroy() {
+		if (this.workletNode) {
+			this.workletNode.disconnect()
+			this.workletNode = null
+		}
+		if (this.lowpassNode) {
+			this.lowpassNode.disconnect()
+			this.lowpassNode = null
+		}
+		if (this.compressor) {
+			this.compressor.disconnect()
+			this.compressor = null
+		}
+		if (this.gainNode) {
+			this.gainNode.disconnect()
+			this.gainNode = null
+		}
+		if (this.analyzer) {
+			this.analyzer.disconnect()
+			this.analyzer = null
+		}
+		if (this.context) {
+			this.context.close()
+			this.context = null
+		}
+		this.isInitialized = false
 	}
 }
 
