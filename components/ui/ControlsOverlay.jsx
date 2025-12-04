@@ -26,7 +26,7 @@ const Key = ({ children, keyName, setKey, onClick, active, wide }) => {
 
 const ControlsOverlay = () => {
 	const [isMobile, setIsMobile] = useState(false)
-	const setInput = useInputStore((state) => state.setInput)
+	const setTouchInput = useInputStore((state) => state.setTouchInput)
 	const setKey = useInputStore((state) => state.setKey)
 	const keys = useInputStore((state) => state.keys)
 	const controlsVisible = useGameStore((state) => state.controlsVisible)
@@ -50,16 +50,16 @@ const ControlsOverlay = () => {
 		return (
 			<div className='fixed inset-x-4 bottom-20 flex justify-between items-end z-40 pointer-events-none text-sm text-white/50 font-semibold'>
 				<div className='flex flex-col items-center gap-4 pointer-events-auto'>
-					<div onClick={resetVehicle}>
-						<span className='text-lg font-black'>↺</span> Reset
-					</div>
-					<Joystick onMove={(val) => setInput({ leftStickX: val.x, leftStickY: val.y })} />
+				<div onClick={resetVehicle}>
+					<span className='text-lg font-black'>↺</span> Reset
 				</div>
-				<div className='flex flex-col items-center gap-4 pointer-events-auto'>
-					<div onTouchStart={() => setKey('Shift', true)} onTouchEnd={() => setKey('Shift', false)}>
-						<span className='text-lg font-black'>⇧</span> Drift
-					</div>
-					<Joystick onMove={(val) => setInput({ rightStickX: val.x, rightStickY: val.y })} />
+				<Joystick onMove={(val) => setTouchInput({ leftStickX: val.x, leftStickY: val.y })} />
+			</div>
+			<div className='flex flex-col items-center gap-4 pointer-events-auto'>
+				<div onTouchStart={() => setKey('Shift', true)} onTouchEnd={() => setKey('Shift', false)}>
+					<span className='text-lg font-black'>⇧</span> Drift
+				</div>
+				<Joystick onMove={(val) => setTouchInput({ rightStickX: val.x, rightStickY: val.y })} />
 				</div>
 			</div>
 		)

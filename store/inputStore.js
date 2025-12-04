@@ -20,9 +20,18 @@ const defaultInput = {
 	rightBumper: false,
 }
 
+// Touch joystick input (separate from polled input sources)
+const defaultTouchInput = {
+	leftStickX: 0,
+	leftStickY: 0,
+	rightStickX: 0,
+	rightStickY: 0,
+}
+
 const useInputStore = create((set) => ({
 	keys: new Set(),
 	input: { ...defaultInput },
+	touchInput: { ...defaultTouchInput },
 	setKey: (key, pressed) =>
 		set((state) => {
 			const keys = new Set(state.keys)
@@ -33,6 +42,10 @@ const useInputStore = create((set) => ({
 	setInput: (newInput) =>
 		set((state) => ({
 			input: { ...state.input, ...newInput },
+		})),
+	setTouchInput: (newTouchInput) =>
+		set((state) => ({
+			touchInput: { ...state.touchInput, ...newTouchInput },
 		})),
 	resetInput: () =>
 		set(() => ({
