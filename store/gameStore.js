@@ -18,6 +18,7 @@ const useGameStore = create((set, get) => {
         physicsEnabled: false,
         performanceDegraded: false,
         controlsVisible: false,
+        vehicleSpeedRef: { current: 0 }, // Mutable ref to avoid re-renders
         setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
         setPhysicsEnabled: (enabled) => set({ physicsEnabled: enabled }),
         setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),

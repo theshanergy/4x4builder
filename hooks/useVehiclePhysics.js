@@ -213,6 +213,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			tempForward.copy(VECTORS.FORWARD).applyQuaternion(vehicle.rotation())
 			tempVelocity.set(velocity.x, velocity.y, velocity.z)
 			forwardSpeed = tempVelocity.dot(tempForward)
+			
+			// Update speed ref for UI (mutate ref directly to avoid re-renders)
+			useGameStore.getState().vehicleSpeedRef.current = forwardSpeed
 		}
 
 		// Determine reverse state
