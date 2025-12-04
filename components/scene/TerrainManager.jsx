@@ -254,6 +254,9 @@ const DistantTerrain = ({ noise, map }) => {
 	)
 }
 
+// Detect mobile/touch devices (check once at module load)
+const isMobile = typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 1024)
+
 // Main TerrainManager component
 const TerrainManager = () => {
 	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
@@ -261,10 +264,10 @@ const TerrainManager = () => {
 	const lastTileCoord = useRef({ x: null, z: null })
 	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
 
-	// Check if grass should be disabled (XR mode or performance degraded)
+	// Check if grass should be disabled (XR mode, performance degraded, or mobile device)
 	const isInXR = useXR((state) => state.mode !== null)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
-	const showGrass = !isInXR && !performanceDegraded
+	const showGrass = !isInXR && !performanceDegraded && !isMobile
 
 	// Pre-compute view distance tile count
 	const tilesInViewDistance = useMemo(() => Math.ceil(viewDistance / tileSize), [viewDistance, tileSize])
