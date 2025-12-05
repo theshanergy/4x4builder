@@ -97,9 +97,6 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Track airborne state
 	const isAirborne = useRef(false)
 
-	// Track reverse state
-	const isReversing = useRef(false)
-
 	// Track reset button state to detect press (not hold)
 	const resetPressedLastFrame = useRef(false)
 
@@ -145,8 +142,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		vehicle.setLinvel({ x: 0, y: 0, z: 0 }, true)
 		vehicle.setAngvel({ x: 0, y: 0, z: 0 }, true)
 
-		// Reset reverse state
-		isReversing.current = false
+		// Reset gear to first
+		useGameStore.getState().engineRef.gear = 1
 	}, [vehicleRef])
 
 	// Setup vehicle physics
@@ -326,7 +323,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		// Use cooldown to prevent skipping gears (e.g., 1 -> 3 -> 5)
 		const canShift = currentTime - lastShiftTime.current > TRANSMISSION.shiftCooldown
 
-		if (!isAirborne.current) {
+		if (!isAirborne.current && engineRef.gear !== -1) {
 			if (canShift && currentRpmFromDrivetrain > TRANSMISSION.shiftUpRpm && currentGear < TRANSMISSION.gearRatios.length - 1 && throttleInput > 0.3) {
 				currentGear++
 				engineRef.gear = currentGear
@@ -462,17 +459,17 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		// Determine reverse state
 		// Enter reverse: braking while nearly stopped and not accelerating
 		// Exit reverse: accelerating (throttle pressed)
-		if (throttleInput > 0) {
-			isReversing.current = false
+		if (throttleInput > 0 && engineRef.gear === -1) {
+			engineRef.gear = 1
 		} else if (brakeInput > 0 && Math.abs(forwardSpeed) < REVERSE_THRESHOLD) {
-			isReversing.current = true
+			engineRef.gear = -1
 		}
 
 		// Calculate actual forces based on state
 		let engineForce = 0
 		let brakeForce = 0
 
-		if (isReversing.current) {
+		if (engineRef.gear === -1) {
 			// In reverse mode: brake input drives backward
 			engineForce = -FORCES.reverse * brakeInput
 			// Throttle acts as brake when reversing
