@@ -1,5 +1,4 @@
 import { Vector3 } from 'three'
-import { Noise } from 'noisejs'
 
 // ============================================================================
 // Road Configuration
@@ -10,11 +9,6 @@ const CURVE_AMP_X = 60 // Lateral curve amplitude
 const CURVE_FREQ_X = 0.002 // Lateral curve frequency
 const CURVE_OFFSET_X = 0.0005 // Secondary lateral variation
 
-// Terrain sampling parameters for road height
-const ROAD_HEIGHT_SAMPLES = 50 // Number of samples to average for smooth road
-const ROAD_HEIGHT_SAMPLE_DISTANCE = 120 // Distance ahead/behind to sample
-const ROAD_HEIGHT_DAMPING = 0.2 // Reduce terrain height influence on road (0-1)
-
 // Spawn area parameters - road starts straight and flat at origin
 const SPAWN_FLAT_RADIUS = 50 // Road is straight and flat within this distance from origin
 const SPAWN_TRANSITION_END = 150 // Road fully follows curves/terrain beyond this distance
@@ -23,10 +17,6 @@ const SPAWN_TRANSITION_END = 150 // Road fully follows curves/terrain beyond thi
 export const ROAD_WIDTH = 14 // Total road width (7m half-width)
 export const ROAD_SHOULDER_WIDTH = 3 // Shoulder extends 3m beyond road edge
 export const ROAD_TRANSITION_WIDTH = 22 // Transition from shoulder to full terrain
-
-// Terrain config needed for road height sampling
-const TERRAIN_SMOOTHNESS = 15
-const TERRAIN_MAX_HEIGHT = 4
 
 // ============================================================================
 // Caching
@@ -37,29 +27,13 @@ const roadInfoCache = new Map()
 const ROAD_INFO_CACHE_PRECISION = 0.5 // Cache precision in world units
 const ROAD_INFO_CACHE_MAX_SIZE = 5000
 
-// Cache for road heights to avoid recalculating
-const roadHeightCache = new Map()
-const CACHE_PRECISION = 1 // Round Z to this precision for caching
-
 // ============================================================================
 // Internal Helpers
 // ============================================================================
 
-// Create a shared noise instance for terrain sampling (same seed as TerrainManager)
-const terrainNoiseSampler = new Noise(1234)
-
 // Reusable Vector3 instances to avoid allocations in hot paths
 const _roadPos = new Vector3()
 const _tangent = new Vector3()
-
-/**
- * Sample raw terrain height at a position (without road influence)
- */
-const sampleTerrainHeight = (x, z) => {
-	const noiseValue = terrainNoiseSampler.perlin2(x / TERRAIN_SMOOTHNESS, z / TERRAIN_SMOOTHNESS)
-	const normalizedHeight = (noiseValue + 1) / 2
-	return normalizedHeight * TERRAIN_MAX_HEIGHT
-}
 
 /**
  * Calculate road X position at given Z (lateral position only)
@@ -88,48 +62,6 @@ const getRoadXAtZ = (z) => {
 	return (baseCurve + secondaryCurve) * amplitude
 }
 
-/**
- * Calculate smoothed road height by averaging terrain samples along the path
- */
-const calculateSmoothedRoadHeight = (z) => {
-	const cacheKey = Math.round(z / CACHE_PRECISION) * CACHE_PRECISION
-
-	if (roadHeightCache.has(cacheKey)) {
-		return roadHeightCache.get(cacheKey)
-	}
-
-	let totalHeight = 0
-	let totalWeight = 0
-
-	// Sample terrain at multiple points ahead and behind for smoothing
-	for (let i = -ROAD_HEIGHT_SAMPLES; i <= ROAD_HEIGHT_SAMPLES; i++) {
-		const sampleZ = z + (i / ROAD_HEIGHT_SAMPLES) * ROAD_HEIGHT_SAMPLE_DISTANCE
-		const sampleX = getRoadXAtZ(sampleZ)
-
-		// Gaussian-like weight - stronger falloff for distant samples
-		const normalizedDist = i / ROAD_HEIGHT_SAMPLES
-		const weight = Math.exp(-2 * normalizedDist * normalizedDist)
-
-		totalHeight += sampleTerrainHeight(sampleX, sampleZ) * weight
-		totalWeight += weight
-	}
-
-	// Apply damping to reduce height variation
-	const avgTerrainHeight = totalHeight / totalWeight
-	const smoothedHeight = avgTerrainHeight * ROAD_HEIGHT_DAMPING
-
-	// Cache the result
-	roadHeightCache.set(cacheKey, smoothedHeight)
-
-	// Limit cache size
-	if (roadHeightCache.size > 2000) {
-		const firstKey = roadHeightCache.keys().next().value
-		roadHeightCache.delete(firstKey)
-	}
-
-	return smoothedHeight
-}
-
 // ============================================================================
 // Exported Functions
 // ============================================================================
@@ -139,25 +71,8 @@ const calculateSmoothedRoadHeight = (z) => {
  * Pass optional target Vector3 to avoid allocation.
  */
 export const getRoadPositionAtZ = (z, target = _roadPos) => {
-	const distFromOrigin = Math.abs(z)
-
-	// Lateral position (X)
-	const x = getRoadXAtZ(z)
-
-	// Elevation (Y) - follows averaged terrain height for smooth driving
-	let y
-	if (distFromOrigin < SPAWN_FLAT_RADIUS) {
-		y = 0
-	} else if (distFromOrigin < SPAWN_TRANSITION_END) {
-		const t = (distFromOrigin - SPAWN_FLAT_RADIUS) / (SPAWN_TRANSITION_END - SPAWN_FLAT_RADIUS)
-		const blend = t * t * t * (t * (t * 6 - 15) + 10)
-		const terrainHeight = calculateSmoothedRoadHeight(z)
-		y = terrainHeight * blend
-	} else {
-		y = calculateSmoothedRoadHeight(z)
-	}
-
-	return target.set(x, y, z)
+	// Road always stays at y=0, only curves laterally (X)
+	return target.set(getRoadXAtZ(z), 0, z)
 }
 
 /**
