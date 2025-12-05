@@ -31,7 +31,7 @@ const AtmosphericSky = ({ sunPosition = [1, 0.5, 1] }) => {
 
 	return (
 		<mesh ref={meshRef} scale={[1, 1, 1]}>
-			<sphereGeometry args={[500, 32, 32]} />
+			<sphereGeometry args={[500, 16, 16]} />
 			<shaderMaterial
 				ref={materialRef}
 				uniforms={uniforms}
