@@ -15,7 +15,6 @@ import {
 
 import grassVertexShader from '../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../shaders/grass.frag.glsl'
-import { getRoadInfo } from '../../utils/roadMath'
 
 // Seeded random number generator (mulberry32)
 const createSeededRandom = (seed) => {
@@ -177,12 +176,7 @@ const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainH
 		const distFromCenter = Math.sqrt(patchWorldX * patchWorldX + patchWorldZ * patchWorldZ)
 		if (distFromCenter < flatAreaRadius) continue
 
-		// Skip if patch center is on or near the road
-		const patchRoadInfo = getRoadInfo(patchWorldX, patchWorldZ)
-		if (patchRoadInfo.isOnRoad || patchRoadInfo.blendFactor > 0.5) continue
-
 		// Get terrain data at patch center
-		const patchTerrainY = getTerrainHeight(patchWorldX, patchWorldZ)
 		const patchTerrainNormal = getTerrainNormal(patchWorldX, patchWorldZ)
 
 		// Skip if slope is too steep
@@ -215,10 +209,6 @@ const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainH
 			// Calculate world position for this blade
 			const bladeWorldX = patchWorldX + bladeLocalX
 			const bladeWorldZ = patchWorldZ + bladeLocalZ
-
-			// Skip if blade is on or near the road
-			const bladeRoadInfo = getRoadInfo(bladeWorldX, bladeWorldZ)
-			if (bladeRoadInfo.isOnRoad || bladeRoadInfo.blendFactor > 0.3) continue
 
 			// Sample terrain height at blade's world position
 			const bladeTerrainY = getTerrainHeight(bladeWorldX, bladeWorldZ)

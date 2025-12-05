@@ -1,262 +1,237 @@
 import { useState, useRef, useMemo, useEffect, memo, useCallback } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
-import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader, ShaderMaterial, BufferAttribute } from 'three'
+import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 import { useXR } from '@react-three/xr'
 
 import useGameStore from '../../store/gameStore'
 import GrassManager from './GrassManager'
 import DistantTerrain from './DistantTerrain'
-import { getRoadInfo } from '../../utils/roadMath'
 
-import terrainVertexShader from '../../shaders/terrain.vert.glsl?raw'
-import terrainFragmentShader from '../../shaders/terrain.frag.glsl?raw'
-
-// Epsilon for numerical gradient approximation (normal calculation)
+// Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
-const TILE_FADE_DURATION = 0.5 // seconds
 
-const TERRAIN_CONFIG = {
-	viewDistance: 300, // How far tiles are rendered visually
-	physicsDistance: 64, // How far tiles have physics colliders (around vehicle)
-	tileSize: 32, // World units per tile
-	resolution: 16, // Vertices per tile edge (affects collision detail)
-	smoothness: 15, // Noise scale - higher = smoother terrain
-	maxHeight: 4, // Maximum terrain elevation in world units
+// Fade-in duration for new tiles (in seconds)
+const TILE_FADE_DURATION = 0.5
+
+// Default terrain configuration
+const DEFAULT_TERRAIN_CONFIG = {
+	viewDistance: 160,
+	tileSize: 32,
+	resolution: 16,
+	smoothness: 15,
+	maxHeight: 4,
 }
 
-// Shared height calculation for both tile generation and terrain queries
-const getBaseHeight = (worldX, worldZ, noise, smoothness, flatAreaRadius, transitionEndDist) => {
-	const distSq = worldX * worldX + worldZ * worldZ
-	const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
-
-	if (distSq < flatAreaRadiusSq) return 0
-
-	const normalizedHeight = (noise.perlin2(worldX / smoothness, worldZ / smoothness) + 1) / 2
-	const transitionEndDistSq = transitionEndDist * transitionEndDist
-
-	if (distSq < transitionEndDistSq) {
-		const t = (Math.sqrt(distSq) - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
-		return normalizedHeight * (t * t * (3 - 2 * t))
-	}
-	return normalizedHeight
-}
-
-// Individual terrain tile with optional physics collider and road blending
-const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeight, noise, map, normalMap, shouldFade = true, hasPhysics = true }) => {
+// TerrainTile component
+const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeight, noise, map, normalMap, shouldFade = true }) => {
 	const materialRef = useRef()
 	const opacityRef = useRef(shouldFade ? 0 : 1)
 
-	// Animate opacity for smooth tile fade-in
+	// Animate opacity from 0 to 1 when tile is created
 	useFrame((_, delta) => {
 		if (materialRef.current && opacityRef.current < 1) {
 			opacityRef.current = Math.min(1, opacityRef.current + delta / TILE_FADE_DURATION)
-			materialRef.current.uniforms.opacity.value = opacityRef.current
+			materialRef.current.opacity = opacityRef.current
 			materialRef.current.transparent = opacityRef.current < 1
 		}
 	})
 
-	// Configure texture wrapping - UVs use world coordinates for seamless tiling
+	// Apply texture settings - UVs are now in world coordinates, so repeat controls texture density
 	useMemo(() => {
 		if (map) {
 			map.wrapS = map.wrapT = RepeatWrapping
-			map.repeat.set(1, 1) // 1 texture per world unit
+			map.repeat.set(1, 1) // 1 texture unit per world unit
 		}
 		if (normalMap) {
 			normalMap.wrapS = normalMap.wrapT = RepeatWrapping
-			normalMap.repeat.set(0.33, 0.33) // Larger scale for normal details
+			normalMap.repeat.set(0.33, 0.33) // Larger scale for normal map details
 		}
 	}, [map, normalMap])
 
-	// Flat area around spawn point, then smooth transition to full terrain
-	const flatAreaRadius = tileSize * 0.5
-	const transitionEndDist = tileSize * 2
+	// Helper to compute height at any world position (for gradient calculation)
+	const getHeightAtPosition = (worldX, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) => {
+		const distSq = worldX * worldX + worldZ * worldZ
+		if (distSq < flatAreaRadiusSq) return 0
 
-	// Generate all vertex data: positions, normals, UVs, and road blend attributes
-	const terrainData = useMemo(() => {
-		const values = [] // Heights for physics collider (normalized 0-1)
+		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
+		const normalizedHeight = (noiseValue + 1) / 2
+
+		if (isCenterTile || distSq < transitionEndDistSq) {
+			const t = (Math.sqrt(distSq) - Math.sqrt(flatAreaRadiusSq)) / (Math.sqrt(transitionEndDistSq) - Math.sqrt(flatAreaRadiusSq))
+			return normalizedHeight * (t * t * (3 - 2 * t))
+		}
+		return normalizedHeight
+	}
+
+	// Generate heights, UVs, and normals together to avoid redundant calculations
+	const heights = useMemo(() => {
+		const values = []
 		const vertexCount = (resolution + 1) * (resolution + 1)
 		const positions = new Float32Array(vertexCount * 3)
 		const uvs = new Float32Array(vertexCount * 2)
 		const normals = new Float32Array(vertexCount * 3)
-		const roadBlendArr = new Float32Array(vertexCount)
-		const signedRoadDistArr = new Float32Array(vertexCount)
+		const flatAreaRadiusSq = (tileSize * 0.5) ** 2
+		const transitionEndDistSq = (tileSize * 2) ** 2
 		const step = tileSize / resolution
-		const halfTile = tileSize / 2
-		const invResolution = 1 / resolution
-		const doubleEpsilon = 2 * GRADIENT_EPSILON
+		const tileX = Math.floor(position[0] / tileSize)
+		const tileZ = Math.floor(position[2] / tileSize)
+		const isCenterTile = tileX >= -1 && tileX <= 0 && tileZ >= -1 && tileZ <= 0
+
+		const normal = new Vector3()
 
 		for (let i = 0; i <= resolution; i++) {
 			for (let j = 0; j <= resolution; j++) {
-				const worldX = position[0] + i * step - halfTile
-				const worldZ = position[2] + j * step - halfTile
-				const roadInfo = getRoadInfo(worldX, worldZ) // Get road proximity data
-				const baseHeight = getBaseHeight(worldX, worldZ, noise, smoothness, flatAreaRadius, transitionEndDist)
+				const worldX = position[0] + i * step - tileSize / 2
+				const worldZ = position[2] + j * step - tileSize / 2
 
-				// Blend terrain height with road height based on proximity
-				const height =
-					roadInfo.blendFactor > 0 ? (baseHeight * maxHeight * (1 - roadInfo.blendFactor) + roadInfo.roadHeight * roadInfo.blendFactor) / maxHeight : baseHeight
+				const height = getHeightAtPosition(worldX, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile)
 				values.push(height)
 
 				const vertIndex = i + (resolution + 1) * j
 				const posIndex = vertIndex * 3
-				positions[posIndex] = i * invResolution * tileSize - halfTile
+				positions[posIndex] = (i / resolution) * tileSize - tileSize / 2
 				positions[posIndex + 1] = height * maxHeight
-				positions[posIndex + 2] = j * invResolution * tileSize - halfTile
+				positions[posIndex + 2] = (j / resolution) * tileSize - tileSize / 2
 
-				roadBlendArr[vertIndex] = roadInfo.blendFactor
-				signedRoadDistArr[vertIndex] = roadInfo.signedDistance
-
-				// Compute normal via numerical gradient (sample 4 neighboring heights)
-				// Uses base terrain only - road surface is flat
-				const hL = getBaseHeight(worldX - GRADIENT_EPSILON, worldZ, noise, smoothness, flatAreaRadius, transitionEndDist) * maxHeight
-				const hR = getBaseHeight(worldX + GRADIENT_EPSILON, worldZ, noise, smoothness, flatAreaRadius, transitionEndDist) * maxHeight
-				const hD = getBaseHeight(worldX, worldZ - GRADIENT_EPSILON, noise, smoothness, flatAreaRadius, transitionEndDist) * maxHeight
-				const hU = getBaseHeight(worldX, worldZ + GRADIENT_EPSILON, noise, smoothness, flatAreaRadius, transitionEndDist) * maxHeight
+				// Compute normal analytically using finite differences on the height function
+				const hL = getHeightAtPosition(worldX - GRADIENT_EPSILON, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) * maxHeight
+				const hR = getHeightAtPosition(worldX + GRADIENT_EPSILON, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) * maxHeight
+				const hD = getHeightAtPosition(worldX, worldZ - GRADIENT_EPSILON, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) * maxHeight
+				const hU = getHeightAtPosition(worldX, worldZ + GRADIENT_EPSILON, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) * maxHeight
 
 				// Normal from gradient: n = normalize(-dh/dx, 1, -dh/dz)
-				const dhdx = (hR - hL) / doubleEpsilon
-				const dhdz = (hU - hD) / doubleEpsilon
-				const nx = -dhdx,
-					ny = 1,
-					nz = -dhdz
-				const invLen = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz)
+				const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
+				const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
+				normal.set(-dhdx, 1, -dhdz).normalize()
 
-				normals[posIndex] = nx * invLen
-				normals[posIndex + 1] = ny * invLen
-				normals[posIndex + 2] = nz * invLen
+				normals[posIndex] = normal.x
+				normals[posIndex + 1] = normal.y
+				normals[posIndex + 2] = normal.z
 
-				// World-space UVs for seamless texture tiling across tiles
+				// Store UVs based on world position (computed once, reused in geometry)
 				const uvIndex = vertIndex * 2
 				uvs[uvIndex] = worldX
 				uvs[uvIndex + 1] = worldZ
 			}
 		}
 
-		return { values, positions, uvs, normals, roadBlend: roadBlendArr, signedRoadDist: signedRoadDistArr }
-	}, [position, tileSize, resolution, smoothness, noise, maxHeight, flatAreaRadius, transitionEndDist])
+		return { values, positions, uvs, normals }
+	}, [position, tileSize, resolution, smoothness, noise, maxHeight])
 
-	// Create geometry with custom road blend attributes for shader
+	// Create geometry for terrain mesh
 	const geometry = useMemo(() => {
 		const geom = new PlaneGeometry(tileSize, tileSize, resolution, resolution)
-		geom.getAttribute('position').array.set(terrainData.positions)
-		geom.getAttribute('uv').array.set(terrainData.uvs)
+		geom.getAttribute('position').array.set(heights.positions)
+
+		// Apply pre-computed UVs (world-space coordinates for seamless tiling)
+		geom.getAttribute('uv').array.set(heights.uvs)
 		geom.getAttribute('uv').needsUpdate = true
-		geom.getAttribute('normal').array.set(terrainData.normals)
+
+		// Apply pre-computed normals (calculated analytically from noise gradient)
+		geom.getAttribute('normal').array.set(heights.normals)
 		geom.getAttribute('normal').needsUpdate = true
-		geom.setAttribute('roadBlend', new BufferAttribute(terrainData.roadBlend, 1))
-		geom.setAttribute('signedRoadDist', new BufferAttribute(terrainData.signedRoadDist, 1))
+
 		return geom
-	}, [terrainData, tileSize, resolution])
+	}, [heights, tileSize, resolution])
 
-	// Shader material for terrain/road blending
-	const material = useMemo(
-		() =>
-			new ShaderMaterial({
-				vertexShader: terrainVertexShader,
-				fragmentShader: terrainFragmentShader,
-				uniforms: {
-					sandMap: { value: map },
-					sandNormalMap: { value: normalMap },
-					opacity: { value: opacityRef.current },
-				},
-				transparent: opacityRef.current < 1,
-			}),
-		[map, normalMap]
-	)
-
+	// Dispose geometry when component unmounts or geometry changes
 	useEffect(() => {
-		materialRef.current = material
-	}, [material])
-
-	// Cleanup geometry and material on unmount
-	useEffect(
-		() => () => {
+		return () => {
 			geometry.dispose()
-			material.dispose()
-		},
-		[geometry, material]
-	)
+		}
+	}, [geometry])
 
-	// Heightfield collider args: [rows, cols, heights, scale]
-	const colliderArgs = useMemo(() => [resolution, resolution, terrainData.values, { x: tileSize, y: maxHeight, z: tileSize }], [resolution, terrainData, tileSize, maxHeight])
+	// Set collider arguments
+	const colliderArgs = useMemo(() => {
+		return [resolution, resolution, heights.values, { x: tileSize, y: maxHeight, z: tileSize }]
+	}, [resolution, heights, tileSize, maxHeight])
 
-	// Always render same structure - conditionally include physics collider
-	// This avoids destroying/recreating the entire tile when physics state changes
 	return (
-		<group position={position}>
-			{hasPhysics && (
-				<RigidBody type='fixed' colliders={false}>
-					<HeightfieldCollider args={colliderArgs} name={`Tile-${position[0]}-${position[2]}`} />
-				</RigidBody>
-			)}
-			<mesh geometry={geometry} material={material} receiveShadow />
-		</group>
+		<RigidBody type='fixed' position={position} colliders={false}>
+			<HeightfieldCollider args={colliderArgs} name={`Tile-${position[0]}-${position[2]}`} />
+			<mesh geometry={geometry} receiveShadow>
+				<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} transparent={opacityRef.current < 1} opacity={opacityRef.current} />
+			</mesh>
+		</RigidBody>
 	)
 })
 
-// Manages dynamic tile loading/unloading based on camera position
+// Main TerrainManager component
 const TerrainManager = () => {
-	const { viewDistance, physicsDistance, tileSize, resolution, smoothness, maxHeight } = TERRAIN_CONFIG
+	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
 	const [activeTiles, setActiveTiles] = useState([])
-	const [physicsTileKeys, setPhysicsTileKeys] = useState(new Set()) // Tracks which tiles need physics
 	const lastTileCoord = useRef({ x: null, z: null })
-	const tileCache = useRef(new Map()) // Stable references prevent unnecessary re-renders
+	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
 
-	// Disable grass in XR, on mobile, or when performance is degraded
+	// Check if grass should be disabled (XR mode, performance degraded, or mobile device)
 	const isInXR = useXR((state) => state.mode !== null)
 	const isMobile = useGameStore((state) => state.isMobile)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const showGrass = !isInXR && !performanceDegraded && !isMobile
 
+	// Pre-compute view distance tile count
 	const tilesInViewDistance = useMemo(() => Math.ceil(viewDistance / tileSize), [viewDistance, tileSize])
-	const tilesInPhysicsDistance = useMemo(() => Math.ceil(physicsDistance / tileSize), [physicsDistance, tileSize])
-	const noise = useMemo(() => new Noise(1234), []) // Seeded for deterministic terrain
+
+	// Generate noise instance
+	const noise = useMemo(() => new Noise(1234), [])
 
 	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
 
 	const distantTexture = useMemo(() => sandTexture.clone(), [sandTexture])
 
+	// Flat area and transition parameters (same as used in TerrainTile)
 	const flatAreaRadius = tileSize * 0.5
 	const transitionEndDist = tileSize * 2
-	const normalScratch = useMemo(() => new Vector3(), []) // Reused to avoid allocations
 
-	// Get raw height (0-1) at world position, without road blending
-	const getRawHeight = useCallback(
-		(worldX, worldZ) => getBaseHeight(worldX, worldZ, noise, smoothness, flatAreaRadius, transitionEndDist),
-		[noise, smoothness, flatAreaRadius, transitionEndDist]
-	)
+	// Scratch vector for normal calculations (reused to avoid allocations)
+	const normalScratch = useMemo(() => new Vector3(), [])
 
-	// Get terrain height in world units, with road blending applied
-	const getTerrainHeight = useCallback(
-		(worldX, worldZ) => {
-			const baseHeight = getRawHeight(worldX, worldZ) * maxHeight
-			const roadInfo = getRoadInfo(worldX, worldZ)
-			return roadInfo.blendFactor > 0 ? baseHeight * (1 - roadInfo.blendFactor) + roadInfo.roadHeight * roadInfo.blendFactor : baseHeight
-		},
-		[getRawHeight, maxHeight]
-	)
+	// Get raw height value at any world position (normalized 0-1)
+	const getRawHeight = useCallback((worldX, worldZ) => {
+		const distSq = worldX * worldX + worldZ * worldZ
+		const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
+		const transitionEndDistSq = transitionEndDist * transitionEndDist
 
-	// Get terrain normal at world position (for grass blade orientation)
-	const getTerrainNormal = useCallback(
-		(worldX, worldZ, target = normalScratch) => {
-			const hL = getRawHeight(worldX - GRADIENT_EPSILON, worldZ) * maxHeight
-			const hR = getRawHeight(worldX + GRADIENT_EPSILON, worldZ) * maxHeight
-			const hD = getRawHeight(worldX, worldZ - GRADIENT_EPSILON) * maxHeight
-			const hU = getRawHeight(worldX, worldZ + GRADIENT_EPSILON) * maxHeight
-			return target.set(-(hR - hL) / (2 * GRADIENT_EPSILON), 1, -(hU - hD) / (2 * GRADIENT_EPSILON)).normalize()
-		},
-		[getRawHeight, maxHeight, normalScratch]
-	)
+		if (distSq < flatAreaRadiusSq) return 0
 
-	// Update active tiles based on camera/vehicle position
+		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
+		const normalizedHeight = (noiseValue + 1) / 2
+
+		if (distSq < transitionEndDistSq) {
+			const t = (Math.sqrt(distSq) - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
+			return normalizedHeight * (t * t * (3 - 2 * t))
+		}
+		return normalizedHeight
+	}, [noise, smoothness, flatAreaRadius, transitionEndDist])
+
+	// Get terrain height at any world position (in world units)
+	const getTerrainHeight = useCallback((worldX, worldZ) => {
+		return getRawHeight(worldX, worldZ) * maxHeight
+	}, [getRawHeight, maxHeight])
+
+	// Get terrain normal at any world position (optionally pass target vector to avoid allocation)
+	const getTerrainNormal = useCallback((worldX, worldZ, target = normalScratch) => {
+		const hL = getRawHeight(worldX - GRADIENT_EPSILON, worldZ) * maxHeight
+		const hR = getRawHeight(worldX + GRADIENT_EPSILON, worldZ) * maxHeight
+		const hD = getRawHeight(worldX, worldZ - GRADIENT_EPSILON) * maxHeight
+		const hU = getRawHeight(worldX, worldZ + GRADIENT_EPSILON) * maxHeight
+
+		const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
+		const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
+
+		return target.set(-dhdx, 1, -dhdz).normalize()
+	}, [getRawHeight, maxHeight, normalScratch])
+
+	// Update tiles based on camera target position
 	useFrame(() => {
+		// Use camera target position if available, otherwise fall back to scene center
 		const centerPosition = useGameStore.getState().cameraTarget
 		const currentTileX = Math.floor(centerPosition.x / tileSize)
 		const currentTileZ = Math.floor(centerPosition.z / tileSize)
 
-		// Only update tiles if we moved to a new tile
+		// Only update tiles if the center position moved to a new tile
 		if (currentTileX === lastTileCoord.current.x && currentTileZ === lastTileCoord.current.z) {
 			return
 		}
@@ -264,61 +239,48 @@ const TerrainManager = () => {
 		lastTileCoord.current.z = currentTileZ
 
 		const newActiveTileKeys = new Set()
-		const newPhysicsTileKeys = new Set()
 		const isInitialLoad = tileCache.current.size === 0
-		const halfTile = tileSize / 2
 
-		// Check all potential tiles in view distance square
+		// Check which tiles should be active
 		for (let x = -tilesInViewDistance; x <= tilesInViewDistance; x++) {
 			for (let z = -tilesInViewDistance; z <= tilesInViewDistance; z++) {
 				const tileX = currentTileX + x
 				const tileZ = currentTileZ + z
-				const tileCenterX = tileX * tileSize + halfTile
-				const tileCenterZ = tileZ * tileSize + halfTile
+				const tileKey = `${tileX},${tileZ}`
+
+				// Calculate distance from center position to tile center using simple math
+				const tileCenterX = tileX * tileSize + tileSize / 2
+				const tileCenterZ = tileZ * tileSize + tileSize / 2
 				const dx = centerPosition.x - tileCenterX
 				const dz = centerPosition.z - tileCenterZ
-				const dist = Math.sqrt(dx * dx + dz * dz)
+				const distanceToTile = Math.sqrt(dx * dx + dz * dz)
 
-				// Circular distance check for smoother tile loading
-				if (dist <= viewDistance) {
-					const tileKey = `${tileX},${tileZ}`
+				// Add tile if within view distance
+				if (distanceToTile <= viewDistance) {
 					newActiveTileKeys.add(tileKey)
 
-					// Check if tile is within physics distance (for colliders)
-					if (dist <= physicsDistance) {
-						newPhysicsTileKeys.add(tileKey)
+					// Only create new tile data if not already cached
+					if (!tileCache.current.has(tileKey)) {
+						tileCache.current.set(tileKey, {
+							key: tileKey,
+							position: [tileX * tileSize, 0, tileZ * tileSize], // Stable reference
+							shouldFade: !isInitialLoad,
+						})
 					}
 				}
 			}
 		}
 
-		// Update tile cache (without physics state - that's tracked separately)
-		for (const tileKey of newActiveTileKeys) {
-			if (!tileCache.current.has(tileKey)) {
-				const [tileX, tileZ] = tileKey.split(',').map(Number)
-				tileCache.current.set(tileKey, {
-					key: tileKey,
-					position: [tileX * tileSize, 0, tileZ * tileSize],
-					shouldFade: !isInitialLoad,
-				})
-			}
-		}
-
-		// Remove tiles no longer in view
+		// Remove tiles that are no longer in view from cache
 		for (const key of tileCache.current.keys()) {
-			if (!newActiveTileKeys.has(key)) tileCache.current.delete(key)
+			if (!newActiveTileKeys.has(key)) {
+				tileCache.current.delete(key)
+			}
 		}
 
-		setActiveTiles(Array.from(newActiveTileKeys).map((key) => tileCache.current.get(key)))
-
-		// Update physics tiles set (only if changed)
-		setPhysicsTileKeys((prev) => {
-			if (prev.size !== newPhysicsTileKeys.size) return newPhysicsTileKeys
-			for (const key of newPhysicsTileKeys) {
-				if (!prev.has(key)) return newPhysicsTileKeys
-			}
-			return prev
-		})
+		// Build active tiles array from cache (stable references)
+		const newActiveTiles = Array.from(newActiveTileKeys).map((key) => tileCache.current.get(key))
+		setActiveTiles(newActiveTiles)
 	})
 
 	return (
@@ -329,7 +291,6 @@ const TerrainManager = () => {
 					key={key}
 					position={position}
 					shouldFade={shouldFade}
-					hasPhysics={physicsTileKeys.has(key)}
 					tileSize={tileSize}
 					resolution={resolution}
 					smoothness={smoothness}
@@ -339,7 +300,14 @@ const TerrainManager = () => {
 					normalMap={sandNormalMap}
 				/>
 			))}
-			{showGrass && <GrassManager activeTiles={activeTiles} tileSize={tileSize} getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
+			{showGrass && (
+				<GrassManager 
+					activeTiles={activeTiles}
+					tileSize={tileSize}
+					getTerrainHeight={getTerrainHeight} 
+					getTerrainNormal={getTerrainNormal} 
+				/>
+			)}
 		</group>
 	)
 }
