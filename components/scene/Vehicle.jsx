@@ -12,7 +12,7 @@ import useAnimateHeight from '../../hooks/useAnimateHeight'
 import useVehiclePhysics from '../../hooks/useVehiclePhysics'
 import useMaterialProperties from '../../hooks/useMaterialProperties'
 import useTireDirtMaterial from '../../hooks/useTireDirtMaterial'
-import useEngineAudio from '../../hooks/useEngineAudio'
+import EngineAudio from './EngineAudio'
 import Dust from './Dust'
 
 // Calculate point on line (a to b, at length).
@@ -260,9 +260,6 @@ const Vehicle = (props) => {
 	// Use vehicle physics
 	const { vehicleController } = useVehiclePhysics(chassisRef, physicsWheels)
 
-	// Use engine audio
-	useEngineAudio()
-
 	// Reusable vectors/quaternions to avoid GC pressure
 	const tempWorldPos = useMemo(() => new Vector3(), [])
 	const tempQuat = useMemo(() => new Quaternion(), [])
@@ -312,6 +309,7 @@ const Vehicle = (props) => {
 			<RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false} angularDamping={1}>
 				<CuboidCollider args={colliderArgs} position={colliderPosition} />
 				<group ref={chassisGroupRef} name='Vehicle'>
+					<EngineAudio />
 					<Suspense fallback={null}>
 						<Body key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
 					</Suspense>
