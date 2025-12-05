@@ -4,16 +4,24 @@ class AeroSonicProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.phase = 0;
-    this.cylinders = 4;
+    this.cylinders = 6; // Default to Toyota V6 layout
     
     // Physics state
-    this.exhaustBuffer = new Float32Array(48000 * 0.2); // 200ms buffer
+    this.exhaustBuffer = new Float32Array(48000 * 0.25); // Slightly longer buffer for smoother tail
     this.exhaustHead = 0;
     this.filterState = 0; // For simple LPF
     
     // Pre-calculated noise for efficiency
     this.noiseBuffer = new Float32Array(4096);
     for (let i = 0; i < 4096; i++) this.noiseBuffer[i] = (Math.random() * 2 - 1);
+    
+    // Smooth the noise buffer to reduce harshness (simple lowpass)
+    for (let j = 0; j < 4; j++) {
+      for (let i = 0; i < 4096; i++) {
+        const next = this.noiseBuffer[(i + 1) % 4096];
+        this.noiseBuffer[i] = (this.noiseBuffer[i] + next) * 0.5;
+      }
+    }
     this.noiseIdx = 0;
     
     // Pre-calculate cylinder offsets with jitter
@@ -38,7 +46,7 @@ class AeroSonicProcessor extends AudioWorkletProcessor {
   updateCylinderOffsets() {
     const invCylinders = 1 / this.cylinders;
     for (let c = 0; c < this.cylinders; c++) {
-      const jitter = (c & 1) === 0 ? 0.01 : -0.01;
+      const jitter = (c & 1) === 0 ? 0.005 : -0.005; // Keep even-fire smooth but not robotic
       this.cylinderOffsets[c] = (c * invCylinders) + jitter;
     }
   }
@@ -84,9 +92,9 @@ class AeroSonicProcessor extends AudioWorkletProcessor {
     const constRpmCompensation = (constRpm * 0.00005); // /8000 * 0.4
     const constEffectiveGain = Math.min(1.0, constLoad + constRpmCompensation);
     const constCombustionGain = constEffectiveGain * constDisp * 0.5;
-    const constIntakeGain = constThrottle * 0.025; // 0.05 * 0.5
-    const constFeedbackAmt = 0.7 + (constThrottle * 0.1);
-    const constDelaySamples = Math.floor(constRes * this.speedOfSoundInv * sampleRate) | 0;
+    const constIntakeGain = constThrottle * 0.02; // Slightly brighter intake
+    const constFeedbackAmt = 0.65 + (constThrottle * 0.1);
+    const constDelaySamples = Math.max(8, Math.floor(constRes * this.speedOfSoundInv * sampleRate) | 0);
     const constClatterGain = constRpm * 0.0000025; // 0.02 / 8000
 
     const dt = this.invSampleRate;
@@ -116,9 +124,9 @@ class AeroSonicProcessor extends AudioWorkletProcessor {
       const combustionGain = (rpmIsConstant && loadIsConstant && dispIsConstant) 
         ? constCombustionGain 
         : Math.min(1.0, currentLoad + currentRpm * 0.00005) * currentDisp * 0.5;
-      const intakeGain = throttleIsConstant ? constIntakeGain : currentThrottle * 0.025;
-      const feedbackAmt = throttleIsConstant ? constFeedbackAmt : 0.7 + (currentThrottle * 0.1);
-      const delaySamples = resIsConstant ? constDelaySamples : (currentRes * this.speedOfSoundInv * sampleRate) | 0;
+      const intakeGain = throttleIsConstant ? constIntakeGain : currentThrottle * 0.02;
+      const feedbackAmt = throttleIsConstant ? constFeedbackAmt : 0.65 + (currentThrottle * 0.1);
+      const delaySamples = resIsConstant ? constDelaySamples : Math.max(8, (currentRes * this.speedOfSoundInv * sampleRate) | 0);
       const clatterGain = rpmIsConstant ? constClatterGain : currentRpm * 0.0000025;
 
       // 1. Engine Cycle Calculation
@@ -128,7 +136,7 @@ class AeroSonicProcessor extends AudioWorkletProcessor {
 
       // 2. Combustion Synthesis
       let combustion = 0;
-      const noiseLoadMix = 0.4 * sqrtLoad;
+      const noiseLoadMix = 0.2 * sqrtLoad;
       
       for (let c = 0; c < cylinders; c++) {
         // Local phase shifted for this cylinder
@@ -162,7 +170,7 @@ class AeroSonicProcessor extends AudioWorkletProcessor {
       const input = combustion + intakeNoise;
       
       // Feedback Loop with Lowpass Filter
-      const filteredFeedback = (delayedSignal * 0.4) + (filterState * 0.6);
+      const filteredFeedback = (delayedSignal * 0.25) + (filterState * 0.75);
       filterState = filteredFeedback;
       
       // Soft Clip
@@ -174,7 +182,7 @@ class AeroSonicProcessor extends AudioWorkletProcessor {
       if (exhaustHead >= bufferLen) exhaustHead = 0;
 
       // 5. Final Output
-      let finalSig = combustion * 0.8 + combined * 0.6;
+      let finalSig = combustion * 0.75 + combined * 0.65;
       
       // Deterministic valve clatter using phase instead of random
       clatterPhase += currentRpm * 0.0001;

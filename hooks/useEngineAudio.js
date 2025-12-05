@@ -11,6 +11,8 @@ class AudioEngine {
 		this.analyzer = null
 		this.compressor = null
 		this.lowpassNode = null
+		this.bassBoostNode = null
+		this.preAmpNode = null
 		this.isInitialized = false
 	}
 
@@ -53,14 +55,31 @@ class AudioEngine {
 		this.compressor.attack.value = 0.01
 		this.compressor.release.value = 0.25
 
+		// Pre-amp gain to tame the hot signal from the worklet before EQ/Compression
+		this.preAmpNode = this.context.createGain()
+		this.preAmpNode.gain.value = 0.3
+
+		// Bass boost for that "Toyota" rumble
+		this.bassBoostNode = this.context.createBiquadFilter()
+		this.bassBoostNode.type = 'lowshelf'
+		this.bassBoostNode.frequency.value = 120
+		this.bassBoostNode.gain.value = 10
+
 		// Filter to remove digital harshness (The "Ray Gun" sizzle)
 		this.lowpassNode = this.context.createBiquadFilter()
 		this.lowpassNode.type = 'lowpass'
-		this.lowpassNode.frequency.value = 4000 // Roll off high frequencies
+		this.lowpassNode.frequency.value = 2000 // Roll off high frequencies more aggressively
 		this.lowpassNode.Q.value = 0.5
 
-		// Chain: Worklet -> LPF -> Compressor -> Gain -> Analyzer -> Destination
-		this.workletNode.connect(this.lowpassNode).connect(this.compressor).connect(this.gainNode).connect(this.analyzer).connect(this.context.destination)
+		// Chain: Worklet -> PreAmp -> BassBoost -> LPF -> Compressor -> Gain -> Analyzer -> Destination
+		this.workletNode
+			.connect(this.preAmpNode)
+			.connect(this.bassBoostNode)
+			.connect(this.lowpassNode)
+			.connect(this.compressor)
+			.connect(this.gainNode)
+			.connect(this.analyzer)
+			.connect(this.context.destination)
 
 		this.isInitialized = true
 
@@ -85,7 +104,7 @@ class AudioEngine {
 
 		// Open up filter slightly at high RPM
 		if (this.lowpassNode) {
-			const targetFreq = 3000 + rpm * 0.5 // Opens up to ~7000Hz at redline
+			const targetFreq = 1500 + rpm * 0.3 // Opens up less to keep it deep
 			this.lowpassNode.frequency.setTargetAtTime(targetFreq, now, 0.1)
 		}
 	}
@@ -132,6 +151,14 @@ class AudioEngine {
 			this.lowpassNode.disconnect()
 			this.lowpassNode = null
 		}
+		if (this.bassBoostNode) {
+			this.bassBoostNode.disconnect()
+			this.bassBoostNode = null
+		}
+		if (this.preAmpNode) {
+			this.preAmpNode.disconnect()
+			this.preAmpNode = null
+		}
 		if (this.compressor) {
 			this.compressor.disconnect()
 			this.compressor = null
@@ -173,7 +200,7 @@ export const useEngineAudio = () => {
 				audioEngine.setGeometry({
 					cylinders: 8,
 					displacement: 5.0,
-					exhaustLength: 1.5,
+					exhaustLength: 2.5, // Longer exhaust for deeper tone
 				})
 				// Apply current mute state
 				const isMuted = useGameStore.getState().muted
