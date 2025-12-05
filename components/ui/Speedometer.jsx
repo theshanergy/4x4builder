@@ -1,14 +1,13 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import useGameStore from '../../store/gameStore'
 
-const Speedometer = () => {
+const Speedometer = memo(() => {
+
 	const [displaySpeed, setDisplaySpeed] = useState(0)
 	const [displayRpm, setDisplayRpm] = useState(850)
 	const [displayGear, setDisplayGear] = useState(1)
 	const isMobile = useGameStore((state) => state.isMobile)
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
-	const vehicleSpeedRef = useGameStore((state) => state.vehicleSpeedRef)
-	const engineRef = useGameStore((state) => state.engineRef)
 	const rafRef = useRef()
 	const lastUpdateRef = useRef(0)
 
@@ -16,13 +15,20 @@ const Speedometer = () => {
 	useEffect(() => {
 		if (isMobile || !physicsEnabled) return
 
+		// Access refs directly from store to avoid subscribing to them
+		const { vehicleSpeedRef, engineRef } = useGameStore.getState()
+
 		const updateSpeed = (timestamp) => {
 			// Throttle updates to ~10fps (every 100ms)
 			if (timestamp - lastUpdateRef.current >= 100) {
-				const speedKmh = Math.abs(vehicleSpeedRef.current * 3.6)
-				setDisplaySpeed(Math.round(speedKmh))
-				setDisplayRpm(Math.round(engineRef.rpm))
-				setDisplayGear(engineRef.gear)
+				const speedKmh = Math.round(Math.abs(vehicleSpeedRef.current * 3.6))
+				const rpm = Math.round(engineRef.rpm)
+				const gear = engineRef.gear
+				
+				// Only update state if values changed to prevent unnecessary rerenders
+				setDisplaySpeed((prev) => (prev !== speedKmh ? speedKmh : prev))
+				setDisplayRpm((prev) => (prev !== rpm ? rpm : prev))
+				setDisplayGear((prev) => (prev !== gear ? gear : prev))
 				lastUpdateRef.current = timestamp
 			}
 			rafRef.current = requestAnimationFrame(updateSpeed)
@@ -32,7 +38,7 @@ const Speedometer = () => {
 		return () => {
 			if (rafRef.current) cancelAnimationFrame(rafRef.current)
 		}
-	}, [isMobile, physicsEnabled, vehicleSpeedRef, engineRef])
+	}, [isMobile, physicsEnabled])
 
 	// Generate tick marks
 	const ticks = useMemo(() => {
@@ -58,7 +64,6 @@ const Speedometer = () => {
 
 	// RPM calculations (matching TRANSMISSION constants from useVehiclePhysics)
 	const maxRpm = 6200
-	const redlineRpm = 5800
 	const normalizedRpm = Math.min(displayRpm / maxRpm, 1)
 	const isRedline = normalizedRpm > 0.9 // Above 90% of max RPM
 
@@ -178,6 +183,6 @@ const Speedometer = () => {
 				</div>
 		</div>
 	)
-}
+})
 
 export default Speedometer
