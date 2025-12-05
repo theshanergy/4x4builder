@@ -15,7 +15,7 @@ import {
 
 import grassVertexShader from '../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../shaders/grass.frag.glsl'
-import { getRoadInfo } from './TerrainManager'
+import { getRoadInfo } from '../../utils/roadMath'
 
 // Seeded random number generator (mulberry32)
 const createSeededRandom = (seed) => {
