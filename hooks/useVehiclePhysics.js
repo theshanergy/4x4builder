@@ -127,6 +127,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Shift cooldown timer to prevent gear skipping
 	const lastShiftTime = useRef(0)
 
+	// Smoothed keyboard steering for lerping
+	const smoothedKeyboardSteering = useRef(0)
+
 	// Reset vehicle function
 	const resetVehicle = useCallback(() => {
 		const vehicle = vehicleRef.current
@@ -228,7 +231,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	})
 
 	// Handle input forces each frame
-	useFrame(() => {
+	useFrame((state, delta) => {
 		if (!vehicleController.current) return
 
 		// Get input from store
@@ -263,9 +266,18 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		// Calculate raw input values
 		const throttleInput = clamp((keys.has('ArrowUp') || keys.has('w') || keys.has('W') ? 1 : 0) + (input.rightStickY < 0 ? -input.rightStickY : 0))
 		const brakeInput = clamp((keys.has('ArrowDown') || keys.has('s') || keys.has('S') ? 1 : 0) + (input.rightStickY > 0 ? input.rightStickY : 0))
+
+		// Calculate keyboard steering target (-1, 0, or 1)
+		const keyboardSteerTarget = (keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? -1 : 0) + (keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? 1 : 0)
+
+		// Lerp keyboard steering for smooth transitions
+		const steerLerpSpeed = keyboardSteerTarget === 0 ? 8 : 5 // Return to center faster than turning
+		smoothedKeyboardSteering.current += (keyboardSteerTarget - smoothedKeyboardSteering.current) * Math.min(1, steerLerpSpeed * delta)
+
+		// Combine smoothed keyboard steering with analog stick input
 		const steerForce =
 			FORCES.steerAngle *
-			clamp((keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? -1 : 0) + (keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? 1 : 0) + -input.leftStickX)
+			clamp(smoothedKeyboardSteering.current + -input.leftStickX)
 
 		// Get current vehicle speed (forward velocity)
 		const vehicle = vehicleRef.current
