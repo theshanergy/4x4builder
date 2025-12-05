@@ -267,19 +267,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		const throttleInput = clamp((keys.has('ArrowUp') || keys.has('w') || keys.has('W') ? 1 : 0) + (input.rightStickY < 0 ? -input.rightStickY : 0))
 		const brakeInput = clamp((keys.has('ArrowDown') || keys.has('s') || keys.has('S') ? 1 : 0) + (input.rightStickY > 0 ? input.rightStickY : 0))
 
-		// Calculate keyboard steering target (-1, 0, or 1)
-		const keyboardSteerTarget = (keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? -1 : 0) + (keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? 1 : 0)
-
-		// Lerp keyboard steering for smooth transitions
-		const steerLerpSpeed = keyboardSteerTarget === 0 ? 8 : 5 // Return to center faster than turning
-		smoothedKeyboardSteering.current += (keyboardSteerTarget - smoothedKeyboardSteering.current) * Math.min(1, steerLerpSpeed * delta)
-
-		// Combine smoothed keyboard steering with analog stick input
-		const steerForce =
-			FORCES.steerAngle *
-			clamp(smoothedKeyboardSteering.current + -input.leftStickX)
-
-		// Get current vehicle speed (forward velocity)
+		// Get current vehicle speed (forward velocity) - needed for speed-based steering
 		const vehicle = vehicleRef.current
 		let forwardSpeed = 0
 		if (vehicle) {
@@ -291,6 +279,24 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			// Update speed ref for UI (mutate ref directly to avoid re-renders)
 			useGameStore.getState().vehicleSpeedRef.current = forwardSpeed
 		}
+
+		// Calculate keyboard steering target (-1, 0, or 1)
+		const keyboardSteerTarget = (keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? -1 : 0) + (keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? 1 : 0)
+
+		// Speed-based steering lerp: slower response at higher speeds for better handling
+		// At 0 speed: fast response (8 for centering, 5 for turning)
+		// At high speed (~25 units/s): slower response (2 for centering, 1.2 for turning)
+		const speedFactor = Math.min(1, Math.abs(forwardSpeed) / 25) // Normalize speed (0 to 1)
+		const baseLerpSpeed = keyboardSteerTarget === 0 ? 8 : 5
+		const minLerpSpeed = keyboardSteerTarget === 0 ? 2 : 1.2
+		const steerLerpSpeed = baseLerpSpeed - (baseLerpSpeed - minLerpSpeed) * speedFactor
+
+		smoothedKeyboardSteering.current += (keyboardSteerTarget - smoothedKeyboardSteering.current) * Math.min(1, steerLerpSpeed * delta)
+
+		// Combine smoothed keyboard steering with analog stick input
+		const steerForce =
+			FORCES.steerAngle *
+			clamp(smoothedKeyboardSteering.current + -input.leftStickX)
 
 		// ===== ENGINE & TRANSMISSION SIMULATION =====
 		// Physics-based approach: drivetrain has rotational inertia
