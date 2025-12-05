@@ -18,7 +18,8 @@ const GRADIENT_EPSILON = 0.01
 const TILE_FADE_DURATION = 0.5 // seconds
 
 const TERRAIN_CONFIG = {
-	viewDistance: 160, // How far tiles are rendered from camera
+	viewDistance: 300, // How far tiles are rendered visually
+	physicsDistance: 64, // How far tiles have physics colliders (around vehicle)
 	tileSize: 32, // World units per tile
 	resolution: 16, // Vertices per tile edge (affects collision detail)
 	smoothness: 15, // Noise scale - higher = smoother terrain
@@ -42,8 +43,8 @@ const getBaseHeight = (worldX, worldZ, noise, smoothness, flatAreaRadius, transi
 	return normalizedHeight
 }
 
-// Individual terrain tile with physics collider and road blending
-const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeight, noise, map, normalMap, shouldFade = true }) => {
+// Individual terrain tile with optional physics collider and road blending
+const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeight, noise, map, normalMap, shouldFade = true, hasPhysics = true }) => {
 	const materialRef = useRef()
 	const opacityRef = useRef(shouldFade ? 0 : 1)
 
@@ -181,18 +182,25 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 	// Heightfield collider args: [rows, cols, heights, scale]
 	const colliderArgs = useMemo(() => [resolution, resolution, terrainData.values, { x: tileSize, y: maxHeight, z: tileSize }], [resolution, terrainData, tileSize, maxHeight])
 
+	// Always render same structure - conditionally include physics collider
+	// This avoids destroying/recreating the entire tile when physics state changes
 	return (
-		<RigidBody type='fixed' position={position} colliders={false}>
-			<HeightfieldCollider args={colliderArgs} name={`Tile-${position[0]}-${position[2]}`} />
+		<group position={position}>
+			{hasPhysics && (
+				<RigidBody type='fixed' colliders={false}>
+					<HeightfieldCollider args={colliderArgs} name={`Tile-${position[0]}-${position[2]}`} />
+				</RigidBody>
+			)}
 			<mesh geometry={geometry} material={material} receiveShadow />
-		</RigidBody>
+		</group>
 	)
 })
 
 // Manages dynamic tile loading/unloading based on camera position
 const TerrainManager = () => {
-	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = TERRAIN_CONFIG
+	const { viewDistance, physicsDistance, tileSize, resolution, smoothness, maxHeight } = TERRAIN_CONFIG
 	const [activeTiles, setActiveTiles] = useState([])
+	const [physicsTileKeys, setPhysicsTileKeys] = useState(new Set()) // Tracks which tiles need physics
 	const lastTileCoord = useRef({ x: null, z: null })
 	const tileCache = useRef(new Map()) // Stable references prevent unnecessary re-renders
 
@@ -203,6 +211,7 @@ const TerrainManager = () => {
 	const showGrass = !isInXR && !performanceDegraded && !isMobile
 
 	const tilesInViewDistance = useMemo(() => Math.ceil(viewDistance / tileSize), [viewDistance, tileSize])
+	const tilesInPhysicsDistance = useMemo(() => Math.ceil(physicsDistance / tileSize), [physicsDistance, tileSize])
 	const noise = useMemo(() => new Noise(1234), []) // Seeded for deterministic terrain
 
 	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
@@ -241,13 +250,13 @@ const TerrainManager = () => {
 		[getRawHeight, maxHeight, normalScratch]
 	)
 
-	// Update active tiles based on camera target position
+	// Update active tiles based on camera/vehicle position
 	useFrame(() => {
 		const centerPosition = useGameStore.getState().cameraTarget
 		const currentTileX = Math.floor(centerPosition.x / tileSize)
 		const currentTileZ = Math.floor(centerPosition.z / tileSize)
 
-		// Only update tiles if the center position moved to a new tile
+		// Only update tiles if we moved to a new tile
 		if (currentTileX === lastTileCoord.current.x && currentTileZ === lastTileCoord.current.z) {
 			return
 		}
@@ -255,6 +264,7 @@ const TerrainManager = () => {
 		lastTileCoord.current.z = currentTileZ
 
 		const newActiveTileKeys = new Set()
+		const newPhysicsTileKeys = new Set()
 		const isInitialLoad = tileCache.current.size === 0
 		const halfTile = tileSize / 2
 
@@ -263,21 +273,34 @@ const TerrainManager = () => {
 			for (let z = -tilesInViewDistance; z <= tilesInViewDistance; z++) {
 				const tileX = currentTileX + x
 				const tileZ = currentTileZ + z
-				const dx = centerPosition.x - (tileX * tileSize + halfTile)
-				const dz = centerPosition.z - (tileZ * tileSize + halfTile)
+				const tileCenterX = tileX * tileSize + halfTile
+				const tileCenterZ = tileZ * tileSize + halfTile
+				const dx = centerPosition.x - tileCenterX
+				const dz = centerPosition.z - tileCenterZ
+				const dist = Math.sqrt(dx * dx + dz * dz)
 
 				// Circular distance check for smoother tile loading
-				if (Math.sqrt(dx * dx + dz * dz) <= viewDistance) {
+				if (dist <= viewDistance) {
 					const tileKey = `${tileX},${tileZ}`
 					newActiveTileKeys.add(tileKey)
-					if (!tileCache.current.has(tileKey)) {
-						tileCache.current.set(tileKey, {
-							key: tileKey,
-							position: [tileX * tileSize, 0, tileZ * tileSize],
-							shouldFade: !isInitialLoad,
-						})
+
+					// Check if tile is within physics distance (for colliders)
+					if (dist <= physicsDistance) {
+						newPhysicsTileKeys.add(tileKey)
 					}
 				}
+			}
+		}
+
+		// Update tile cache (without physics state - that's tracked separately)
+		for (const tileKey of newActiveTileKeys) {
+			if (!tileCache.current.has(tileKey)) {
+				const [tileX, tileZ] = tileKey.split(',').map(Number)
+				tileCache.current.set(tileKey, {
+					key: tileKey,
+					position: [tileX * tileSize, 0, tileZ * tileSize],
+					shouldFade: !isInitialLoad,
+				})
 			}
 		}
 
@@ -287,6 +310,15 @@ const TerrainManager = () => {
 		}
 
 		setActiveTiles(Array.from(newActiveTileKeys).map((key) => tileCache.current.get(key)))
+
+		// Update physics tiles set (only if changed)
+		setPhysicsTileKeys((prev) => {
+			if (prev.size !== newPhysicsTileKeys.size) return newPhysicsTileKeys
+			for (const key of newPhysicsTileKeys) {
+				if (!prev.has(key)) return newPhysicsTileKeys
+			}
+			return prev
+		})
 	})
 
 	return (
@@ -297,6 +329,7 @@ const TerrainManager = () => {
 					key={key}
 					position={position}
 					shouldFade={shouldFade}
+					hasPhysics={physicsTileKeys.has(key)}
 					tileSize={tileSize}
 					resolution={resolution}
 					smoothness={smoothness}
