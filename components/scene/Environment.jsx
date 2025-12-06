@@ -5,6 +5,7 @@ import TerrainManager from './TerrainManager'
 import Sky from './Sky'
 import EnvMap from './EnvMap'
 import Sun from './Sun'
+import Hawk from './Hawk'
 
 // Environment component
 const SceneEnvironment = memo(() => {
@@ -30,6 +31,9 @@ const SceneEnvironment = memo(() => {
 
 			{/* Terrain with integrated grass */}
 			<TerrainManager />
+
+			{/* Flying Hawk */}
+			<Hawk />
 		</>
 	)
 })

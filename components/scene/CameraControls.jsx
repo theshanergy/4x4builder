@@ -71,7 +71,7 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
 				enableDamping
 				dampingFactor={0.025}
 				minDistance={2}
-				maxDistance={16}
+				maxDistance={24}
 				minPolarAngle={Math.PI / 6} // Prevent camera from going below the ground
 				maxPolarAngle={Math.PI / 2} // Prevent camera from going above the target
 				autoRotate={cameraAutoRotate}
