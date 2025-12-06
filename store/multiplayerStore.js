@@ -3,9 +3,9 @@ import NetworkManager, { ConnectionState } from '../network/NetworkManager.js'
 import useGameStore from './gameStore.js'
 
 // Default server URL - uses environment variable if available
-const getServerUrl = () => {
-	if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MULTIPLAYER_SERVER_URL) {
-		return import.meta.env.VITE_MULTIPLAYER_SERVER_URL
+export const getServerUrl = () => {
+	if (typeof import.meta !== 'undefined' && import.meta.env?.MULTIPLAYER_SERVER_URL) {
+		return import.meta.env.MULTIPLAYER_SERVER_URL
 	}
 	// Default to localhost for development
 	return 'ws://localhost:8080'

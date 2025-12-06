@@ -1,16 +1,7 @@
 import { useCallback } from 'react'
-import useMultiplayerStore from '../store/multiplayerStore'
+import useMultiplayerStore, { getServerUrl } from '../store/multiplayerStore'
 import useGameStore from '../store/gameStore'
 import { ConnectionState } from '../network/NetworkManager'
-
-// Default server URL - uses environment variable if available
-const getServerUrl = () => {
-	if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MULTIPLAYER_SERVER_URL) {
-		return import.meta.env.VITE_MULTIPLAYER_SERVER_URL
-	}
-	// Default to localhost for development
-	return 'ws://localhost:8080'
-}
 
 // Hook for managing network connection lifecycle
 export function useNetworkConnection() {
