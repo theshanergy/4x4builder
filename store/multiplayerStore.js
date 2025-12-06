@@ -4,8 +4,8 @@ import useGameStore from './gameStore.js'
 
 // Default server URL - uses environment variable if available
 export const getServerUrl = () => {
-	if (typeof import.meta !== 'undefined' && import.meta.env?.MULTIPLAYER_SERVER_URL) {
-		return import.meta.env.MULTIPLAYER_SERVER_URL
+	if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MULTIPLAYER_SERVER_URL) {
+		return import.meta.env.VITE_MULTIPLAYER_SERVER_URL
 	}
 	// Default to localhost for development
 	return 'ws://localhost:8080'
@@ -41,36 +41,56 @@ const useMultiplayerStore = create((set, get) => ({
 	// Handler for pushing transforms to vehicles (set by RemoteVehicleManager)
 	_pushTransformToVehicle: null,
 	
-	// Check if server is available
+	// Retry interval reference
+	_serverCheckRetryInterval: null,
+	
+	// Check if server is available (with automatic retries)
 	checkServerAvailability: async () => {
-		// Don't check if already in progress
+		// Don't check if already in progress or already available
 		if (get().serverCheckInProgress) return get().serverAvailable
+		if (get().serverAvailable === true) return true
 		
 		set({ serverCheckInProgress: true })
 		
 		const serverUrl = getServerUrl()
 		
-		return new Promise((resolve) => {
+		const result = await new Promise((resolve) => {
 			const ws = new WebSocket(serverUrl)
-			const timeout = setTimeout(() => {
-				ws.close()
-				set({ serverAvailable: false, serverCheckInProgress: false })
-				resolve(false)
-			}, 3000) // 3 second timeout
+			let resolved = false
 			
-			ws.onopen = () => {
+			const cleanup = (value) => {
+				if (resolved) return
+				resolved = true
 				clearTimeout(timeout)
-				ws.close()
-				set({ serverAvailable: true, serverCheckInProgress: false })
-				resolve(true)
+				try { ws.close() } catch (e) {}
+				resolve(value)
 			}
 			
-			ws.onerror = () => {
-				clearTimeout(timeout)
-				set({ serverAvailable: false, serverCheckInProgress: false })
-				resolve(false)
+			const timeout = setTimeout(() => cleanup(false), 5000)
+			
+			ws.onopen = () => cleanup(true)
+			ws.onerror = () => cleanup(false)
+			ws.onclose = () => {
+				if (!resolved) cleanup(false)
 			}
 		})
+		
+		set({ serverAvailable: result, serverCheckInProgress: false })
+		
+		// If not available, start retry interval
+		if (!result && !get()._serverCheckRetryInterval) {
+			const interval = setInterval(() => {
+				if (get().serverAvailable === true) {
+					clearInterval(interval)
+					set({ _serverCheckRetryInterval: null })
+				} else {
+					get().checkServerAvailability()
+				}
+			}, 5000)
+			set({ _serverCheckRetryInterval: interval })
+		}
+		
+		return result
 	},
 	
 	// Initialize network manager
@@ -330,5 +350,8 @@ const useMultiplayerStore = create((set, get) => ({
 	// Check if in a room
 	isInRoom: () => get().currentRoom !== null,
 }))
+
+// Auto-start server availability check
+useMultiplayerStore.getState().checkServerAvailability()
 
 export default useMultiplayerStore

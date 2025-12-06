@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import classNames from 'classnames'
 import useNetworkConnection from '../../hooks/useNetworkConnection'
 import EditorSection from './EditorSection'
@@ -10,7 +10,6 @@ import MultiplayerIcon from '../../assets/images/icons/Multiplayer.svg'
 // Multiplayer panel component
 function MultiplayerPanel() {
 	const {
-		connectionState,
 		connectionError,
 		currentRoom,
 		isHost,
@@ -32,11 +31,6 @@ function MultiplayerPanel() {
 	} = useNetworkConnection()
 
 	const [joinRoomId, setJoinRoomId] = useState('')
-
-	// Check server availability on mount
-	useEffect(() => {
-		checkServerAvailability()
-	}, [checkServerAvailability])
 
 	// Handle name change on blur or enter
 	const handleNameChange = useCallback(
@@ -80,11 +74,6 @@ function MultiplayerPanel() {
 		disconnect()
 	}, [disconnect])
 
-	// Don't render if server is not available
-	if (serverAvailable !== true) {
-		return null
-	}
-
 	// Get status text and color
 	const getStatusInfo = () => {
 		if (isInRoom) {
@@ -108,8 +97,23 @@ function MultiplayerPanel() {
 				dotColor: 'bg-blue-500',
 			}
 		}
+		// Server availability states when not connected
+		if (serverAvailable === null) {
+			return {
+				text: 'Checking server...',
+				color: 'text-yellow-400',
+				dotColor: 'bg-yellow-500 animate-pulse',
+			}
+		}
+		if (serverAvailable === false) {
+			return {
+				text: 'Server unavailable',
+				color: 'text-red-400',
+				dotColor: 'bg-red-500',
+			}
+		}
 		return {
-			text: 'Not connected',
+			text: 'Ready to connect',
 			color: 'text-stone-400',
 			dotColor: 'bg-stone-500',
 		}
@@ -127,6 +131,23 @@ function MultiplayerPanel() {
 					<span className={status.color}>{status.text}</span>
 				</div>
 			</div>
+
+			{/* Server unavailable message */}
+			{serverAvailable === false && !isConnecting && (
+				<div className='bg-stone-800/50 border border-stone-700 rounded p-3 text-sm'>
+					<p className='text-stone-300 mb-2'>Unable to reach the multiplayer server. It may be starting up.</p>
+					<button onClick={checkServerAvailability} className='w-full justify-center secondary'>
+						Retry Connection
+					</button>
+				</div>
+			)}
+
+			{/* Checking server message */}
+			{serverAvailable === null && (
+				<p className='text-stone-400 text-sm'>
+					The server may take up to a minute to start if it has been inactive.
+				</p>
+			)}
 
 			{/* Connection Error */}
 			{connectionError && (
@@ -174,8 +195,8 @@ function MultiplayerPanel() {
 							/>
 							<button
 								onClick={handleJoinRoom}
-								disabled={!joinRoomId.trim() || isConnecting}
-								className={classNames({ 'opacity-50 cursor-not-allowed': !joinRoomId.trim() || isConnecting })}>
+								disabled={!joinRoomId.trim() || isConnecting || serverAvailable === null}
+								className={classNames({ 'opacity-50 cursor-not-allowed': !joinRoomId.trim() || isConnecting || serverAvailable === null })}>
 								Join
 							</button>
 						</div>
@@ -186,8 +207,8 @@ function MultiplayerPanel() {
 						<label>New Room</label>
 						<button
 							onClick={handleCreateRoom}
-							disabled={isConnecting}
-							className={classNames('w-full justify-center', { 'opacity-50 cursor-not-allowed': isConnecting })}>
+							disabled={isConnecting || serverAvailable === null}
+							className={classNames('w-full justify-center', { 'opacity-50 cursor-not-allowed': isConnecting || serverAvailable === null })}>
 							{isConnecting ? 'Connecting...' : 'Create Room'}
 						</button>
 					</div>
