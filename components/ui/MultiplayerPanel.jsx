@@ -78,7 +78,7 @@ function MultiplayerPanel() {
 	const getStatusInfo = () => {
 		if (isInRoom) {
 			return {
-				text: `In room with ${remotePlayerCount + 1} player${remotePlayerCount !== 0 ? 's' : ''}`,
+				text: remotePlayerCount === 0 ? 'Waiting for players...' : `In room with ${remotePlayerCount} player${remotePlayerCount !== 1 ? 's' : ''}`,
 				color: 'text-green-400',
 				dotColor: 'bg-green-500',
 			}
