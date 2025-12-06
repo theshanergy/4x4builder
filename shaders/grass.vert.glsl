@@ -1,5 +1,3 @@
-#include "noise.glsl"
-
 uniform float uTime;
 uniform float uWindStrength;
 uniform float uWindFrequency;
@@ -46,21 +44,24 @@ void main() {
     // Calculate absolute world position for consistent wind across patches
     vec4 absolutePosition = modelMatrix * worldPosition;
 
-    // Simplified Wind System (1 noise call + sine waves instead of 3 noise calls)
-    // This reduces GPU ALU operations by ~66% while maintaining organic feel
+    // Pure Sine Wave Wind System (no noise - better performance)
+    // Multiple sine waves at different frequencies create pseudo-random feel
     
-    // Single noise sample for gust envelope (low frequency, large scale)
-    float gustTime = uTime * 0.4;
-    float gustNoise = snoise(vec3(absolutePosition.xz * 0.03, gustTime));
-    float gustStrength = smoothstep(-0.3, 0.7, gustNoise);
-    
-    // Use cheaper sine waves for turbulence instead of additional noise
+    // Primary wind waves
     float wave1 = sin(absolutePosition.x * 0.5 + uTime * uWindFrequency);
     float wave2 = sin(absolutePosition.z * 0.7 + uTime * uWindFrequency * 1.3 + 1.57);
-    float turbulence = (wave1 + wave2) * 0.5;
+    float wave3 = sin((absolutePosition.x + absolutePosition.z) * 0.3 + uTime * uWindFrequency * 0.7);
     
-    // Combine for final wind
-    float currentStrength = uWindStrength * (0.15 + 0.85 * gustStrength);
+    // Combine waves for turbulence
+    float turbulence = (wave1 + wave2 + wave3) / 3.0;
+    
+    // Gust simulation using slower sine waves
+    float gust1 = sin(absolutePosition.x * 0.05 + uTime * 0.4) * 0.5 + 0.5;
+    float gust2 = sin(absolutePosition.z * 0.07 + uTime * 0.3 + 2.0) * 0.5 + 0.5;
+    float gustStrength = gust1 * gust2;
+    
+    // Combine for final wind strength
+    float currentStrength = uWindStrength * (0.3 + 0.7 * gustStrength);
     
     // Simplified directional variance using sine
     float dirVariance = sin(absolutePosition.x * 0.1 + uTime * 0.15) * 0.3;
@@ -71,6 +72,6 @@ void main() {
     
     worldPosition.x += windDir.x * displacement;
     worldPosition.z += windDir.y * displacement;
-    
+
     gl_Position = projectionMatrix * modelViewMatrix * worldPosition;
 }

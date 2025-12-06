@@ -1,4 +1,4 @@
-import { useRef, useMemo, memo, useEffect } from 'react'
+import { useRef, useMemo, memo, useEffect, useReducer } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { 
 	Vector3, 
@@ -10,13 +10,15 @@ import {
 	BufferAttribute, 
 	Object3D, 
 	InstancedMesh, 
-	ShaderMaterial 
+	ShaderMaterial,
+	Matrix4 
 } from 'three'
 
+import useGameStore from '../../store/gameStore'
 import grassVertexShader from '../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../shaders/grass.frag.glsl'
 
-// Seeded random number generator (mulberry32)
+// Seeded random number generator (mulberry32) - inlined for performance
 const createSeededRandom = (seed) => {
 	let state = seed
 	return () => {
@@ -33,39 +35,50 @@ const hashCoords = (x, z, salt = 0) => {
 	return Math.abs(h)
 }
 
+// Pre-allocated scratch objects for matrix generation (avoids allocations in hot loop)
+const _scratchDummy = new Object3D()
+const _scratchUp = new Vector3(0, 1, 0)
+const _scratchQuaternion = new Quaternion()
+const _scratchMatrix = new Matrix4()
+
 // Blade configuration (tuned for realistic scale)
 const BLADE_CONFIG = {
-	height: 0.18, // Increased from 0.16 to compensate for ground sinking
+	height: 0.22,
 	baseWidth: 0.005,
 	tipWidth: 0.002,
-	segments: 3, // Reduced from 8 for performance (65% fewer triangles)
+	segments: 3, // Low segment count for performance
 	curvature: 0.35,
 	twist: 0.15,
 	colorBase: '#c9b896',
 	colorTip: '#ddd5b8',
 	ambientStrength: 0.6,
 	translucency: 0.1,
-	windStrength: 0.04,
+	windStrength: 0.055,
 	windFrequency: 1.5,
 }
 
-// Grass configuration for tile-based generation
+// Grass configuration for chunk-based generation
+const GRASS_CHUNK_SIZE = 16
+const GRASS_VIEW_DISTANCE = 60
+const GRASS_LOD_DISTANCE = 35 // Distance at which to reduce blade count
+
 const GRASS_CONFIG = {
-	patchesPerTile: { min: 15, max: 25 },
+	patchesPerChunk: { min: 4, max: 7 },
 	patchRadius: { min: 0.3, max: 0.6 },
 	bladesPerPatch: { min: 50, max: 150 },
 	slopeThreshold: 0.85,
 	flatAreaRadius: 12,
-	heightOffset: -0.02, // Sink blades slightly into ground to prevent floating on hilltops
+	heightOffset: -0.02,
 	scaleRange: { min: 0.7, max: 1.3 },
-	// Patch-level blade distribution settings
 	scaleVariation: 0.3,
 	rotationVariation: 0.5,
 }
 
-// Maximum blades per tile (for pre-allocating InstancedMesh)
-// Max patches (25) * max blades per patch (150) = 3750
-const MAX_BLADES_PER_TILE = 4000
+// Maximum blades per chunk (for pre-allocating InstancedMesh)
+const MAX_BLADES_PER_CHUNK = 1200
+
+// Pre-allocate a reusable Float32Array for matrix building (16 elements per matrix * max blades)
+const _matrixBuffer = new Float32Array(MAX_BLADES_PER_CHUNK * 16)
 
 // Generate procedural grass blade geometry (shared across all instances)
 const createGrassBladeGeometry = (config) => {
@@ -75,7 +88,7 @@ const createGrassBladeGeometry = (config) => {
 	for (let i = 0; i <= segments; i++) {
 		const t = i / segments
 		const y = t * height
-		const x = curvature * Math.pow(t, 2) * height
+		const x = curvature * t * t * height
 		const z = Math.sin(t * Math.PI) * curvature * 0.2 * height
 		points.push(new Vector3(x, y, z))
 	}
@@ -83,10 +96,12 @@ const createGrassBladeGeometry = (config) => {
 	const curve = new CatmullRomCurve3(points)
 	const curvePoints = curve.getPoints(segments * 4)
 
-	const vertices = []
-	const normals = []
-	const uvs = []
-	const indices = []
+	const numPoints = curvePoints.length
+	// Pre-allocate arrays with known sizes
+	const vertices = new Float32Array(numPoints * 2 * 3)
+	const normals = new Float32Array(numPoints * 2 * 3)
+	const uvs = new Float32Array(numPoints * 2 * 2)
+	const indices = new Uint16Array((numPoints - 1) * 6)
 
 	const up = new Vector3(0, 1, 0)
 	const tempVec = new Vector3()
@@ -94,7 +109,8 @@ const createGrassBladeGeometry = (config) => {
 	const normal = new Vector3()
 	const binormal = new Vector3()
 
-	const numPoints = curvePoints.length
+	let vertIdx = 0
+	let uvIdx = 0
 
 	for (let i = 0; i < numPoints; i++) {
 		const t = i / (numPoints - 1)
@@ -119,27 +135,48 @@ const createGrassBladeGeometry = (config) => {
 
 		normal.crossVectors(tangent, binormal).normalize()
 
-		vertices.push(point.x - binormal.x * currentWidth * 0.5, point.y - binormal.y * currentWidth * 0.5, point.z - binormal.z * currentWidth * 0.5)
-		vertices.push(point.x + binormal.x * currentWidth * 0.5, point.y + binormal.y * currentWidth * 0.5, point.z + binormal.z * currentWidth * 0.5)
+		const halfWidth = currentWidth * 0.5
 
-		normals.push(normal.x, normal.y, normal.z)
-		normals.push(normal.x, normal.y, normal.z)
+		// Left vertex
+		vertices[vertIdx] = point.x - binormal.x * halfWidth
+		vertices[vertIdx + 1] = point.y - binormal.y * halfWidth
+		vertices[vertIdx + 2] = point.z - binormal.z * halfWidth
+		// Right vertex
+		vertices[vertIdx + 3] = point.x + binormal.x * halfWidth
+		vertices[vertIdx + 4] = point.y + binormal.y * halfWidth
+		vertices[vertIdx + 5] = point.z + binormal.z * halfWidth
 
-		uvs.push(0, t)
-		uvs.push(1, t)
+		normals[vertIdx] = normal.x
+		normals[vertIdx + 1] = normal.y
+		normals[vertIdx + 2] = normal.z
+		normals[vertIdx + 3] = normal.x
+		normals[vertIdx + 4] = normal.y
+		normals[vertIdx + 5] = normal.z
+
+		vertIdx += 6
+
+		uvs[uvIdx] = 0
+		uvs[uvIdx + 1] = t
+		uvs[uvIdx + 2] = 1
+		uvs[uvIdx + 3] = t
+		uvIdx += 4
 	}
 
-	for (let i = 0; i < numPoints - 1; i++) {
+	for (let i = 0, idxOffset = 0; i < numPoints - 1; i++) {
 		const baseIndex = i * 2
-		indices.push(baseIndex, baseIndex + 1, baseIndex + 2)
-		indices.push(baseIndex + 1, baseIndex + 3, baseIndex + 2)
+		indices[idxOffset++] = baseIndex
+		indices[idxOffset++] = baseIndex + 1
+		indices[idxOffset++] = baseIndex + 2
+		indices[idxOffset++] = baseIndex + 1
+		indices[idxOffset++] = baseIndex + 3
+		indices[idxOffset++] = baseIndex + 2
 	}
 
 	const geom = new BufferGeometry()
-	geom.setAttribute('position', new BufferAttribute(new Float32Array(vertices), 3))
-	geom.setAttribute('normal', new BufferAttribute(new Float32Array(normals), 3))
-	geom.setAttribute('uv', new BufferAttribute(new Float32Array(uvs), 2))
-	geom.setIndex(new BufferAttribute(new Uint16Array(indices), 1))
+	geom.setAttribute('position', new BufferAttribute(vertices, 3))
+	geom.setAttribute('normal', new BufferAttribute(normals, 3))
+	geom.setAttribute('uv', new BufferAttribute(uvs, 2))
+	geom.setIndex(new BufferAttribute(indices, 1))
 
 	return geom
 }
@@ -147,34 +184,37 @@ const createGrassBladeGeometry = (config) => {
 // Reusable scratch vector for terrain normal calculations (avoids allocations)
 const _normalScratch = new Vector3()
 
-// Generate all blade instances for a tile (returns Float32Array of matrices and count)
-const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainHeight, getTerrainNormal) => {
-	const { patchesPerTile, patchRadius, bladesPerPatch, slopeThreshold, flatAreaRadius, scaleRange, heightOffset, scaleVariation, rotationVariation } = GRASS_CONFIG
+// Generate all blade instances for a chunk (returns Float32Array of matrices and count)
+// lodFactor: 1.0 = full detail, 0.5 = half blades, etc.
+const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal, lodFactor = 1.0) => {
+	const { patchesPerChunk, patchRadius, bladesPerPatch, slopeThreshold, flatAreaRadius, scaleRange, heightOffset, scaleVariation, rotationVariation } = GRASS_CONFIG
 
-	const tileX = Math.floor(tilePosition[0] / tileSize)
-	const tileZ = Math.floor(tilePosition[2] / tileSize)
-	const tileSeed = hashCoords(tileX, tileZ, 42069)
-	const random = createSeededRandom(tileSeed)
+	const chunkX = Math.floor(chunkPosition[0] / chunkSize)
+	const chunkZ = Math.floor(chunkPosition[2] / chunkSize)
+	const chunkSeed = hashCoords(chunkX, chunkZ, 42069)
+	const random = createSeededRandom(chunkSeed)
 
-	// Pre-allocate array for matrix elements (will be trimmed at end)
-	const matrixElements = []
-	const dummy = new Object3D()
-	const up = new Vector3(0, 1, 0)
-	const quaternion = new Quaternion()
+	// Use pre-allocated scratch objects
+	const dummy = _scratchDummy
+	const up = _scratchUp
+	const quaternion = _scratchQuaternion
+	
+	let bladeCount = 0
+	const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
 
-	// Determine number of patches for this tile (same logic as before)
-	const patchCount = Math.floor(random() * (patchesPerTile.max - patchesPerTile.min + 1)) + patchesPerTile.min
+	// Determine number of patches for this chunk
+	const patchCount = Math.floor(random() * (patchesPerChunk.max - patchesPerChunk.min + 1)) + patchesPerChunk.min
 
 	for (let patchIdx = 0; patchIdx < patchCount; patchIdx++) {
-		// Random position within tile (same as before)
-		const localX = (random() - 0.5) * tileSize
-		const localZ = (random() - 0.5) * tileSize
-		const patchWorldX = tilePosition[0] + localX
-		const patchWorldZ = tilePosition[2] + localZ
+		// Random position within chunk
+		const localX = (random() - 0.5) * chunkSize
+		const localZ = (random() - 0.5) * chunkSize
+		const patchWorldX = chunkPosition[0] + localX
+		const patchWorldZ = chunkPosition[2] + localZ
 
-		// Skip if in flat area near spawn
-		const distFromCenter = Math.sqrt(patchWorldX * patchWorldX + patchWorldZ * patchWorldZ)
-		if (distFromCenter < flatAreaRadius) continue
+		// Skip if in flat area near spawn (use squared distance to avoid sqrt)
+		const distFromCenterSq = patchWorldX * patchWorldX + patchWorldZ * patchWorldZ
+		if (distFromCenterSq < flatAreaRadiusSq) continue
 
 		// Get terrain data at patch center
 		const patchTerrainNormal = getTerrainNormal(patchWorldX, patchWorldZ)
@@ -182,25 +222,25 @@ const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainH
 		// Skip if slope is too steep
 		if (patchTerrainNormal.y < slopeThreshold) continue
 
-		// Random Y rotation for the patch (same as before)
+		// Random Y rotation for the patch
 		const patchRotationY = random() * Math.PI * 2
 
-		// Vary patch properties based on seed (same as before)
+		// Vary patch properties based on seed
 		const radius = patchRadius.min + random() * (patchRadius.max - patchRadius.min)
-		const bladeCount = Math.floor(bladesPerPatch.min + random() * (bladesPerPatch.max - bladesPerPatch.min))
+		const baseBladeCount = Math.floor(bladesPerPatch.min + random() * (bladesPerPatch.max - bladesPerPatch.min))
 		const patchScale = scaleRange.min + random() * (scaleRange.max - scaleRange.min)
 
-		// Reduce blade count on steeper slopes (same as before)
+		// Reduce blade count on steeper slopes
 		const slopeFactor = (patchTerrainNormal.y - slopeThreshold) / (1 - slopeThreshold)
-		const adjustedBladeCount = Math.floor(bladeCount * (0.5 + 0.5 * slopeFactor))
+		// Apply LOD factor to reduce blades at distance
+		const adjustedBladeCount = Math.floor(baseBladeCount * (0.5 + 0.5 * slopeFactor) * lodFactor)
 
-		// Generate blades within this patch (same distribution as Grass.jsx)
 		// Use a sub-seed for blade distribution within the patch
-		const bladeSeed = hashCoords(tileX * 1000 + patchIdx, tileZ, 12345)
+		const bladeSeed = hashCoords(chunkX * 1000 + patchIdx, chunkZ, 12345)
 		const bladeRandom = createSeededRandom(bladeSeed)
 
 		for (let bladeIdx = 0; bladeIdx < adjustedBladeCount; bladeIdx++) {
-			// Random position within a circular area (same as Grass.jsx)
+			// Random position within a circular area
 			const angle = bladeRandom() * Math.PI * 2
 			const r = Math.sqrt(bladeRandom()) * radius
 			const bladeLocalX = Math.cos(angle) * r
@@ -212,10 +252,13 @@ const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainH
 
 			// Sample terrain height at blade's world position
 			const bladeTerrainY = getTerrainHeight(bladeWorldX, bladeWorldZ)
-			// Use scratch vector to avoid allocation
-			const bladeTerrainNormal = getTerrainNormal(bladeWorldX, bladeWorldZ, _normalScratch)
+			
+			// OPTIMIZATION: Use patch normal instead of sampling per-blade normal
+			// This saves ~4 noise calls per blade (huge performance win)
+			// Since patches are small (radius < 0.6), the normal variance is minimal
+			const bladeTerrainNormal = patchTerrainNormal
 
-			// Determine base rotation (inward curve strategy, same as before)
+			// Determine base rotation
 			const baseRotY = -angle + Math.PI
 			const rotY = baseRotY + (bladeRandom() - 0.5) * rotationVariation
 
@@ -233,43 +276,53 @@ const generateTileBladeInstances = (tileKey, tilePosition, tileSize, getTerrainH
 			dummy.scale.setScalar(bladeScale)
 			dummy.updateMatrix()
 
-			// Push matrix elements directly (avoid clone allocation)
-			matrixElements.push(...dummy.matrix.elements)
+			// Copy matrix elements directly into pre-allocated buffer
+			const offset = bladeCount * 16
+			const elements = dummy.matrix.elements
+			for (let i = 0; i < 16; i++) {
+				_matrixBuffer[offset + i] = elements[i]
+			}
+			bladeCount++
+			
+			// Safety check to prevent buffer overflow
+			if (bladeCount >= MAX_BLADES_PER_CHUNK) break
 		}
+		if (bladeCount >= MAX_BLADES_PER_CHUNK) break
 	}
 
-	// Return as Float32Array for direct use with InstancedMesh
+	// Return a copy of only the used portion of the buffer
 	return {
-		array: new Float32Array(matrixElements),
-		count: matrixElements.length / 16
+		array: new Float32Array(_matrixBuffer.buffer, 0, bladeCount * 16),
+		count: bladeCount
 	}
 }
 
-// GrassTile component - single InstancedMesh for all blades in a tile
-const GrassTile = memo(({ tileKey, tilePosition, tileSize, getTerrainHeight, getTerrainNormal, sharedGeometry, sharedMaterial }) => {
+// GrassChunk component - single InstancedMesh for all blades in a chunk
+const GrassChunk = memo(({ chunkKey, chunkPosition, chunkSize, lodFactor, getTerrainHeight, getTerrainNormal, sharedGeometry, sharedMaterial }) => {
 	const meshRef = useRef()
 
-	// Generate all blade matrices for this tile (returns {array: Float32Array, count: number})
+	// Generate all blade matrices for this chunk
 	const bladeData = useMemo(() => {
-		return generateTileBladeInstances(tileKey, tilePosition, tileSize, getTerrainHeight, getTerrainNormal)
-	}, [tileKey, tilePosition, tileSize, getTerrainHeight, getTerrainNormal])
+		return generateChunkBladeInstances(chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal, lodFactor)
+	}, [chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal, lodFactor])
 
-	// Create a single InstancedMesh for the entire tile
+	// Create a single InstancedMesh for the entire chunk
 	const instancedMesh = useMemo(() => {
 		if (bladeData.count === 0) return null
 
 		const mesh = new InstancedMesh(sharedGeometry, sharedMaterial, bladeData.count)
 		
-		// Copy matrix data directly from Float32Array (no per-instance loop)
+		// Copy matrix data directly from Float32Array
 		mesh.instanceMatrix.array.set(bladeData.array)
 		mesh.instanceMatrix.needsUpdate = true
 		mesh.frustumCulled = true
-		mesh.castShadow = false // Grass shouldn't cast shadows for performance
+		mesh.castShadow = false
+		mesh.receiveShadow = false
 		
 		return mesh
 	}, [bladeData, sharedGeometry, sharedMaterial])
 
-	// Dispose InstancedMesh when tile unmounts (geometry/material are shared, so don't dispose those)
+	// Dispose InstancedMesh when chunk unmounts
 	useEffect(() => {
 		return () => {
 			if (instancedMesh) {
@@ -283,9 +336,12 @@ const GrassTile = memo(({ tileKey, tilePosition, tileSize, getTerrainHeight, get
 	return <primitive ref={meshRef} object={instancedMesh} />
 })
 
-// Main GrassManager component - shares geometry and material across all tiles
-const GrassManager = memo(({ activeTiles, tileSize, getTerrainHeight, getTerrainNormal }) => {
-	const materialRef = useRef()
+// Main GrassManager component - shares geometry and material across all chunks
+const GrassManager = memo(({ getTerrainHeight, getTerrainNormal }) => {
+	const chunkCache = useRef(new Map())
+	const frameCount = useRef(0)
+	// Use useReducer for batch updates instead of useState (more efficient for arrays)
+	const [activeChunks, updateChunks] = useReducer((_, chunks) => chunks, [])
 
 	// Create shared geometry once
 	const sharedGeometry = useMemo(() => {
@@ -313,15 +369,74 @@ const GrassManager = memo(({ activeTiles, tileSize, getTerrainHeight, getTerrain
 		})
 	}, [])
 
-	// Store material ref for animation
-	useEffect(() => {
-		materialRef.current = sharedMaterial
-	}, [sharedMaterial])
-
 	// Animate wind on the shared material
 	useFrame((state) => {
-		if (materialRef.current) {
-			materialRef.current.uniforms.uTime.value = state.clock.elapsedTime
+		sharedMaterial.uniforms.uTime.value = state.clock.elapsedTime
+
+		// Throttle chunk updates to every 10 frames
+		frameCount.current++
+		if (frameCount.current % 10 !== 0) return
+
+		// Update active chunks based on camera position
+		const cameraTarget = useGameStore.getState().cameraTarget
+		const currentChunkX = Math.floor(cameraTarget.x / GRASS_CHUNK_SIZE)
+		const currentChunkZ = Math.floor(cameraTarget.z / GRASS_CHUNK_SIZE)
+
+		const chunksInView = Math.ceil(GRASS_VIEW_DISTANCE / GRASS_CHUNK_SIZE)
+		const newActiveChunkKeys = new Set()
+		const viewDistSq = GRASS_VIEW_DISTANCE * GRASS_VIEW_DISTANCE
+		const lodDistSq = GRASS_LOD_DISTANCE * GRASS_LOD_DISTANCE
+		
+		let hasChanges = false
+
+		for (let x = -chunksInView; x <= chunksInView; x++) {
+			for (let z = -chunksInView; z <= chunksInView; z++) {
+				const chunkX = currentChunkX + x
+				const chunkZ = currentChunkZ + z
+				const chunkKey = `${chunkX},${chunkZ}`
+
+				const chunkCenterX = chunkX * GRASS_CHUNK_SIZE + GRASS_CHUNK_SIZE / 2
+				const chunkCenterZ = chunkZ * GRASS_CHUNK_SIZE + GRASS_CHUNK_SIZE / 2
+
+				const dx = cameraTarget.x - chunkCenterX
+				const dz = cameraTarget.z - chunkCenterZ
+				const distSq = dx * dx + dz * dz
+
+				if (distSq <= viewDistSq) {
+					newActiveChunkKeys.add(chunkKey)
+
+					// Calculate LOD factor based on distance
+					const lodFactor = distSq <= lodDistSq ? 1.0 : 0.5
+
+					let chunkData = chunkCache.current.get(chunkKey)
+					if (!chunkData) {
+						chunkData = {
+							key: chunkKey,
+							position: [chunkX * GRASS_CHUNK_SIZE, 0, chunkZ * GRASS_CHUNK_SIZE],
+							lodFactor,
+						}
+						chunkCache.current.set(chunkKey, chunkData)
+						hasChanges = true
+					} else if (chunkData.lodFactor !== lodFactor) {
+						// Update LOD if changed
+						chunkData = { ...chunkData, lodFactor }
+						chunkCache.current.set(chunkKey, chunkData)
+						hasChanges = true
+					}
+				}
+			}
+		}
+
+		// Cleanup cache and check for removals
+		for (const key of chunkCache.current.keys()) {
+			if (!newActiveChunkKeys.has(key)) {
+				chunkCache.current.delete(key)
+				hasChanges = true
+			}
+		}
+
+		if (hasChanges) {
+			updateChunks(Array.from(newActiveChunkKeys).map((key) => chunkCache.current.get(key)))
 		}
 	})
 
@@ -335,12 +450,13 @@ const GrassManager = memo(({ activeTiles, tileSize, getTerrainHeight, getTerrain
 
 	return (
 		<group name="GrassManager">
-			{activeTiles.map(({ key, position }) => (
-				<GrassTile
+			{activeChunks && activeChunks.map(({ key, position, lodFactor }) => (
+				<GrassChunk
 					key={key}
-					tileKey={key}
-					tilePosition={position}
-					tileSize={tileSize}
+					chunkKey={key}
+					chunkPosition={position}
+					chunkSize={GRASS_CHUNK_SIZE}
+					lodFactor={lodFactor}
 					getTerrainHeight={getTerrainHeight}
 					getTerrainNormal={getTerrainNormal}
 					sharedGeometry={sharedGeometry}

@@ -302,8 +302,6 @@ const TerrainManager = () => {
 			))}
 			{showGrass && (
 				<GrassManager 
-					activeTiles={activeTiles}
-					tileSize={tileSize}
 					getTerrainHeight={getTerrainHeight} 
 					getTerrainNormal={getTerrainNormal} 
 				/>
