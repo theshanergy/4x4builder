@@ -32,6 +32,10 @@ const FORCES = {
 // Speed threshold for switching to reverse (in world units per second)
 const REVERSE_THRESHOLD = 0.5
 
+// Default wheel side friction stiffness
+const FRONT_WHEEL_FRICTION = 0.95
+const REAR_WHEEL_FRICTION = 0.85
+
 // Transmission simulation
 const TRANSMISSION = {
 	gearRatios: [0, 3.5, 2.2, 1.4, 1.0, 0.75], // 0 = neutral, 1-5 = gears
@@ -100,11 +104,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Track reset button state to detect press (not hold)
 	const resetPressedLastFrame = useRef(false)
 
-	// Track default side friction stiffness
-	const defaultSideFrictionStiffness = useRef(null)
-
-	// Track current friction stiffness for smooth transitions
-	const currentFrictionStiffness = useRef(null)
+	// Track current friction stiffness for smooth drift transitions
+	const currentRearWheelFriction = useRef(null)
 
 	// Reusable objects to avoid GC pressure
 	const tempVelocity = useMemo(() => new Vector3(), [])
@@ -164,15 +165,20 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			vehicle.setWheelMaxSuspensionTravel(index, wheel.maxSuspensionTravel || 0.23)
 			vehicle.setWheelSuspensionCompression(index, wheel.suspensionCompression || 2.3)
 			vehicle.setWheelSuspensionRelaxation(index, wheel.suspensionRebound || 3.4)
+			// Only set reduced side friction for rear wheels (indices 2 and 3)
+			if (index < 2) {
+				vehicle.setWheelSideFrictionStiffness(index, FRONT_WHEEL_FRICTION)
+			} else {
+				vehicle.setWheelSideFrictionStiffness(index, REAR_WHEEL_FRICTION)
+			}
 		})
 
 		// Store controller reference
 		vehicleController.current = vehicle
 
-		// Store default side friction stiffness from the first wheel if not already set
-		if (defaultSideFrictionStiffness.current === null) {
-			defaultSideFrictionStiffness.current = vehicle.wheelSideFrictionStiffness(0) || 1.0
-			currentFrictionStiffness.current = defaultSideFrictionStiffness.current
+		// Initialize rear wheel friction tracking for drift mode
+		if (currentRearWheelFriction.current === null) {
+			currentRearWheelFriction.current = REAR_WHEEL_FRICTION
 		}
 
 		return () => {
@@ -243,20 +249,20 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 		// Handle drift mode (Shift key) with smooth transition
 		const isDrifting = keys.has('Shift')
-		const targetFriction = isDrifting ? 0.05 : defaultSideFrictionStiffness.current || 1.0
+		const targetFriction = isDrifting ? 0.1 : REAR_WHEEL_FRICTION
 
 		// Smoothly interpolate friction with different rates for entering/exiting drift
 		// Faster transition into drift (0.15), slower transition out (0.05) for smoother recovery
 		const lerpFactor = isDrifting ? 0.15 : 0.0015
-		if (currentFrictionStiffness.current === null) {
-			currentFrictionStiffness.current = targetFriction
+		if (currentRearWheelFriction.current === null) {
+			currentRearWheelFriction.current = targetFriction
 		} else {
-			currentFrictionStiffness.current += (targetFriction - currentFrictionStiffness.current) * lerpFactor
+			currentRearWheelFriction.current += (targetFriction - currentRearWheelFriction.current) * lerpFactor
 		}
 
 		// Apply side friction to rear wheels (indices 2 and 3)
-		if (wheels.length > 2) vehicleController.current.setWheelSideFrictionStiffness(2, currentFrictionStiffness.current)
-		if (wheels.length > 3) vehicleController.current.setWheelSideFrictionStiffness(3, currentFrictionStiffness.current)
+		if (wheels.length > 2) vehicleController.current.setWheelSideFrictionStiffness(2, currentRearWheelFriction.current)
+		if (wheels.length > 3) vehicleController.current.setWheelSideFrictionStiffness(3, currentRearWheelFriction.current)
 
 		const clamp = (value) => Math.min(1, Math.max(-1, value))
 
@@ -291,9 +297,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		smoothedKeyboardSteering.current += (keyboardSteerTarget - smoothedKeyboardSteering.current) * Math.min(1, steerLerpSpeed * delta)
 
 		// Combine smoothed keyboard steering with analog stick input
-		const steerForce =
-			FORCES.steerAngle *
-			clamp(smoothedKeyboardSteering.current + -input.leftStickX)
+		const steerForce = FORCES.steerAngle * clamp(smoothedKeyboardSteering.current + -input.leftStickX)
 
 		// ===== ENGINE & TRANSMISSION SIMULATION =====
 		// Physics-based approach: drivetrain has rotational inertia
@@ -386,7 +390,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 				// Engine is spinning faster than ground speed and we're on throttle
 				// This is wheelspin territory - reduce coupling based on friction
 				// Lower friction = engine can overpower tire grip = wheelspin
-				couplingStiffness = baseCouplingStiffness * currentFrictionStiffness.current * currentFrictionStiffness.current
+				couplingStiffness = baseCouplingStiffness * currentRearWheelFriction.current * currentRearWheelFriction.current
 			} else {
 				// Engine braking or not on throttle - maintain normal coupling
 				couplingStiffness = baseCouplingStiffness
@@ -527,8 +531,12 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			// Airborne controls when all wheels are not in contact
 			const vehicle = vehicleRef.current
 			if (vehicle) {
-				const pitch = clamp(((keys.has('ArrowUp') || keys.has('w') || keys.has('W')) ? -1 : 0) + ((keys.has('ArrowDown') || keys.has('s') || keys.has('S')) ? 1 : 0) - input.leftStickY)
-				const roll = clamp(((keys.has('ArrowLeft') || keys.has('a') || keys.has('A')) ? -1 : 0) + ((keys.has('ArrowRight') || keys.has('d') || keys.has('D')) ? 1 : 0) + input.leftStickX)
+				const pitch = clamp(
+					(keys.has('ArrowUp') || keys.has('w') || keys.has('W') ? -1 : 0) + (keys.has('ArrowDown') || keys.has('s') || keys.has('S') ? 1 : 0) - input.leftStickY
+				)
+				const roll = clamp(
+					(keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? -1 : 0) + (keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? 1 : 0) + input.leftStickX
+				)
 				const yaw = clamp(-input.rightStickX)
 
 				// Construct torque vector in world space using reusable objects
