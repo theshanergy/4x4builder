@@ -1,12 +1,12 @@
-import { useRef, useCallback } from 'react'
+import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { Vector3, Raycaster } from 'three'
+import { Vector3, Raycaster, MathUtils } from 'three'
 
 import useGameStore from '../../store/gameStore'
 
 // Camera controls and chase cam logic
-const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
+const CameraControls = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 	const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 
 	const camera = useThree((state) => state.camera)
@@ -21,11 +21,18 @@ const CameraControls = ({ followSpeed = 0.1, minGroundDistance = 0.5 }) => {
 	const lastTerrainCacheFrame = useRef(0)
 	const TERRAIN_CACHE_INTERVAL = 60 // Refresh terrain mesh cache every 60 frames
 
-	useFrame((state) => {
+	useFrame((state, delta) => {
 		if (!cameraControlsRef.current) return
 
-		// Smoothly update the orbit controls target
-		cameraControlsRef.current.target.lerp(useGameStore.getState().cameraTarget, followSpeed)
+		// Get the target position from the store
+		const target = useGameStore.getState().cameraTarget
+		const controlsTarget = cameraControlsRef.current.target
+
+		// Use damp for frame-rate independent smoothing (prevents micro-banding)
+		controlsTarget.x = MathUtils.damp(controlsTarget.x, target.x, followSpeed, delta)
+		controlsTarget.y = MathUtils.damp(controlsTarget.y, target.y, followSpeed, delta)
+		controlsTarget.z = MathUtils.damp(controlsTarget.z, target.z, followSpeed, delta)
+		
 		cameraControlsRef.current.update()
 
 		// Ground avoidance logic
