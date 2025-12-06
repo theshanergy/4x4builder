@@ -1,0 +1,18 @@
+{
+	"name": "4x4builder-server",
+	"version": "1.0.0",
+	"description": "WebSocket server for 4x4 Builder multiplayer",
+	"type": "module",
+	"main": "index.js",
+	"scripts": {
+		"start": "node index.js",
+		"dev": "node --watch index.js"
+	},
+	"dependencies": {
+		"ws": "^8.18.0",
+		"uuid": "^10.0.0"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
+}

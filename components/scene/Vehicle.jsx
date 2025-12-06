@@ -12,6 +12,7 @@ import useAnimateHeight from '../../hooks/useAnimateHeight'
 import useVehiclePhysics from '../../hooks/useVehiclePhysics'
 import useMaterialProperties from '../../hooks/useMaterialProperties'
 import useTireDirtMaterial from '../../hooks/useTireDirtMaterial'
+import useTransformBroadcast from '../../hooks/useTransformBroadcast'
 import EngineAudio from './EngineAudio'
 import Dust from './Dust'
 
@@ -259,6 +260,9 @@ const Vehicle = (props) => {
 
 	// Use vehicle physics
 	const { vehicleController } = useVehiclePhysics(chassisRef, physicsWheels)
+
+	// Broadcast transform to multiplayer server
+	useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, vehicleController)
 
 	// Reusable vectors/quaternions to avoid GC pressure
 	const tempWorldPos = useMemo(() => new Vector3(), [])

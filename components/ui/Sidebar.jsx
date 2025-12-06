@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import Drawer from './Drawer'
 import Editor from './Editor'
 import Logo from './Logo'
+import MultiplayerPanel from './MultiplayerPanel'
 
 // Sidebar component
 const Sidebar = () => {
@@ -21,6 +22,7 @@ const Sidebar = () => {
         <Drawer id='sidebar' isVertical={isVertical} defaultOpen={isVertical} className='order-first bg-black/80 text-gray-400 z-50'>
             <Logo />
             <Editor />
+            <MultiplayerPanel />
         </Drawer>
     )
 }

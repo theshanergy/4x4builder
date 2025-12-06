@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from 'react'
+import { Suspense, useMemo, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { PerformanceMonitor } from '@react-three/drei'
@@ -10,7 +10,9 @@ import InputManager from './InputManager'
 import XRManager from './XRManager'
 import Loader from '../ui/Loader'
 import VehicleManager from './VehicleManager'
+import RemoteVehicleManager from './RemoteVehicleManager'
 import Screenshot from '../ui/Screenshot'
+import useConfigSync from '../../hooks/useConfigSync'
 
 // Dev-only performance monitor - completely excluded from production bundle
 const PerfMonitor = import.meta.env.DEV
@@ -22,6 +24,9 @@ const ThreeCanvas = () => {
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
+
+	// Sync vehicle config changes to multiplayer server
+	useConfigSync()
 
 	// Set default camera position based on aspect ratio
 	const cameraConfig = useMemo(() => {
@@ -46,6 +51,9 @@ const ThreeCanvas = () => {
 						<Suspense fallback={null}>
 							<VehicleManager />
 						</Suspense>
+
+						{/* Remote players' vehicles */}
+						<RemoteVehicleManager />
 
 						<Environment />
 					</Physics>

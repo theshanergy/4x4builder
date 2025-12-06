@@ -3,6 +3,16 @@ import { produce } from 'immer'
 import { Vector3 } from 'three'
 import vehicleConfigs from '../vehicleConfigs'
 
+// Create mutable ref objects outside the store to avoid Zustand/Immer freezing them
+const vehicleSpeedRef = { current: 0 }
+const engineRef = {
+	rpm: 850,
+	throttle: 0,
+	gear: 1,
+	clutchEngaged: true,
+	load: 0.2, // Engine load (0 = no load/airborne, 1 = max load/climbing)
+}
+
 // Compatibility shim for legacy localStorage data, mapping old vehicle id field to body
 const preprocessVehicleConfig = (config) => {
 	if (!config) return config
@@ -29,16 +39,10 @@ const useGameStore = create((set, get) => {
 		performanceDegraded: false,
 		controlsVisible: false,
 		muted: true, // Audio muted by default
-		vehicleSpeedRef: { current: 0 }, // Mutable ref to avoid re-renders
+		vehicleSpeedRef, // Mutable ref to avoid re-renders (defined outside store)
 		
 		// Engine/Transmission state (mutable refs for performance)
-		engineRef: {
-			rpm: 850,
-			throttle: 0,
-			gear: 1,
-			clutchEngaged: true,
-			load: 0.2, // Engine load (0 = no load/airborne, 1 = max load/climbing)
-		},
+		engineRef, // Defined outside store to avoid freezing
 		
 		setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
 		setPhysicsEnabled: (enabled) => set((state) => {
