@@ -153,7 +153,7 @@ function MultiplayerPanel() {
 					<PlayerList players={remotePlayers} isHost={isHost} />
 
 					{/* Leave Room Button */}
-					<button onClick={handleLeaveRoom} className='w-full'>
+					<button onClick={handleLeaveRoom} className='justify-center'>
 						Leave Room
 					</button>
 				</>
