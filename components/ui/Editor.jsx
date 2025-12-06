@@ -132,7 +132,7 @@ function Editor() {
                     {/* Roughness */}
                     <div className='field field-vehicle-roughness'>
                         <label style={{ visibility: 'hidden' }}>Finish</label>
-                        <select value={currentVehicle.roughness || 0} onChange={(e) => setVehicle({ roughness: e.target.value })}>
+                        <select value={currentVehicle.roughness || 0} onChange={(e) => setVehicle({ roughness: parseFloat(e.target.value) })}>
                             <option value='0.6'>Matte</option>
                             <option value='0.2'>Semi Gloss</option>
                             <option value='0'>High Gloss</option>
@@ -146,13 +146,13 @@ function Editor() {
                 {/* Vehicle Lift */}
                 <div className='field field-vehicle-lift'>
                     <label>Lift</label>
-                    <InchRangeSelect value={currentVehicle.lift} min={-2} max={8} onChange={(e) => setVehicle({ lift: e.target.value })} />
+                    <InchRangeSelect value={currentVehicle.lift} min={-2} max={8} onChange={(e) => setVehicle({ lift: parseInt(e.target.value, 10) })} />
                 </div>
 
                 {/* Wheel Offset */}
                 <div className='field field-wheel-offset'>
                     <label>Offset</label>
-                    <input type='range' min='0' max='0.1' step='0.01' value={currentVehicle.wheel_offset || 0} onChange={(e) => setVehicle({ wheel_offset: e.target.value })} />
+                    <input type='range' min='0' max='0.1' step='0.01' value={currentVehicle.wheel_offset || 0} onChange={(e) => setVehicle({ wheel_offset: parseFloat(e.target.value) })} />
                 </div>
             </EditorSection>
 
@@ -192,13 +192,13 @@ function Editor() {
                 <div className='field field-rim-size'>
                     <div className='field field-rim-diameter'>
                         <label>Diameter</label>
-                        <InchRangeSelect value={currentVehicle.rim_diameter} min={14} max={24} onChange={(e) => setVehicle({ rim_diameter: e.target.value })} />
+                        <InchRangeSelect value={currentVehicle.rim_diameter} min={14} max={24} onChange={(e) => setVehicle({ rim_diameter: parseInt(e.target.value, 10) })} />
                     </div>
 
                     {/* Rim Width */}
                     <div className='field field-rim-width'>
                         <label>Width</label>
-                        <InchRangeSelect value={currentVehicle.rim_width} min={8} max={16} onChange={(e) => setVehicle({ rim_width: e.target.value })} />
+                        <InchRangeSelect value={currentVehicle.rim_width} min={8} max={16} onChange={(e) => setVehicle({ rim_width: parseInt(e.target.value, 10) })} />
                     </div>
                 </div>
             </EditorSection>
@@ -215,7 +215,7 @@ function Editor() {
                     {/* Tire Size */}
                     <div className='field field-tire-size'>
                         <label>Size</label>
-                        <InchRangeSelect value={currentVehicle.tire_diameter} min={30} max={40} onChange={(e) => setVehicle({ tire_diameter: e.target.value })} />
+                        <InchRangeSelect value={currentVehicle.tire_diameter} min={30} max={40} onChange={(e) => setVehicle({ tire_diameter: parseInt(e.target.value, 10) })} />
                     </div>
                 </div>
 

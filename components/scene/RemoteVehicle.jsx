@@ -195,6 +195,10 @@ const Tire = memo(({ tire, tire_diameter, tire_muddiness, rim_diameter, rim_widt
 
 // Wheels container for remote vehicle
 const RemoteWheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, color, roughness, wheelPositions, wheelRefs }) => {
+	// Create keys that include all properties that require a fresh geometry/model
+	const rimKey = `${rim}-${rim_diameter}-${rim_width}`
+	const tireKey = `${tire}-${tire_diameter}-${rim_diameter}-${rim_width}`
+
 	return (
 		<group name='Wheels'>
 			{wheelPositions.map(({ key, rotation, ...transform }, index) => (
@@ -202,6 +206,7 @@ const RemoteWheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_
 					<group rotation={rotation}>
 						<Suspense fallback={null}>
 							<Rim
+								key={rimKey}
 								rim={rim}
 								rim_diameter={rim_diameter}
 								rim_width={rim_width}
@@ -212,7 +217,7 @@ const RemoteWheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_
 							/>
 						</Suspense>
 						<Suspense fallback={null}>
-							<Tire tire={tire} tire_diameter={tire_diameter} tire_muddiness={tire_muddiness} rim_diameter={rim_diameter} rim_width={rim_width} />
+							<Tire key={tireKey} tire={tire} tire_diameter={tire_diameter} tire_muddiness={tire_muddiness} rim_diameter={rim_diameter} rim_width={rim_width} />
 						</Suspense>
 					</group>
 				</group>
