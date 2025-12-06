@@ -246,7 +246,7 @@ function Editor() {
             )}
 
             {/* Scene */}
-            <EditorSection title='Options' icon={<GearIcon className='icon' />}>
+            <EditorSection title='Scene' icon={<GearIcon className='icon' />}>
                 {/* Auto Rotate */}
                 <div className='field field-camera-autorotate'>
                     <input type='checkbox' id='camera-autorotate' checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} />

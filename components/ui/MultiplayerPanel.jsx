@@ -122,7 +122,7 @@ function MultiplayerPanel() {
 	const status = getStatusInfo()
 
 	return (
-		<EditorSection title='Multiplayer' icon={<MultiplayerIcon className='icon' />}>
+		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />}>
 			{/* Status */}
 			<div className='field'>
 				<label>Status</label>
