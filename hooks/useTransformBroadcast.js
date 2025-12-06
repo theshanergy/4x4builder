@@ -61,16 +61,22 @@ export function useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, ve
 		lastPosition.current = { x: position.x, y: position.y, z: position.z }
 		lastRotation.current = { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }
 		
-		// Get wheel rotations from wheel refs
-		const wheelRotations = wheelRefs.map(ref => {
-			if (!ref.current) return 0
-			return ref.current.rotation?.x || 0
-		})
-		
-		// Get steering angle from vehicle controller if available
+		// Get wheel data from vehicle controller
+		let wheelRotations = [0, 0, 0, 0]
+		let wheelYPositions = [0, 0, 0, 0]
 		let steering = 0
+		
 		if (vehicleController.current) {
 			try {
+				// Get wheel spin rotations and Y positions from physics controller
+				for (let i = 0; i < 4; i++) {
+					wheelRotations[i] = vehicleController.current.wheelRotation(i) || 0
+					// Get suspension compression for wheel Y position
+					const connection = vehicleController.current.wheelChassisConnectionPointCs(i)
+					const suspension = vehicleController.current.wheelSuspensionLength(i) || 0
+					wheelYPositions[i] = connection?.y - suspension
+				}
+				// Get steering angle from front wheel
 				steering = vehicleController.current.wheelSteering(0) || 0
 			} catch (e) {
 				// Controller may not be ready
@@ -89,6 +95,7 @@ export function useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, ve
 			velocity: [velocity.x, velocity.y, velocity.z],
 			angularVelocity: [angularVelocity.x, angularVelocity.y, angularVelocity.z],
 			wheelRotations,
+			wheelYPositions,
 			steering,
 			engineRpm,
 		})

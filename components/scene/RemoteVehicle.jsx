@@ -90,6 +90,9 @@ class TransformBuffer {
 			wheelRotations: before.wheelRotations?.map((v, i) => 
 				MathUtils.lerp(v, after.wheelRotations?.[i] || v, clampedT)
 			) || [0, 0, 0, 0],
+			wheelYPositions: before.wheelYPositions?.map((v, i) => 
+				MathUtils.lerp(v, after.wheelYPositions?.[i] || v, clampedT)
+			) || null,
 			steering: MathUtils.lerp(before.steering || 0, after.steering || 0, clampedT),
 			engineRpm: MathUtils.lerp(before.engineRpm || 850, after.engineRpm || 850, clampedT),
 			velocity: after.velocity || before.velocity || [0, 0, 0],
@@ -274,7 +277,7 @@ const PlayerLabel = memo(({ name }) => {
  * RemoteVehicle - Visual-only vehicle component for rendering other players
  * No physics simulation - uses interpolation for smooth movement
  */
-const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform }) => {
+const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, onRef }) => {
 	const groupRef = useRef()
 	const bufferRef = useRef(new TransformBuffer())
 	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
@@ -340,8 +343,15 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform }
 				bufferRef.current.push(transform)
 			}
 			groupRef.current.userData.playerId = playerId
+			
+			// Notify parent that ref is ready
+			onRef?.(groupRef.current)
 		}
-	}, [playerId])
+		
+		return () => {
+			onRef?.(null)
+		}
+	}, [playerId, onRef])
 
 	// Interpolate and update position each frame
 	useFrame(() => {
@@ -361,27 +371,30 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform }
 			currentRotation.current.slerp(targetRot, INTERPOLATION_SMOOTHING)
 			groupRef.current.quaternion.copy(currentRotation.current)
 
-			// Update wheel rotations
-			if (interpolated.wheelRotations) {
-				wheelRefs.forEach((ref, i) => {
-					if (ref.current) {
-						// Apply wheel spin rotation
-						ref.current.rotation.x = interpolated.wheelRotations[i] || 0
-					}
-				})
-			}
-
 			// Update front wheel steering
 			const steering = interpolated.steering || 0
 			currentSteering.current = MathUtils.lerp(currentSteering.current, steering, INTERPOLATION_SMOOTHING)
 			
-			// Apply steering to front wheels (FL and FR are indices 0 and 1)
-			if (wheelRefs[0].current) {
-				wheelRefs[0].current.rotation.y = rotation + currentSteering.current
-			}
-			if (wheelRefs[1].current) {
-				wheelRefs[1].current.rotation.y = -rotation + currentSteering.current
-			}
+			// Update wheel rotations, positions, and steering
+			wheelRefs.forEach((ref, i) => {
+				if (!ref.current) return
+				
+				// Update wheel Y position for suspension movement
+				if (interpolated.wheelYPositions && interpolated.wheelYPositions[i] !== undefined) {
+					ref.current.position.y = interpolated.wheelYPositions[i]
+				}
+				
+				// Apply wheel spin and steering using quaternion (matching physics behavior)
+				// Front wheels (0, 1) get steering, rear wheels (2, 3) don't
+				const wheelSteering = i < 2 ? currentSteering.current : 0
+				const wheelSpin = interpolated.wheelRotations?.[i] || 0
+				
+				// Create quaternion from steering (Y axis) and spin (X axis)
+				// This matches how the physics system applies wheel rotation
+				const steeringQuat = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), wheelSteering)
+				const spinQuat = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), wheelSpin)
+				ref.current.quaternion.multiplyQuaternions(steeringQuat, spinQuat)
+			})
 		}
 	})
 

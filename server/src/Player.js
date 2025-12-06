@@ -21,6 +21,7 @@ export default class Player {
 		
 		// Wheel state
 		this.wheelRotations = [0, 0, 0, 0]
+		this.wheelYPositions = [0, 0, 0, 0]
 		this.steering = 0
 		this.engineRpm = 850
 		
@@ -41,6 +42,7 @@ export default class Player {
 		if (data.velocity) this.transform.velocity = data.velocity
 		if (data.angularVelocity) this.transform.angularVelocity = data.angularVelocity
 		if (data.wheelRotations) this.wheelRotations = data.wheelRotations
+		if (data.wheelYPositions) this.wheelYPositions = data.wheelYPositions
 		if (typeof data.steering === 'number') this.steering = data.steering
 		if (typeof data.engineRpm === 'number') this.engineRpm = data.engineRpm
 		this.lastUpdate = Date.now()
@@ -88,6 +90,7 @@ export default class Player {
 			vehicleConfig: this.vehicleConfig,
 			transform: this.transform,
 			wheelRotations: this.wheelRotations,
+			wheelYPositions: this.wheelYPositions,
 			steering: this.steering,
 			engineRpm: this.engineRpm,
 			lastUpdate: this.lastUpdate,
@@ -103,6 +106,7 @@ export default class Player {
 			velocity: this.transform.velocity,
 			angularVelocity: this.transform.angularVelocity,
 			wheelRotations: this.wheelRotations,
+			wheelYPositions: this.wheelYPositions,
 			steering: this.steering,
 			engineRpm: this.engineRpm,
 			timestamp: this.lastUpdate,

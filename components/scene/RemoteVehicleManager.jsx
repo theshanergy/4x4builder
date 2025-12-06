@@ -1,5 +1,4 @@
 import { useEffect, useRef, useMemo, memo } from 'react'
-import { useFrame } from '@react-three/fiber'
 import useMultiplayerStore from '../../store/multiplayerStore'
 import RemoteVehicle from './RemoteVehicle'
 
@@ -22,42 +21,32 @@ const RemoteVehicleManager = () => {
 		}))
 	}, [remotePlayers])
 
-	// Set up transform update listener
+	// Set up transform update listener using zustand's subscribe
 	useEffect(() => {
-		const networkManager = useMultiplayerStore.getState().networkManager
-		if (!networkManager) return
-
-		// Subscribe to player updates for transform pushes
-		const handlePlayerUpdate = (message) => {
-			const { playerId, ...transform } = message
-			
-			// Find the vehicle ref for this player and push transform
-			vehicleRefs.current.forEach((ref, refPlayerId) => {
-				if (refPlayerId === playerId && ref?.userData?.pushTransform) {
-					ref.userData.pushTransform(transform)
-				}
-			})
+		// Create a handler for player updates that pushes transforms to vehicles
+		const handlePlayerUpdate = (playerId, transform) => {
+			const ref = vehicleRefs.current.get(playerId)
+			console.log('[RemoteVehicleManager] handlePlayerUpdate', playerId, 'ref:', !!ref, 'pushTransform:', !!ref?.userData?.pushTransform, 'vehicleRefs size:', vehicleRefs.current.size)
+			if (ref?.userData?.pushTransform) {
+				ref.userData.pushTransform(transform)
+			}
 		}
-
-		// Store original callback
-		const originalCallback = networkManager.callbacks.onPlayerUpdate
-
-		// Wrap the callback to also handle our transform updates
-		networkManager.on('onPlayerUpdate', (message) => {
-			// Call original store callback first
-			originalCallback?.(message)
-			// Then handle our transform update
-			handlePlayerUpdate(message)
+		
+		// Store the handler on the multiplayerStore for the network callback to use
+		useMultiplayerStore.setState({ 
+			_pushTransformToVehicle: handlePlayerUpdate 
 		})
 
 		return () => {
-			// Restore original callback
-			networkManager.on('onPlayerUpdate', originalCallback)
+			useMultiplayerStore.setState({ 
+				_pushTransformToVehicle: null 
+			})
 		}
 	}, [])
 
 	// Register/unregister vehicle refs
 	const registerVehicleRef = (playerId, ref) => {
+		console.log('[RemoteVehicleManager] registerVehicleRef', playerId, 'ref:', !!ref, 'pushTransform:', !!ref?.userData?.pushTransform)
 		if (ref) {
 			vehicleRefs.current.set(playerId, ref)
 		} else {
@@ -90,39 +79,14 @@ const RemoteVehicleManager = () => {
  * Wrapper component to handle ref registration
  */
 const RemoteVehicleWrapper = memo(({ playerId, playerName, vehicleConfig, initialTransform, onRef }) => {
-	const groupRef = useRef()
-
-	useEffect(() => {
-		// Wait for next frame to ensure ref is set
-		const timeout = setTimeout(() => {
-			if (groupRef.current) {
-				onRef(groupRef.current)
-			}
-		}, 0)
-		
-		return () => {
-			clearTimeout(timeout)
-			onRef(null)
-		}
-	}, [onRef])
-
-	// Use useFrame to keep ref updated
-	useFrame(() => {
-		if (groupRef.current && !groupRef.current.userData.registered) {
-			onRef(groupRef.current)
-			groupRef.current.userData.registered = true
-		}
-	})
-
 	return (
-		<group ref={groupRef}>
-			<RemoteVehicle
-				playerId={playerId}
-				playerName={playerName}
-				vehicleConfig={vehicleConfig}
-				initialTransform={initialTransform}
-			/>
-		</group>
+		<RemoteVehicle
+			playerId={playerId}
+			playerName={playerName}
+			vehicleConfig={vehicleConfig}
+			initialTransform={initialTransform}
+			onRef={onRef}
+		/>
 	)
 })
 

@@ -65,6 +65,17 @@ export default class Validator {
 		)
 	}
 	
+	// Validate wheel Y positions array (suspension positions)
+	static isValidWheelYPositions(wheelYPositions) {
+		if (!Array.isArray(wheelYPositions) || wheelYPositions.length !== 4) {
+			return false
+		}
+		
+		return wheelYPositions.every(v => 
+			typeof v === 'number' && !isNaN(v)
+		)
+	}
+	
 	// Validate player update message
 	static validatePlayerUpdate(data) {
 		const errors = []
@@ -87,6 +98,10 @@ export default class Validator {
 		
 		if (data.wheelRotations && !this.isValidWheelRotations(data.wheelRotations)) {
 			errors.push('Invalid wheel rotations')
+		}
+		
+		if (data.wheelYPositions && !this.isValidWheelYPositions(data.wheelYPositions)) {
+			errors.push('Invalid wheel Y positions')
 		}
 		
 		if (typeof data.steering !== 'undefined' && 

@@ -37,6 +37,9 @@ const useMultiplayerStore = create((set, get) => ({
 	// Latency
 	latency: 0,
 	
+	// Handler for pushing transforms to vehicles (set by RemoteVehicleManager)
+	_pushTransformToVehicle: null,
+	
 	// Check if server is available
 	checkServerAvailability: async () => {
 		// Don't check if already in progress
@@ -152,7 +155,16 @@ const useMultiplayerStore = create((set, get) => ({
 			})
 			.on('onPlayerUpdate', (message) => {
 				const { playerId, ...transform } = message
+				console.log('[multiplayerStore] onPlayerUpdate', playerId, 'localPlayerId:', get().localPlayerId)
 				if (playerId !== get().localPlayerId) {
+					// Push transform to vehicle via the handler (if registered)
+					const pushHandler = get()._pushTransformToVehicle
+					console.log('[multiplayerStore] pushHandler:', !!pushHandler)
+					if (pushHandler) {
+						pushHandler(playerId, transform)
+					}
+					
+					// Also update store state
 					set((state) => {
 						const existing = state.remotePlayers[playerId]
 						if (!existing) return state
