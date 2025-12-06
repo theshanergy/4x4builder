@@ -9,7 +9,7 @@ export default {
 	roomTimeout: 30 * 60 * 1000, // 30 minutes of inactivity
 	
 	// Rate limiting
-	maxMessagesPerSecond: 30,
+	maxMessagesPerSecond: 60,
 	rateLimitWindow: 1000, // 1 second
 	
 	// Connection settings

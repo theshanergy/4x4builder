@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react'
+import { useCallback } from 'react'
 import useMultiplayerStore from '../store/multiplayerStore'
 import useGameStore from '../store/gameStore'
 import { ConnectionState } from '../network/NetworkManager'
@@ -30,13 +30,9 @@ export function useNetworkConnection() {
 	const leaveRoom = useMultiplayerStore((state) => state.leaveRoom)
 	const setPlayerName = useMultiplayerStore((state) => state.setPlayerName)
 	const clearError = useMultiplayerStore((state) => state.clearError)
-	const sendVehicleConfig = useMultiplayerStore((state) => state.sendVehicleConfig)
 	const checkServerAvailability = useMultiplayerStore((state) => state.checkServerAvailability)
 	
 	const currentVehicle = useGameStore((state) => state.currentVehicle)
-	
-	// Track previous vehicle config for change detection
-	const prevConfigRef = useRef(null)
 	
 	// Connect to server with default URL
 	const handleConnect = useCallback(async () => {
@@ -54,23 +50,7 @@ export function useNetworkConnection() {
 		return joinRoom(roomId, currentVehicle)
 	}, [joinRoom, currentVehicle])
 	
-	// Sync vehicle config changes when in a room
-	useEffect(() => {
-		if (!currentRoom) {
-			prevConfigRef.current = null
-			return
-		}
-		
-		const configString = JSON.stringify(currentVehicle)
-		if (configString !== prevConfigRef.current) {
-			prevConfigRef.current = configString
-			
-			// Don't send on initial join
-			if (prevConfigRef.current !== null) {
-				sendVehicleConfig(currentVehicle)
-			}
-		}
-	}, [currentVehicle, currentRoom, sendVehicleConfig])
+	// Note: Vehicle config sync is handled by useConfigSync hook with debouncing
 	
 	// Derived state
 	const isConnected = connectionState === ConnectionState.CONNECTED
