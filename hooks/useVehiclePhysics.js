@@ -3,7 +3,7 @@ import { useRapier, useAfterPhysicsStep } from '@react-three/rapier'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
 
-import useGameStore from '../store/gameStore'
+import useGameStore, { vehicleState } from '../store/gameStore'
 import useInputStore from '../store/inputStore'
 
 // Reset position (scene center, slightly above ground)
@@ -144,7 +144,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		vehicle.setAngvel({ x: 0, y: 0, z: 0 }, true)
 
 		// Reset gear to first
-		useGameStore.getState().engineRef.gear = 1
+		vehicleState.gear = 1
 	}, [vehicleRef])
 
 	// Setup vehicle physics
@@ -279,8 +279,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			tempVelocity.set(velocity.x, velocity.y, velocity.z)
 			forwardSpeed = tempVelocity.dot(tempForward)
 
-			// Update speed ref for UI (mutate ref directly to avoid re-renders)
-			useGameStore.getState().vehicleSpeedRef.current = forwardSpeed
+			// Update speed for UI (mutate directly to avoid re-renders)
+			vehicleState.speed = forwardSpeed
 		}
 
 		// Calculate keyboard steering target (-1, 0, or 1)
@@ -303,7 +303,6 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		// Physics-based approach: drivetrain has rotational inertia
 		// Forces act on it: throttle accelerates, friction/load decelerates
 
-		const engineRef = useGameStore.getState().engineRef
 		const absSpeed = Math.abs(forwardSpeed)
 
 		// Convert current drivetrain angular velocity to RPM for gear logic
@@ -311,7 +310,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		const currentRpmFromDrivetrain = (currentAngularVel * 60) / (2 * Math.PI)
 
 		// Get current gear
-		let currentGear = engineRef.gear
+		let currentGear = vehicleState.gear
 		const gearRatio = TRANSMISSION.gearRatios[currentGear] || 1
 		const totalRatio = gearRatio * TRANSMISSION.finalDrive
 
@@ -327,18 +326,18 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		// Use cooldown to prevent skipping gears (e.g., 1 -> 3 -> 5)
 		const canShift = currentTime - lastShiftTime.current > TRANSMISSION.shiftCooldown
 
-		if (!isAirborne.current && engineRef.gear !== -1) {
+		if (!isAirborne.current && vehicleState.gear !== -1) {
 			if (canShift && currentRpmFromDrivetrain > TRANSMISSION.shiftUpRpm && currentGear < TRANSMISSION.gearRatios.length - 1 && throttleInput > 0.3) {
 				currentGear++
-				engineRef.gear = currentGear
+				vehicleState.gear = currentGear
 				lastShiftTime.current = currentTime
 			} else if (canShift && currentRpmFromDrivetrain < TRANSMISSION.shiftDownRpm && currentGear > 1 && absSpeed > 0.5) {
 				currentGear--
-				engineRef.gear = currentGear
+				vehicleState.gear = currentGear
 				lastShiftTime.current = currentTime
 			} else if (absSpeed < 0.5) {
 				currentGear = 1
-				engineRef.gear = 1
+				vehicleState.gear = 1
 			}
 		}
 
@@ -414,10 +413,10 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		drivetrainAngularVel.current = Math.max(idleAngularVel * 0.9, Math.min(maxAngularVel, drivetrainAngularVel.current))
 
 		// Convert back to RPM for audio system
-		engineRef.rpm = (drivetrainAngularVel.current * 60) / (2 * Math.PI)
+		vehicleState.rpm = (drivetrainAngularVel.current * 60) / (2 * Math.PI)
 
 		// Clamp RPM
-		engineRef.rpm = Math.max(TRANSMISSION.idleRpm, Math.min(TRANSMISSION.maxRpm, engineRef.rpm))
+		vehicleState.rpm = Math.max(TRANSMISSION.idleRpm, Math.min(TRANSMISSION.maxRpm, vehicleState.rpm))
 
 		// ===== ENGINE LOAD CALCULATION =====
 		// Load represents resistance the engine is fighting against
@@ -430,7 +429,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		if (throttleInput > 0.05) {
 			// How much throttle vs how much the engine is actually accelerating
 			// If throttle is high but RPM isn't climbing, engine is loaded
-			const rpmNorm = (engineRef.rpm - TRANSMISSION.idleRpm) / (TRANSMISSION.maxRpm - TRANSMISSION.idleRpm)
+			const rpmNorm = (vehicleState.rpm - TRANSMISSION.idleRpm) / (TRANSMISSION.maxRpm - TRANSMISSION.idleRpm)
 
 			// Throttle-based load - pressing throttle means engine is working
 			engineLoad += throttleInput * 0.4
@@ -455,25 +454,25 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		smoothedLoad.current += (engineLoad - smoothedLoad.current) * loadLerpSpeed
 
 		// Store for audio system
-		engineRef.load = smoothedLoad.current
+		vehicleState.load = smoothedLoad.current
 
 		// Store throttle for audio
-		engineRef.throttle = throttleInput
+		vehicleState.throttle = throttleInput
 
 		// Determine reverse state
 		// Enter reverse: braking while nearly stopped and not accelerating
 		// Exit reverse: accelerating (throttle pressed)
-		if (throttleInput > 0 && engineRef.gear === -1) {
-			engineRef.gear = 1
+		if (throttleInput > 0 && vehicleState.gear === -1) {
+			vehicleState.gear = 1
 		} else if (brakeInput > 0 && Math.abs(forwardSpeed) < REVERSE_THRESHOLD) {
-			engineRef.gear = -1
+			vehicleState.gear = -1
 		}
 
 		// Calculate actual forces based on state
 		let engineForce = 0
 		let brakeForce = 0
 
-		if (engineRef.gear === -1) {
+		if (vehicleState.gear === -1) {
 			// In reverse mode: brake input drives backward
 			engineForce = -FORCES.reverse * brakeInput
 			// Throttle acts as brake when reversing
@@ -482,7 +481,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			// Normal forward mode
 			if (throttleInput > 0) {
 				// Get torque multiplier from curve based on current RPM
-				const torqueMultiplier = getTorqueMultiplier(engineRef.rpm)
+				const torqueMultiplier = getTorqueMultiplier(vehicleState.rpm)
 
 				// Get current gear ratio (higher ratio = more torque multiplication)
 				const currentGearRatio = TRANSMISSION.gearRatios[currentGear] || 1
@@ -497,7 +496,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			} else if (forwardSpeed > 1.0) {
 				// Engine braking when coasting forward
 				const gearRatio = TRANSMISSION.gearRatios[currentGear] || 1
-				const rpmFactor = Math.max(0, (engineRef.rpm - TRANSMISSION.idleRpm) / (TRANSMISSION.maxRpm - TRANSMISSION.idleRpm))
+				const rpmFactor = Math.max(0, (vehicleState.rpm - TRANSMISSION.idleRpm) / (TRANSMISSION.maxRpm - TRANSMISSION.idleRpm))
 
 				// Calculate braking force based on RPM and gear ratio
 				// Higher RPM and lower gear (higher ratio) = more braking

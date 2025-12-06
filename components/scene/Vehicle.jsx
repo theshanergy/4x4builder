@@ -5,7 +5,7 @@ import { useGLTF, Gltf } from '@react-three/drei'
 import { useXR } from '@react-three/xr'
 import { Vector3, Quaternion } from 'three'
 
-import useGameStore from '../../store/gameStore'
+import useGameStore, { vehicleState } from '../../store/gameStore'
 import useInputStore from '../../store/inputStore'
 import vehicleConfigs from '../../vehicleConfigs'
 import useAnimateHeight from '../../hooks/useAnimateHeight'
@@ -192,7 +192,6 @@ const Vehicle = (props) => {
 	}
 
 	// Get vehicle store
-	const setCameraTarget = useGameStore((state) => state.setCameraTarget)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const xrOriginRef = useGameStore((state) => state.xrOriginRef)
 	const insideVehicle = useGameStore((state) => state.insideVehicle)
@@ -282,8 +281,8 @@ const Vehicle = (props) => {
 		chassisGroupRef.current.getWorldPosition(tempWorldPos)
 		chassisGroupRef.current.getWorldQuaternion(tempQuat)
 
-		// Set camera target
-		setCameraTarget(tempWorldPos.x, tempWorldPos.y + 0.95, tempWorldPos.z)
+		// Update vehicle position for camera and other systems
+		vehicleState.position.copy(tempWorldPos)
 
 		// Update XR origin to follow vehicle when inside
 		if (insideVehicle && xrOriginRef?.current) {

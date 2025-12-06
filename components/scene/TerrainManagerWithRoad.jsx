@@ -5,7 +5,7 @@ import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader, ShaderMaterial, 
 import { Noise } from 'noisejs'
 import { useXR } from '@react-three/xr'
 
-import useGameStore from '../../store/gameStore'
+import useGameStore, { vehicleState } from '../../store/gameStore'
 import GrassManager from './GrassManager'
 import DistantTerrain from './DistantTerrain'
 import { getRoadInfo } from '../../utils/roadMath'
@@ -275,7 +275,7 @@ const TerrainManager = () => {
 
 	// Update active tiles based on camera/vehicle position
 	useFrame(() => {
-		const centerPosition = useGameStore.getState().cameraTarget
+		const centerPosition = vehicleState.position
 
 		// --- Visual Tiles Update ---
 		const currentTileX = Math.floor(centerPosition.x / VISUAL_TILE_SIZE)

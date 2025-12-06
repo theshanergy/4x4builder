@@ -14,7 +14,7 @@ import {
 	Matrix4 
 } from 'three'
 
-import useGameStore from '../../store/gameStore'
+import useGameStore, { vehicleState } from '../../store/gameStore'
 import grassVertexShader from '../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../shaders/grass.frag.glsl'
 
@@ -377,10 +377,10 @@ const GrassManager = memo(({ getTerrainHeight, getTerrainNormal }) => {
 		frameCount.current++
 		if (frameCount.current % 10 !== 0) return
 
-		// Update active chunks based on camera position
-		const cameraTarget = useGameStore.getState().cameraTarget
-		const currentChunkX = Math.floor(cameraTarget.x / GRASS_CHUNK_SIZE)
-		const currentChunkZ = Math.floor(cameraTarget.z / GRASS_CHUNK_SIZE)
+		// Update active chunks based on vehicle position
+		const targetPos = vehicleState.position
+		const currentChunkX = Math.floor(targetPos.x / GRASS_CHUNK_SIZE)
+		const currentChunkZ = Math.floor(targetPos.z / GRASS_CHUNK_SIZE)
 
 		const chunksInView = Math.ceil(GRASS_VIEW_DISTANCE / GRASS_CHUNK_SIZE)
 		const newActiveChunkKeys = new Set()
@@ -398,8 +398,8 @@ const GrassManager = memo(({ getTerrainHeight, getTerrainNormal }) => {
 				const chunkCenterX = chunkX * GRASS_CHUNK_SIZE + GRASS_CHUNK_SIZE / 2
 				const chunkCenterZ = chunkZ * GRASS_CHUNK_SIZE + GRASS_CHUNK_SIZE / 2
 
-				const dx = cameraTarget.x - chunkCenterX
-				const dz = cameraTarget.z - chunkCenterZ
+				const dx = targetPos.x - chunkCenterX
+				const dz = targetPos.z - chunkCenterZ
 				const distSq = dx * dx + dz * dz
 
 				if (distSq <= viewDistSq) {

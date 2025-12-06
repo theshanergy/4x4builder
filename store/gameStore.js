@@ -13,6 +13,16 @@ const preprocessVehicleConfig = (config) => {
 // Check if device is mobile (touch device or small screen)
 const checkIsMobile = () => typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 1024)
 
+// Mutable state for high-frequency data (avoiding store updates/rerenders)
+export const vehicleState = {
+	speed: 0,
+	rpm: 850,
+	throttle: 0,
+	gear: 1,
+	load: 0.2, // Engine load (0 = no load/airborne, 1 = max load/climbing)
+	position: new Vector3(0, 0, 0), // Vehicle world position (updated every frame)
+}
+
 // Game store
 const useGameStore = create((set, get) => {
 	// Set up resize listener for isMobile detection
@@ -29,16 +39,6 @@ const useGameStore = create((set, get) => {
 		performanceDegraded: false,
 		controlsVisible: false,
 		muted: true, // Audio muted by default
-		vehicleSpeedRef: { current: 0 }, // Mutable ref to avoid re-renders
-		
-		// Engine/Transmission state (mutable refs for performance)
-		engineRef: {
-			rpm: 850,
-			throttle: 0,
-			gear: 1,
-			clutchEngaged: true,
-			load: 0.2, // Engine load (0 = no load/airborne, 1 = max load/climbing)
-		},
 		
 		setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
 		setPhysicsEnabled: (enabled) => set((state) => {
@@ -60,14 +60,7 @@ const useGameStore = create((set, get) => {
 		hideNotification: () => set({ notification: null }),
 
 		// Camera state
-		cameraTarget: new Vector3(0, 0, 0),
-		cameraControlsRef: null,
 		cameraAutoRotate: false,
-		setCameraTarget: (x, y, z) => {
-			// mutate in place
-			useGameStore.getState().cameraTarget.set(x, y, z)
-		},
-		setCameraControlsRef: (ref) => set({ cameraControlsRef: ref }),
 		setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
 
 		// XR state

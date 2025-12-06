@@ -5,7 +5,7 @@ import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 import { useXR } from '@react-three/xr'
 
-import useGameStore from '../../store/gameStore'
+import useGameStore, { vehicleState } from '../../store/gameStore'
 import GrassManager from './GrassManager'
 import DistantTerrain from './DistantTerrain'
 
@@ -224,10 +224,9 @@ const TerrainManager = () => {
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}, [getRawHeight, maxHeight, normalScratch])
 
-	// Update tiles based on camera target position
+	// Update tiles based on vehicle position
 	useFrame(() => {
-		// Use camera target position if available, otherwise fall back to scene center
-		const centerPosition = useGameStore.getState().cameraTarget
+		const centerPosition = vehicleState.position
 		const currentTileX = Math.floor(centerPosition.x / tileSize)
 		const currentTileZ = Math.floor(centerPosition.z / tileSize)
 
