@@ -1,12 +1,27 @@
 import { memo, useMemo, useRef, useEffect, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { useGLTF, Gltf, Html } from '@react-three/drei'
+import { useGLTF, Html } from '@react-three/drei'
 import { Vector3, Quaternion, MathUtils } from 'three'
 
 import vehicleConfigs from '../../vehicleConfigs'
 import useAnimateHeight from '../../hooks/useAnimateHeight'
 import useMaterialProperties from '../../hooks/useMaterialProperties'
 import useTireDirtMaterial from '../../hooks/useTireDirtMaterial'
+
+// Deep clone a scene with unique materials to avoid shared material references
+const cloneWithMaterials = (scene) => {
+	const clone = scene.clone()
+	clone.traverse((child) => {
+		if (child.isMesh) {
+			if (Array.isArray(child.material)) {
+				child.material = child.material.map((m) => m.clone())
+			} else if (child.material) {
+				child.material = child.material.clone()
+			}
+		}
+	})
+	return clone
+}
 
 // Interpolation settings
 const INTERPOLATION_DELAY = 100 // ms - buffer time for smooth interpolation
@@ -121,7 +136,8 @@ const linePoint = (a, b, length) => {
 const Rim = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, color, roughness }) => {
 	const { setObjectMaterials } = useMaterialProperties()
 	const rimGltf = useGLTF(vehicleConfigs.wheels.rims[rim].model)
-	const rimScene = useMemo(() => rimGltf.scene.clone(), [rimGltf.scene])
+	// Clone scene with unique materials so we don't affect other instances
+	const rimScene = useMemo(() => cloneWithMaterials(rimGltf.scene), [rimGltf.scene])
 
 	const odScale = useMemo(() => ((rim_diameter * 2.54) / 100 + 0.03175) / vehicleConfigs.wheels.rims[rim].od, [rim, rim_diameter])
 	const widthScale = useMemo(() => (rim_width * 2.54) / 100 / vehicleConfigs.wheels.rims[rim].width, [rim, rim_width])
@@ -205,20 +221,40 @@ const RemoteWheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_
 	)
 })
 
-// Body component for remote vehicle
-const RemoteBody = memo(({ id, height, color, roughness, addons }) => {
-	const vehicle = useRef()
+// Single addon component - each addon loads its own model
+const RemoteAddon = memo(({ path, color, roughness }) => {
 	const { setObjectMaterials } = useMaterialProperties()
+	const gltf = useGLTF(path)
+	// Clone scene with unique materials
+	const scene = useMemo(() => cloneWithMaterials(gltf.scene), [gltf.scene])
 
 	useEffect(() => {
-		setObjectMaterials(vehicle.current, color, roughness)
-	}, [setObjectMaterials, color, roughness, addons])
+		setObjectMaterials(scene, color, roughness)
+	}, [scene, setObjectMaterials, color, roughness])
 
+	return <primitive object={scene} />
+})
+
+// Body component for remote vehicle
+const RemoteBody = memo(({ id, height, color, roughness, addons }) => {
+	const { setObjectMaterials } = useMaterialProperties()
+	const vehicle = useRef()
+	
+	// Load body model
+	const bodyGltf = useGLTF(vehicleConfigs.vehicles[id]?.model || vehicleConfigs.vehicles[vehicleConfigs.defaults.body].model)
+	// Clone scene with unique materials
+	const bodyScene = useMemo(() => cloneWithMaterials(bodyGltf.scene), [bodyGltf.scene])
+
+	// Get addon paths
 	const addonPaths = useMemo(() => {
 		return Object.entries(addons || {})
 			.filter(([type, value]) => vehicleConfigs.vehicles[id]?.['addons']?.[type]?.['options']?.[value])
 			.map(([type, value]) => vehicleConfigs.vehicles[id]['addons'][type]['options'][value]['model'])
 	}, [id, addons])
+
+	useEffect(() => {
+		setObjectMaterials(bodyScene, color, roughness)
+	}, [bodyScene, setObjectMaterials, color, roughness])
 
 	useAnimateHeight(vehicle, height, height + 0.1)
 
@@ -230,14 +266,16 @@ const RemoteBody = memo(({ id, height, color, roughness, addons }) => {
 
 	return (
 		<group ref={vehicle} name='Body' key={id}>
-			<Gltf src={vehicleConfigs.vehicles[id].model} />
-			{addonPaths.length ? (
+			<primitive object={bodyScene} />
+			{addonPaths.length > 0 && (
 				<group name='Addons'>
-					{addonPaths.map((addon) => (
-						<Gltf key={addon} src={addon} />
+					{addonPaths.map((path) => (
+						<Suspense key={path} fallback={null}>
+							<RemoteAddon path={path} color={color} roughness={roughness} />
+						</Suspense>
 					))}
 				</group>
-			) : null}
+			)}
 		</group>
 	)
 })
