@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, memo } from 'react'
-import useGameStore from '../../store/gameStore'
+import useGameStore, { vehicleState } from '../../store/gameStore'
 
 const Speedometer = memo(() => {
 
@@ -15,15 +15,12 @@ const Speedometer = memo(() => {
 	useEffect(() => {
 		if (isMobile || !physicsEnabled) return
 
-		// Access refs directly from store to avoid subscribing to them
-		const { vehicleSpeedRef, engineRef } = useGameStore.getState()
-
 		const updateSpeed = (timestamp) => {
 			// Throttle updates to ~10fps (every 100ms)
 			if (timestamp - lastUpdateRef.current >= 100) {
-				const speedKmh = Math.round(Math.abs(vehicleSpeedRef.current * 3.6))
-				const rpm = Math.round(engineRef.rpm)
-				const gear = engineRef.gear
+				const speedKmh = Math.round(Math.abs(vehicleState.speed * 3.6))
+				const rpm = Math.round(vehicleState.rpm)
+				const gear = vehicleState.gear
 				
 				// Only update state if values changed to prevent unnecessary rerenders
 				setDisplaySpeed((prev) => (prev !== speedKmh ? speedKmh : prev))

@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { Vector3, Raycaster, MathUtils } from 'three'
 
-import useGameStore from '../../store/gameStore'
+import useGameStore, { vehicleState } from '../../store/gameStore'
 
 // Camera controls and chase cam logic
 const CameraControls = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
@@ -24,13 +24,13 @@ const CameraControls = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 	useFrame((state, delta) => {
 		if (!cameraControlsRef.current) return
 
-		// Get the target position from the store
-		const target = useGameStore.getState().cameraTarget
+		// Get the target position from vehicleState
+		const target = vehicleState.position
 		const controlsTarget = cameraControlsRef.current.target
 
 		// Use damp for frame-rate independent smoothing (prevents micro-banding)
 		controlsTarget.x = MathUtils.damp(controlsTarget.x, target.x, followSpeed, delta)
-		controlsTarget.y = MathUtils.damp(controlsTarget.y, target.y, followSpeed, delta)
+		controlsTarget.y = MathUtils.damp(controlsTarget.y, target.y + 0.95, followSpeed, delta) // Y offset to look at cabin level
 		controlsTarget.z = MathUtils.damp(controlsTarget.z, target.z, followSpeed, delta)
 		
 		cameraControlsRef.current.update()

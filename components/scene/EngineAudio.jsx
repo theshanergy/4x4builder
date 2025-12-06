@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { AudioListener, PositionalAudio } from 'three'
-import useGameStore from '../../store/gameStore'
+import useGameStore, { vehicleState } from '../../store/gameStore'
 import { workletCode } from '../../hooks/engineWorklet'
 
 class AudioEngine {
@@ -181,7 +181,6 @@ const EngineAudio = memo(() => {
 
 	const groupRef = useRef(null)
 	const audioRef = useRef(null)
-	const engineRef = useRef(null)
 
 	// Initialize positional audio and audio engine
 	useEffect(() => {
@@ -207,9 +206,6 @@ const EngineAudio = memo(() => {
 				// Apply current mute state
 				const isMuted = useGameStore.getState().muted
 				audioEngine.setVolume(isMuted ? 0 : 0.5)
-
-				// Cache engineRef once - it's a mutable object
-				engineRef.current = useGameStore.getState().engineRef
 			})
 			.catch((e) => {
 				console.warn('Audio engine initialization failed:', e)
@@ -247,10 +243,10 @@ const EngineAudio = memo(() => {
 
 	// Update audio parameters each frame
 	useFrame(() => {
-		if (!audioEngine.isInitialized || !engineRef.current) return
+		if (!audioEngine.isInitialized) return
 
-		// Read directly from the mutable engineRef - no store access needed
-		audioEngine.updateParams(engineRef.current.rpm || 800, engineRef.current.load || 0.5, engineRef.current.throttle || 0)
+		// Read directly from mutable vehicleState - no store access needed
+		audioEngine.updateParams(vehicleState.rpm || 800, vehicleState.load || 0.5, vehicleState.throttle || 0)
 	})
 
 	return <group ref={groupRef} />

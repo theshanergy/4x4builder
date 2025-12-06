@@ -2,7 +2,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RingGeometry, Color, BufferAttribute, Vector3, RepeatWrapping } from 'three'
 
-import useGameStore from '../../store/gameStore'
+import { vehicleState } from '../../store/gameStore'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
@@ -97,10 +97,9 @@ const DistantTerrain = ({ noise, map }) => {
 	}, [innerRadius, outerRadius, segments, rings, noise, maxHeight, noiseScale, peakSharpness])
 
 	useFrame(() => {
-		const cameraTarget = useGameStore.getState().cameraTarget
-		if (meshRef.current && cameraTarget) {
-			meshRef.current.position.x = cameraTarget.x
-			meshRef.current.position.z = cameraTarget.z
+		if (meshRef.current) {
+			meshRef.current.position.x = vehicleState.position.x
+			meshRef.current.position.z = vehicleState.position.z
 		}
 	})
 

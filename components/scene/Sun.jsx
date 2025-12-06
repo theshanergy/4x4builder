@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import useGameStore from '../../store/gameStore'
+import useGameStore, { vehicleState } from '../../store/gameStore'
 
 // Sun directional light that follows camera target
 const Sun = ({ sunDirection }) => {
@@ -10,14 +10,14 @@ const Sun = ({ sunDirection }) => {
 
 	useFrame(() => {
 		const light = lightRef.current
-		const cameraTarget = useGameStore.getState().cameraTarget
 
 		if (!light) return
 
-		// Position light based on sun direction relative to camera target
+		// Position light based on sun direction relative to vehicle position
 		const lightDistance = 50
-		light.position.set(cameraTarget.x + sunDirection.x * lightDistance, sunDirection.y * lightDistance, cameraTarget.z + sunDirection.z * lightDistance)
-		light.target.position.copy(cameraTarget)
+		const targetPos = vehicleState.position
+		light.position.set(targetPos.x + sunDirection.x * lightDistance, sunDirection.y * lightDistance, targetPos.z + sunDirection.z * lightDistance)
+		light.target.position.set(targetPos.x, targetPos.y, targetPos.z)
 		light.target.updateMatrixWorld()
 	})
 

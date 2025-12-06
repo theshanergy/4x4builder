@@ -3,7 +3,7 @@ import { useFrame, useLoader } from '@react-three/fiber'
 import { AnimationMixer, LoopRepeat, Vector3, MathUtils } from 'three'
 import { GLTFLoader } from 'three-stdlib'
 
-import useGameStore from '../../store/gameStore'
+import { vehicleState } from '../../store/gameStore'
 
 // Normalize angle to -PI to PI range
 const normalizeAngle = (angle) => MathUtils.euclideanModulo(angle + Math.PI, Math.PI * 2) - Math.PI
@@ -43,7 +43,7 @@ export default function Hawk() {
 
 		if (!groupRef.current) return
 
-		const targetPos = useGameStore.getState().cameraTarget
+		const targetPos = vehicleState.position
 		const hawkPos = groupRef.current.position
 
 		const dx = targetPos.x - hawkPos.x
