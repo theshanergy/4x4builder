@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import NetworkManager, { ConnectionState } from '../network/NetworkManager.js'
+import useGameStore from './gameStore.js'
 
 // Default server URL - uses environment variable if available
 const getServerUrl = () => {
@@ -95,7 +96,7 @@ const useMultiplayerStore = create((set, get) => ({
 			.on('onError', (message) => {
 				set({ connectionError: message.message })
 			})
-			.on('onRoomCreated', (message) => {
+			.on('onRoomEntered', (message) => {
 				set({
 					currentRoom: message.roomState,
 					isHost: message.isHost,
@@ -103,15 +104,8 @@ const useMultiplayerStore = create((set, get) => ({
 				})
 				// Initialize remote players from room state
 				get().syncRemotePlayers(message.roomState.players)
-			})
-			.on('onRoomJoined', (message) => {
-				set({
-					currentRoom: message.roomState,
-					isHost: message.isHost,
-					connectionError: null,
-				})
-				// Initialize remote players from room state
-				get().syncRemotePlayers(message.roomState.players)
+				// Enable physics so vehicles don't spawn floating
+				useGameStore.getState().setPhysicsEnabled(true)
 			})
 			.on('onRoomLeft', () => {
 				set({

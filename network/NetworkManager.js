@@ -35,8 +35,7 @@ export default class NetworkManager {
 			onStateChange: null,
 			onWelcome: null,
 			onError: null,
-			onRoomCreated: null,
-			onRoomJoined: null,
+			onRoomEntered: null,
 			onRoomLeft: null,
 			onRoomState: null,
 			onRoomClosed: null,
@@ -238,11 +237,8 @@ export default class NetworkManager {
 				break
 				
 			case MessageTypes.ROOM_CREATED:
-				this.callbacks.onRoomCreated?.(message)
-				break
-				
 			case MessageTypes.ROOM_JOINED:
-				this.callbacks.onRoomJoined?.(message)
+				this.callbacks.onRoomEntered?.(message)
 				break
 				
 			case MessageTypes.ROOM_LEFT:
