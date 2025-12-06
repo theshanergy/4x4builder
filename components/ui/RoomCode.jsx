@@ -30,33 +30,24 @@ function RoomCode({ roomId, isHost }) {
 	}, [roomId])
 	
 	return (
-		<div className='bg-stone-800 rounded-lg p-4'>
-			<div className='flex items-center justify-between mb-2'>
-				<span className='text-stone-500 text-sm'>Room Code</span>
-				{isHost && (
-					<span className='text-xs bg-yellow-600/30 text-yellow-400 px-2 py-0.5 rounded'>
-						Host
-					</span>
-				)}
+		<div className='field'>
+			<div className='flex justify-between items-center mb-2'>
+				<label className='mb-0'>Room Code</label>
+				{isHost && <span className='text-xs text-yellow-500 font-bold'>HOST</span>}
 			</div>
-			<div className='flex items-center gap-3'>
-				<code className='text-2xl font-mono font-bold tracking-widest text-white'>
+			<div className='flex gap-2'>
+				<div className='flex-1 p-2 bg-stone-900 border border-stone-800 rounded text-center font-mono text-xl tracking-widest select-all text-white'>
 					{roomId}
-				</code>
+				</div>
 				<button
 					onClick={handleCopy}
-					className={classNames(
-						'p-2 rounded transition-colors',
-						copied 
-							? 'bg-green-600 text-white' 
-							: 'bg-stone-700 text-stone-400 hover:bg-stone-600 hover:text-white'
-					)}
+					className={classNames('secondary w-auto px-3', { 'text-green-400': copied })}
 					title={copied ? 'Copied!' : 'Copy room code'}
 				>
 					{copied ? CheckIcon : CopyIcon}
 				</button>
 			</div>
-			<p className='text-stone-500 text-xs mt-3'>
+			<p className='text-stone-500 text-xs mt-2'>
 				Share this code with friends to play together
 			</p>
 		</div>
