@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import classNames from 'classnames'
 import useNetworkConnection from '../../hooks/useNetworkConnection'
 import RoomCode from './RoomCode'
@@ -27,6 +27,7 @@ function MultiplayerPanel() {
 		isHost,
 		playerName,
 		remotePlayers,
+		serverAvailable,
 		isConnected,
 		isConnecting,
 		isInRoom,
@@ -38,12 +39,18 @@ function MultiplayerPanel() {
 		leaveRoom,
 		setPlayerName,
 		clearError,
+		checkServerAvailability,
 	} = useNetworkConnection()
 	
 	const [joinRoomId, setJoinRoomId] = useState('')
 	const [editingName, setEditingName] = useState(false)
 	const [nameInput, setNameInput] = useState(playerName)
 	const [isExpanded, setIsExpanded] = useState(false)
+	
+	// Check server availability on mount
+	useEffect(() => {
+		checkServerAvailability()
+	}, [checkServerAvailability])
 	
 	// Handle name change
 	const handleNameSubmit = useCallback(() => {
@@ -88,6 +95,11 @@ function MultiplayerPanel() {
 	const toggleExpand = useCallback(() => {
 		setIsExpanded(!isExpanded)
 	}, [isExpanded])
+	
+	// Don't render if server is not available
+	if (serverAvailable !== true) {
+		return null
+	}
 	
 	return (
 		<div className='section'>

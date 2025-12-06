@@ -21,6 +21,7 @@ export function useNetworkConnection() {
 	const localPlayerId = useMultiplayerStore((state) => state.localPlayerId)
 	const playerName = useMultiplayerStore((state) => state.playerName)
 	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
+	const serverAvailable = useMultiplayerStore((state) => state.serverAvailable)
 	
 	const connect = useMultiplayerStore((state) => state.connect)
 	const disconnect = useMultiplayerStore((state) => state.disconnect)
@@ -30,6 +31,7 @@ export function useNetworkConnection() {
 	const setPlayerName = useMultiplayerStore((state) => state.setPlayerName)
 	const clearError = useMultiplayerStore((state) => state.clearError)
 	const sendVehicleConfig = useMultiplayerStore((state) => state.sendVehicleConfig)
+	const checkServerAvailability = useMultiplayerStore((state) => state.checkServerAvailability)
 	
 	const currentVehicle = useGameStore((state) => state.currentVehicle)
 	
@@ -86,6 +88,7 @@ export function useNetworkConnection() {
 		localPlayerId,
 		playerName,
 		remotePlayers,
+		serverAvailable,
 		
 		// Derived state
 		isConnected,
@@ -101,6 +104,7 @@ export function useNetworkConnection() {
 		leaveRoom,
 		setPlayerName,
 		clearError,
+		checkServerAvailability,
 	}
 }
 

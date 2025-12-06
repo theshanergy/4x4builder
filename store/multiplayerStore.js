@@ -1,8 +1,21 @@
 import { create } from 'zustand'
 import NetworkManager, { ConnectionState } from '../network/NetworkManager.js'
 
+// Default server URL - uses environment variable if available
+const getServerUrl = () => {
+	if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MULTIPLAYER_SERVER_URL) {
+		return import.meta.env.VITE_MULTIPLAYER_SERVER_URL
+	}
+	// Default to localhost for development
+	return 'ws://localhost:8080'
+}
+
 // Multiplayer store
 const useMultiplayerStore = create((set, get) => ({
+	// Server availability
+	serverAvailable: null, // null = not checked, true = available, false = unavailable
+	serverCheckInProgress: false,
+	
 	// Connection state
 	connectionState: ConnectionState.DISCONNECTED,
 	connectionError: null,
@@ -23,6 +36,38 @@ const useMultiplayerStore = create((set, get) => ({
 	
 	// Latency
 	latency: 0,
+	
+	// Check if server is available
+	checkServerAvailability: async () => {
+		// Don't check if already in progress
+		if (get().serverCheckInProgress) return get().serverAvailable
+		
+		set({ serverCheckInProgress: true })
+		
+		const serverUrl = getServerUrl()
+		
+		return new Promise((resolve) => {
+			const ws = new WebSocket(serverUrl)
+			const timeout = setTimeout(() => {
+				ws.close()
+				set({ serverAvailable: false, serverCheckInProgress: false })
+				resolve(false)
+			}, 3000) // 3 second timeout
+			
+			ws.onopen = () => {
+				clearTimeout(timeout)
+				ws.close()
+				set({ serverAvailable: true, serverCheckInProgress: false })
+				resolve(true)
+			}
+			
+			ws.onerror = () => {
+				clearTimeout(timeout)
+				set({ serverAvailable: false, serverCheckInProgress: false })
+				resolve(false)
+			}
+		})
+	},
 	
 	// Initialize network manager
 	initNetworkManager: (serverUrl) => {
