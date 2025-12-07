@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
 
 import useGameStore, { vehicleState } from '../store/gameStore'
-import useInputStore from '../store/inputStore'
+import useVehicleInput from './useVehicleInput'
 
 // Reset position (scene center, slightly above ground)
 const RESET_POSITION = { x: 0, y: 1, z: 0 }
@@ -101,9 +101,6 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Track airborne state
 	const isAirborne = useRef(false)
 
-	// Track reset button state to detect press (not hold)
-	const resetPressedLastFrame = useRef(false)
-
 	// Track current friction stiffness for smooth drift transitions
 	const currentRearWheelFriction = useRef(null)
 
@@ -125,8 +122,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Shift cooldown timer to prevent gear skipping
 	const lastShiftTime = useRef(0)
 
-	// Smoothed keyboard steering for lerping
-	const smoothedKeyboardSteering = useRef(0)
+	// Get vehicle input processor
+	const getVehicleInput = useVehicleInput()
 
 	// Reset vehicle function
 	const resetVehicle = useCallback(() => {
@@ -237,18 +234,28 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	useFrame((state, delta) => {
 		if (!vehicleController.current) return
 
-		// Get input from store
-		const { keys, input } = useInputStore.getState()
+		// Get current vehicle speed first (needed for speed-based steering)
+		const vehicle = vehicleRef.current
+		let forwardSpeed = 0
+		if (vehicle) {
+			const velocity = vehicle.linvel()
+			tempForward.copy(VECTORS.FORWARD).applyQuaternion(vehicle.rotation())
+			tempVelocity.set(velocity.x, velocity.y, velocity.z)
+			forwardSpeed = tempVelocity.dot(tempForward)
 
-		// Check for reset input (R key or Y button) - trigger on press, not hold
-		const resetPressed = keys.has('r') || keys.has('R') || input.buttonY
-		if (resetPressed && !resetPressedLastFrame.current) {
+			// Update speed for UI (mutate directly to avoid re-renders)
+			vehicleState.speed = forwardSpeed
+		}
+
+		// Get processed vehicle input
+		const { throttleInput, brakeInput, steerInput, isDrifting, shouldReset, pitchInput, rollInput, yawInput } = getVehicleInput(delta, forwardSpeed)
+
+		// Handle reset
+		if (shouldReset) {
 			resetVehicle()
 		}
-		resetPressedLastFrame.current = resetPressed
 
-		// Handle drift mode (Shift key) with smooth transition
-		const isDrifting = keys.has('Shift')
+		// Handle drift mode with smooth transition
 		const targetFriction = isDrifting ? 0.1 : REAR_WHEEL_FRICTION
 
 		// Smoothly interpolate friction with different rates for entering/exiting drift
@@ -264,40 +271,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		if (wheels.length > 2) vehicleController.current.setWheelSideFrictionStiffness(2, currentRearWheelFriction.current)
 		if (wheels.length > 3) vehicleController.current.setWheelSideFrictionStiffness(3, currentRearWheelFriction.current)
 
-		const clamp = (value) => Math.min(1, Math.max(-1, value))
-
-		// Calculate raw input values
-		const throttleInput = clamp((keys.has('ArrowUp') || keys.has('w') || keys.has('W') ? 1 : 0) + (input.rightStickY < 0 ? -input.rightStickY : 0))
-		const brakeInput = clamp((keys.has('ArrowDown') || keys.has('s') || keys.has('S') ? 1 : 0) + (input.rightStickY > 0 ? input.rightStickY : 0))
-
-		// Get current vehicle speed (forward velocity) - needed for speed-based steering
-		const vehicle = vehicleRef.current
-		let forwardSpeed = 0
-		if (vehicle) {
-			const velocity = vehicle.linvel()
-			tempForward.copy(VECTORS.FORWARD).applyQuaternion(vehicle.rotation())
-			tempVelocity.set(velocity.x, velocity.y, velocity.z)
-			forwardSpeed = tempVelocity.dot(tempForward)
-
-			// Update speed for UI (mutate directly to avoid re-renders)
-			vehicleState.speed = forwardSpeed
-		}
-
-		// Calculate keyboard steering target (-1, 0, or 1)
-		const keyboardSteerTarget = (keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? -1 : 0) + (keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? 1 : 0)
-
-		// Speed-based steering lerp: slower response at higher speeds for better handling
-		// At 0 speed: fast response (8 for centering, 5 for turning)
-		// At high speed (~25 units/s): slower response (2 for centering, 1.2 for turning)
-		const speedFactor = Math.min(1, Math.abs(forwardSpeed) / 25) // Normalize speed (0 to 1)
-		const baseLerpSpeed = keyboardSteerTarget === 0 ? 8 : 5
-		const minLerpSpeed = keyboardSteerTarget === 0 ? 2 : 1.2
-		const steerLerpSpeed = baseLerpSpeed - (baseLerpSpeed - minLerpSpeed) * speedFactor
-
-		smoothedKeyboardSteering.current += (keyboardSteerTarget - smoothedKeyboardSteering.current) * Math.min(1, steerLerpSpeed * delta)
-
-		// Combine smoothed keyboard steering with analog stick input
-		const steerForce = FORCES.steerAngle * clamp(smoothedKeyboardSteering.current + -input.leftStickX)
+		// Calculate steering force from input
+		const steerForce = FORCES.steerAngle * steerInput
 
 		// ===== ENGINE & TRANSMISSION SIMULATION =====
 		// Physics-based approach: drivetrain has rotational inertia
@@ -528,18 +503,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			}
 		} else {
 			// Airborne controls when all wheels are not in contact
-			const vehicle = vehicleRef.current
 			if (vehicle) {
-				const pitch = clamp(
-					(keys.has('ArrowUp') || keys.has('w') || keys.has('W') ? -1 : 0) + (keys.has('ArrowDown') || keys.has('s') || keys.has('S') ? 1 : 0) - input.leftStickY
-				)
-				const roll = clamp(
-					(keys.has('ArrowLeft') || keys.has('a') || keys.has('A') ? -1 : 0) + (keys.has('ArrowRight') || keys.has('d') || keys.has('D') ? 1 : 0) + input.leftStickX
-				)
-				const yaw = clamp(-input.rightStickX)
-
 				// Construct torque vector in world space using reusable objects
-				tempLocalTorque.set(pitch, yaw, roll)
+				tempLocalTorque.set(pitchInput, yawInput, rollInput)
 				tempQuat.copy(vehicle.rotation())
 				tempWorldTorque.copy(tempLocalTorque).applyQuaternion(tempQuat).multiplyScalar(FORCES.airControl)
 
@@ -549,7 +515,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		}
 
 		// Enable physics if not already enabled
-		if (!useGameStore.getState().physicsEnabled && (throttleInput || brakeInput)) {
+		if (!useGameStore.getState().physicsEnabled && (throttleInput > 0 || brakeInput > 0)) {
 			useGameStore.getState().setPhysicsEnabled(true)
 		}
 	})

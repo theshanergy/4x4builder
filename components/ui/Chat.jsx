@@ -29,6 +29,7 @@ const Chat = () => {
 	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
 	const sendChatMessage = useMultiplayerStore((state) => state.sendChatMessage)
 	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
+	const setChatOpen = useMultiplayerStore((state) => state.setChatOpen)
 	const localVehicleColor = useGameStore((state) => state.currentVehicle?.color)
 
 	// Memoize player colors to avoid recalculating when other player data changes
@@ -93,6 +94,7 @@ const Chat = () => {
 				if (e.key === 'Escape') {
 					inputRef.current?.blur()
 					setIsInputFocused(false)
+					setChatOpen(false)
 				}
 				return
 			}
@@ -102,12 +104,13 @@ const Chat = () => {
 				e.preventDefault()
 				inputRef.current?.focus()
 				setIsInputFocused(true)
+				setChatOpen(true)
 			}
 		}
 
 		window.addEventListener('keydown', handleKeyDown)
 		return () => window.removeEventListener('keydown', handleKeyDown)
-	}, [currentRoom])
+	}, [currentRoom, setChatOpen])
 
 	// Handle send message
 	const handleSubmit = useCallback(
@@ -125,11 +128,13 @@ const Chat = () => {
 	// Handle input focus/blur
 	const handleFocus = useCallback(() => {
 		setIsInputFocused(true)
-	}, [])
+		setChatOpen(true)
+	}, [setChatOpen])
 
 	const handleBlur = useCallback(() => {
 		setIsInputFocused(false)
-	}, [])
+		setChatOpen(false)
+	}, [setChatOpen])
 
 	// Scroll to bottom when new messages arrive
 	useEffect(() => {
