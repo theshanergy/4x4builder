@@ -241,6 +241,10 @@ const useMultiplayerStore = create((set, get) => ({
 			.on('onPublicRoomsList', (message) => {
 				set({ publicRooms: message.rooms || [] })
 			})
+			.on('onPublicRoomsUpdate', (message) => {
+				// Auto-update public rooms when server broadcasts changes
+				set({ publicRooms: message.rooms || [] })
+			})
 		
 		set({ networkManager })
 		return networkManager

@@ -45,6 +45,7 @@ export default class NetworkManager {
 			onVehicleConfig: null,
 			onVehicleReset: null,
 			onPublicRoomsList: null,
+			onPublicRoomsUpdate: null,
 		}
 	}
 	
@@ -276,6 +277,10 @@ export default class NetworkManager {
 				
 			case MessageTypes.PUBLIC_ROOMS_LIST:
 				this.callbacks.onPublicRoomsList?.(message)
+				break
+				
+			case MessageTypes.PUBLIC_ROOMS_UPDATE:
+				this.callbacks.onPublicRoomsUpdate?.(message)
 				break
 				
 			default:

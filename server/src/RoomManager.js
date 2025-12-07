@@ -123,12 +123,25 @@ export default class RoomManager {
 	constructor() {
 		this.rooms = new Map() // roomId -> Room
 		this.playerRooms = new Map() // playerId -> roomId
+		this.onPublicRoomsChange = null // Callback for broadcasting public rooms updates
 
 		// Create the persistent PUBLIC room
 		this.createPersistentPublicRoom()
 
 		// Start cleanup interval
 		this.cleanupInterval = setInterval(() => this.cleanup(), 60000) // Every minute
+	}
+	
+	// Set callback for broadcasting public rooms updates
+	setBroadcastCallback(callback) {
+		this.onPublicRoomsChange = callback
+	}
+	
+	// Notify about public rooms change
+	notifyPublicRoomsChange() {
+		if (this.onPublicRoomsChange) {
+			this.onPublicRoomsChange()
+		}
 	}
 
 	// Create the persistent PUBLIC room (no host, always exists)
@@ -171,6 +184,9 @@ export default class RoomManager {
 		this.playerRooms.set(hostPlayer.id, roomId)
 
 		console.log(`Room ${roomId} created by player ${hostPlayer.id}`)
+		
+		// Notify about public rooms change (new room might become public later)
+		this.notifyPublicRoomsChange()
 
 		return room
 	}
@@ -197,6 +213,11 @@ export default class RoomManager {
 		this.playerRooms.set(player.id, roomId)
 
 		console.log(`Player ${player.id} joined room ${roomId}`)
+		
+		// Notify about public rooms change (player count changed)
+		if (room.isPublic) {
+			this.notifyPublicRoomsChange()
+		}
 
 		return room
 	}
@@ -209,6 +230,8 @@ export default class RoomManager {
 		}
 
 		const room = this.rooms.get(roomId)
+		const wasPublic = room?.isPublic
+		
 		if (room) {
 			room.removePlayer(playerId)
 
@@ -221,6 +244,11 @@ export default class RoomManager {
 
 		this.playerRooms.delete(playerId)
 		console.log(`Player ${playerId} left room ${roomId}`)
+		
+		// Notify about public rooms change (room deleted or player count changed)
+		if (wasPublic) {
+			this.notifyPublicRoomsChange()
+		}
 
 		return room
 	}
@@ -254,6 +282,8 @@ export default class RoomManager {
 		expiredRooms.forEach((roomId) => {
 			const room = this.rooms.get(roomId)
 			if (room) {
+				const wasPublic = room.isPublic
+				
 				// Notify players
 				room.broadcastAll({
 					type: 'room_closed',
@@ -268,6 +298,11 @@ export default class RoomManager {
 
 				this.rooms.delete(roomId)
 				console.log(`Room ${roomId} deleted (timeout)`)
+				
+				// Notify about public rooms change
+				if (wasPublic) {
+					this.notifyPublicRoomsChange()
+				}
 			}
 		})
 	}
@@ -329,6 +364,10 @@ export default class RoomManager {
 		}
 
 		room.isPublic = isPublic
+		
+		// Notify about public rooms change
+		this.notifyPublicRoomsChange()
+		
 		return room
 	}
 }

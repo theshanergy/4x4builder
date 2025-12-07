@@ -7,7 +7,6 @@ import PlayerList from './PlayerList'
 import MultiplayerIcon from '../../assets/images/icons/Multiplayer.svg'
 import CopyIcon from '../../assets/images/icons/Copy.svg'
 import CheckIcon from '../../assets/images/icons/Check.svg'
-import RefreshIcon from '../../assets/images/icons/Refresh.svg'
 
 // Multiplayer panel component
 function MultiplayerPanel() {
@@ -31,7 +30,6 @@ function MultiplayerPanel() {
 		clearError,
 		checkServerAvailability,
 		setRoomPublic,
-		fetchPublicRooms,
 	} = useNetworkConnection()
 
 	const [joinRoomId, setJoinRoomId] = useState('')
@@ -222,10 +220,7 @@ function MultiplayerPanel() {
 				<>
 					{/* Public Rooms List */}
 					<div className='field'>
-						<div className='flex items-end justify-between mb-2'>
-							<label>Public Rooms</label>
-							<RefreshIcon className='size-4 mb-2' onClick={fetchPublicRooms} title='Refresh rooms' />
-						</div>
+						<label className='mb-2'>Public Rooms</label>
 						<div className='flex flex-col gap-1 max-h-32 overflow-y-auto'>
 							{publicRooms.length > 0 ? (
 								publicRooms.map((room) => (
