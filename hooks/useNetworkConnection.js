@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import useMultiplayerStore, { getServerUrl } from '../store/multiplayerStore'
 import useGameStore from '../store/gameStore'
 import { ConnectionState } from '../network/NetworkManager'
@@ -13,6 +13,7 @@ export function useNetworkConnection() {
 	const playerName = useMultiplayerStore((state) => state.playerName)
 	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
 	const serverAvailable = useMultiplayerStore((state) => state.serverAvailable)
+	const publicRooms = useMultiplayerStore((state) => state.publicRooms)
 	
 	const connect = useMultiplayerStore((state) => state.connect)
 	const disconnect = useMultiplayerStore((state) => state.disconnect)
@@ -22,6 +23,8 @@ export function useNetworkConnection() {
 	const setPlayerName = useMultiplayerStore((state) => state.setPlayerName)
 	const clearError = useMultiplayerStore((state) => state.clearError)
 	const checkServerAvailability = useMultiplayerStore((state) => state.checkServerAvailability)
+	const setRoomPublic = useMultiplayerStore((state) => state.setRoomPublic)
+	const fetchPublicRooms = useMultiplayerStore((state) => state.fetchPublicRooms)
 	
 	const currentVehicle = useGameStore((state) => state.currentVehicle)
 	
@@ -50,6 +53,13 @@ export function useNetworkConnection() {
 	const isInRoom = currentRoom !== null
 	const remotePlayerCount = Object.keys(remotePlayers).length
 	
+	// Fetch public rooms when server becomes available and not in a room
+	useEffect(() => {
+		if (serverAvailable && !isInRoom) {
+			fetchPublicRooms()
+		}
+	}, [serverAvailable, isInRoom, fetchPublicRooms])
+	
 	return {
 		// State
 		connectionState,
@@ -60,6 +70,7 @@ export function useNetworkConnection() {
 		playerName,
 		remotePlayers,
 		serverAvailable,
+		publicRooms,
 		
 		// Derived state
 		isConnected,
@@ -76,6 +87,8 @@ export function useNetworkConnection() {
 		setPlayerName,
 		clearError,
 		checkServerAvailability,
+		setRoomPublic,
+		fetchPublicRooms,
 	}
 }
 

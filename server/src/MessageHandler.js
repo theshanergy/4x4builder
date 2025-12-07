@@ -35,6 +35,14 @@ export default class MessageHandler {
 				this.handleLeaveRoom(player)
 				break
 				
+			case MessageTypes.SET_ROOM_PUBLIC:
+				this.handleSetRoomPublic(player, message)
+				break
+				
+			case MessageTypes.GET_PUBLIC_ROOMS:
+				this.handleGetPublicRooms(player)
+				break
+				
 			case MessageTypes.PLAYER_UPDATE:
 				this.handlePlayerUpdate(player, message)
 				break
@@ -283,8 +291,36 @@ export default class MessageHandler {
 				return 'You are already in a room. Leave first to join another.'
 			case 'NOT_IN_ROOM':
 				return 'You are not in a room.'
+			case 'NOT_HOST':
+				return 'Only the room host can perform this action.'
 			default:
 				return 'An error occurred. Please try again.'
 		}
+	}
+	
+	// Handle set room public/private
+	handleSetRoomPublic(player, message) {
+		try {
+			const isPublic = Boolean(message.isPublic)
+			const room = this.roomManager.setRoomPublic(player.id, isPublic)
+			
+			// Notify all players in room about the change
+			room.broadcastAll(createMessage(MessageTypes.ROOM_STATE, {
+				roomState: room.getState(),
+			}))
+		} catch (error) {
+			player.send(createMessage(MessageTypes.ERROR, {
+				code: error.message,
+				message: this.getErrorMessage(error.message),
+			}))
+		}
+	}
+	
+	// Handle get public rooms list
+	handleGetPublicRooms(player) {
+		const publicRooms = this.roomManager.getPublicRooms()
+		player.send(createMessage(MessageTypes.PUBLIC_ROOMS_LIST, {
+			rooms: publicRooms,
+		}))
 	}
 }

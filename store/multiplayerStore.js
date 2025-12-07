@@ -32,6 +32,9 @@ const useMultiplayerStore = create((set, get) => ({
 	// Remote players (Map-like object: playerId -> playerState)
 	remotePlayers: {},
 	
+	// Public rooms list
+	publicRooms: [],
+	
 	// Network manager instance
 	networkManager: null,
 	
@@ -235,6 +238,9 @@ const useMultiplayerStore = create((set, get) => ({
 					})
 				}
 			})
+			.on('onPublicRoomsList', (message) => {
+				set({ publicRooms: message.rooms || [] })
+			})
 		
 		set({ networkManager })
 		return networkManager
@@ -329,6 +335,39 @@ const useMultiplayerStore = create((set, get) => ({
 		const networkManager = get().networkManager
 		if (networkManager?.isConnected() && get().currentRoom) {
 			networkManager.sendVehicleConfig(config)
+		}
+	},
+	
+	// Set room public/private (host only)
+	setRoomPublic: (isPublic) => {
+		const networkManager = get().networkManager
+		if (networkManager?.isConnected() && get().currentRoom && get().isHost) {
+			networkManager.setRoomPublic(isPublic)
+		}
+	},
+	
+	// Fetch public rooms list
+	fetchPublicRooms: async () => {
+		const networkManager = get().networkManager
+		if (!networkManager) {
+			// Need to connect first to fetch rooms
+			const serverUrl = getServerUrl()
+			const nm = get().initNetworkManager(serverUrl)
+			try {
+				await nm.connect()
+				nm.getPublicRooms()
+			} catch (error) {
+				set({ connectionError: error.message })
+			}
+		} else if (networkManager.isConnected()) {
+			networkManager.getPublicRooms()
+		} else {
+			try {
+				await networkManager.connect()
+				networkManager.getPublicRooms()
+			} catch (error) {
+				set({ connectionError: error.message })
+			}
 		}
 	},
 	

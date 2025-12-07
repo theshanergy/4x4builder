@@ -44,6 +44,7 @@ export default class NetworkManager {
 			onPlayerUpdate: null,
 			onVehicleConfig: null,
 			onVehicleReset: null,
+			onPublicRoomsList: null,
 		}
 	}
 	
@@ -273,6 +274,10 @@ export default class NetworkManager {
 				this.callbacks.onVehicleReset?.(message)
 				break
 				
+			case MessageTypes.PUBLIC_ROOMS_LIST:
+				this.callbacks.onPublicRoomsList?.(message)
+				break
+				
 			default:
 				console.warn('Unknown message type:', message.type)
 		}
@@ -309,6 +314,14 @@ export default class NetworkManager {
 	
 	sendVehicleReset(position, rotation) {
 		return this.send(createMessage(MessageTypes.VEHICLE_RESET, { position, rotation }))
+	}
+	
+	setRoomPublic(isPublic) {
+		return this.send(createMessage(MessageTypes.SET_ROOM_PUBLIC, { isPublic }))
+	}
+	
+	getPublicRooms() {
+		return this.send(createMessage(MessageTypes.GET_PUBLIC_ROOMS))
 	}
 	
 	// Get current latency

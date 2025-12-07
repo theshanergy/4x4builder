@@ -18,6 +18,7 @@ class Room {
 		this.players = new Map()
 		this.createdAt = Date.now()
 		this.lastActivity = Date.now()
+		this.isPublic = false
 		this.settings = {
 			maxPlayers: settings.maxPlayersPerRoom,
 		}
@@ -90,7 +91,17 @@ class Room {
 			host: this.host,
 			playerCount: this.players.size,
 			maxPlayers: this.settings.maxPlayers,
+			isPublic: this.isPublic,
 			players,
+		}
+	}
+	
+	// Get public room info (less detailed)
+	getPublicInfo() {
+		return {
+			id: this.id,
+			playerCount: this.players.size,
+			maxPlayers: this.settings.maxPlayers,
 		}
 	}
 }
@@ -262,5 +273,36 @@ export default class RoomManager {
 			roomCount: this.rooms.size,
 			playerCount: totalPlayers,
 		}
+	}
+	
+	// Get list of public rooms
+	getPublicRooms() {
+		const publicRooms = []
+		this.rooms.forEach((room) => {
+			if (room.isPublic && !room.isFull()) {
+				publicRooms.push(room.getPublicInfo())
+			}
+		})
+		return publicRooms
+	}
+	
+	// Set room public/private
+	setRoomPublic(playerId, isPublic) {
+		const roomId = this.playerRooms.get(playerId)
+		if (!roomId) {
+			throw new Error('NOT_IN_ROOM')
+		}
+		
+		const room = this.rooms.get(roomId)
+		if (!room) {
+			throw new Error('ROOM_NOT_FOUND')
+		}
+		
+		if (room.host !== playerId) {
+			throw new Error('NOT_HOST')
+		}
+		
+		room.isPublic = isPublic
+		return room
 	}
 }
