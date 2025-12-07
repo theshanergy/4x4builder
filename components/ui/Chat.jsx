@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import useMultiplayerStore from '../../store/multiplayerStore'
 import useGameStore from '../../store/gameStore'
+import ChatIcon from '../../assets/images/icons/Chat.svg'
 
 // How long messages stay visible when chat is not focused
 const MESSAGE_FADE_DELAY = 8000
@@ -19,7 +20,6 @@ ChatMessage.displayName = 'ChatMessage'
 // Main chat component
 const Chat = () => {
 	const [inputValue, setInputValue] = useState('')
-	const [isInputFocused, setIsInputFocused] = useState(false)
 	const [messagesVisible, setMessagesVisible] = useState(false)
 	const inputRef = useRef(null)
 	const messagesEndRef = useRef(null)
@@ -29,6 +29,7 @@ const Chat = () => {
 	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
 	const sendChatMessage = useMultiplayerStore((state) => state.sendChatMessage)
 	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
+	const chatOpen = useMultiplayerStore((state) => state.chatOpen)
 	const setChatOpen = useMultiplayerStore((state) => state.setChatOpen)
 	const localVehicleColor = useGameStore((state) => state.currentVehicle?.color)
 
@@ -74,7 +75,7 @@ const Chat = () => {
 
 	// Handle focus state
 	useEffect(() => {
-		if (isInputFocused) {
+		if (chatOpen) {
 			// Clear fade timer and show messages when focused
 			if (fadeTimerRef.current) {
 				clearTimeout(fadeTimerRef.current)
@@ -84,7 +85,7 @@ const Chat = () => {
 			// Start fade timer when unfocused
 			showMessages()
 		}
-	}, [isInputFocused, showMessages])
+	}, [chatOpen, showMessages])
 
 	// Handle keyboard shortcut (T to open chat, Escape to close)
 	useEffect(() => {
@@ -93,7 +94,6 @@ const Chat = () => {
 			if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
 				if (e.key === 'Escape') {
 					inputRef.current?.blur()
-					setIsInputFocused(false)
 					setChatOpen(false)
 				}
 				return
@@ -103,7 +103,6 @@ const Chat = () => {
 			if ((e.key === 't' || e.key === 'T' || e.key === 'Enter') && currentRoom) {
 				e.preventDefault()
 				inputRef.current?.focus()
-				setIsInputFocused(true)
 				setChatOpen(true)
 			}
 		}
@@ -127,21 +126,19 @@ const Chat = () => {
 
 	// Handle input focus/blur
 	const handleFocus = useCallback(() => {
-		setIsInputFocused(true)
 		setChatOpen(true)
 	}, [setChatOpen])
 
 	const handleBlur = useCallback(() => {
-		setIsInputFocused(false)
 		setChatOpen(false)
 	}, [setChatOpen])
 
 	// Scroll to bottom when new messages arrive
 	useEffect(() => {
-		if (isInputFocused) {
+		if (chatOpen) {
 			messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
 		}
-	}, [chatMessages, isInputFocused])
+	}, [chatMessages, chatOpen])
 
 	// Cleanup timer on unmount
 	useEffect(() => {
@@ -153,18 +150,37 @@ const Chat = () => {
 	}, [])
 
 	// Memoize messages to display (last 8 when not focused, all when focused)
-	const displayMessages = useMemo(() => (isInputFocused ? chatMessages : chatMessages.slice(-8)), [isInputFocused, chatMessages])
+	const displayMessages = useMemo(() => (chatOpen ? chatMessages : chatMessages.slice(-8)), [chatOpen, chatMessages])
 
 	// Memoize opacity value to pass as primitive instead of inline style object
-	const messageOpacity = isInputFocused || messagesVisible ? 1 : 0
+	const messageOpacity = chatOpen || messagesVisible ? 1 : 0
 
 	// Don't render if not in a room
 	if (!currentRoom) return null
 
 	return (
-		<div className='fixed top-16 right-4 z-40 w-80 pointer-events-none select-none'>
+		<div className='fixed top-18 right-4 z-40 w-100'>
+			{/* Chat toggle button */}
+			<div
+				className='flex items-center gap-2 text-white/50 text-sm drop-shadow-sm cursor-pointer hover:text-white transition-colors justify-end mb-2'
+				onMouseDown={(e) => {
+					e.preventDefault()
+				}}
+				onClick={() => {
+					if (chatOpen) {
+						inputRef.current?.blur()
+						setChatOpen(false)
+					} else {
+						inputRef.current?.focus()
+						setChatOpen(true)
+					}
+				}}>
+				<ChatIcon className='size-5 max-lg:size-7' />
+				<span className='max-lg:hidden'>{chatOpen ? 'Close chat' : 'Press T to chat'}</span>
+			</div>
+
 			{/* Messages container */}
-			<div className={`flex flex-col gap-1 mb-2 max-h-64 overflow-hidden ${isInputFocused ? 'overflow-y-auto scrollbar-none' : ''}`}>
+			<div className={`flex flex-col gap-1 mb-2 max-h-64 overflow-hidden ${chatOpen ? 'overflow-y-auto scrollbar-none' : ''}`}>
 				{displayMessages.map((message) => (
 					<ChatMessage key={message.id} message={message} opacity={messageOpacity} playerColor={getPlayerColor(message.playerId, message.isLocal)} />
 				))}
@@ -173,8 +189,7 @@ const Chat = () => {
 
 			{/* Input field */}
 			<form onSubmit={handleSubmit} className='pointer-events-auto'>
-				<div className={`flex items-center transition-all duration-200 ${isInputFocused ? 'bg-black/50 backdrop-blur-sm rounded' : 'bg-transparent'}`}>
-					{isInputFocused && <span className='text-white/50 text-sm px-4'>Say:</span>}
+				<div className={`transition-opacity duration-200 ${chatOpen ? 'opacity-100' : 'opacity-0'}`}>
 					<input
 						ref={inputRef}
 						type='text'
@@ -182,22 +197,12 @@ const Chat = () => {
 						onChange={(e) => setInputValue(e.target.value)}
 						onFocus={handleFocus}
 						onBlur={handleBlur}
-						placeholder={isInputFocused ? 'Type a message...' : ''}
+						placeholder='Type a message...'
 						maxLength={200}
-						className={`flex-1 bg-transparent border-none shadow-none outline-none text-white text-sm p-2 placeholder:text-white/40 ${
-							isInputFocused ? '' : 'cursor-default caret-transparent'
-						}`}
-						style={{
-							opacity: isInputFocused ? 1 : 0,
-							width: isInputFocused ? '100%' : 0,
-							padding: isInputFocused ? undefined : 0,
-						}}
+						className='w-full bg-black/50 backdrop-blur-sm border-none text-white text-sm placeholder:text-white/40'
 					/>
 				</div>
 			</form>
-
-			{/* Hint when not focused and no recent messages */}
-			{!isInputFocused && displayMessages.length === 0 && <div className='text-white/30 text-xs drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'>Press T to chat</div>}
 		</div>
 	)
 }
