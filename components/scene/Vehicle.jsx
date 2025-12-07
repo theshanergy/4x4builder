@@ -288,6 +288,11 @@ const Vehicle = (props) => {
 		// Update vehicle position for camera and other systems
 		vehicleState.position.copy(tempWorldPos)
 
+		// Calculate heading (yaw) from quaternion for minimap
+		const sinYaw = 2 * (tempQuat.w * tempQuat.y + tempQuat.x * tempQuat.z)
+		const cosYaw = 1 - 2 * (tempQuat.y * tempQuat.y + tempQuat.x * tempQuat.x)
+		vehicleState.heading = Math.atan2(sinYaw, cosYaw)
+
 		// Update XR origin to follow vehicle when inside
 		if (insideVehicle && xrOriginRef?.current) {
 			// Calculate seat world position (offset is relative to body, add vehicleHeight)
