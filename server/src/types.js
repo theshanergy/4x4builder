@@ -50,7 +50,6 @@ export const ErrorCodes = {
 export function createMessage(type, payload = {}) {
 	return {
 		type,
-		timestamp: Date.now(),
 		...payload,
 	}
 }

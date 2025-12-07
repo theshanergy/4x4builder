@@ -307,6 +307,7 @@ export default class MessageHandler {
 			playerId: player.id,
 			playerName: player.name,
 			text: text.trim(),
+			timestamp: Date.now(),
 		}))
 	}
 	
