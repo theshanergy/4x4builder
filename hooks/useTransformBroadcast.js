@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import useMultiplayerStore from '../store/multiplayerStore'
 import useGameStore from '../store/gameStore'
@@ -11,6 +11,11 @@ const MIN_VELOCITY_THRESHOLD = 0.01
 
 // Position delta threshold to force broadcast even if velocity is low
 const POSITION_DELTA_THRESHOLD = 0.01
+
+// Precision helpers - reduces message size significantly
+const round1 = (v) => Math.round(v * 10) / 10
+const round2 = (v) => Math.round(v * 100) / 100
+const round3 = (v) => Math.round(v * 1000) / 1000
 
 /**
  * Hook to broadcast local player's vehicle transform to the server
@@ -88,16 +93,17 @@ export function useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, ve
 		const engineRpm = engineRef?.rpm || 850
 		
 		// Send transform update to server
+		// Values are rounded to reduce message size while maintaining visual fidelity
 		sendPlayerUpdate({
-			timestamp: now,
-			position: [position.x, position.y, position.z],
-			rotation: [rotation.x, rotation.y, rotation.z, rotation.w],
-			velocity: [velocity.x, velocity.y, velocity.z],
-			angularVelocity: [angularVelocity.x, angularVelocity.y, angularVelocity.z],
-			wheelRotations,
-			wheelYPositions,
-			steering,
-			engineRpm,
+			timestamp: Math.round(now),
+			position: [round2(position.x), round2(position.y), round2(position.z)],
+			rotation: [round3(rotation.x), round3(rotation.y), round3(rotation.z), round3(rotation.w)],
+			velocity: [round1(velocity.x), round1(velocity.y), round1(velocity.z)],
+			angularVelocity: [round1(angularVelocity.x), round1(angularVelocity.y), round1(angularVelocity.z)],
+			wheelRotations: wheelRotations.map(round3),
+			wheelYPositions: wheelYPositions.map(round2),
+			steering: round2(steering),
+			engineRpm: Math.round(engineRpm),
 		})
 	})
 }
