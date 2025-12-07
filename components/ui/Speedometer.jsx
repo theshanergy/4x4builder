@@ -27,18 +27,21 @@ const TICKS = (() => {
 // Memoized tick marks component - never re-renders
 const TickMarks = memo(() => (
 	<>
-		{TICKS.map(({ angle, value, isMajor }, index) => (
-			<div key={index} className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 origin-center' style={{ transform: `rotate(${angle}deg)` }}>
-				<div className={`absolute rounded-sm ${isMajor ? 'w-0.5 h-3 bg-white/60' : 'w-px h-1.5 bg-white/30'}`} style={{ top: '-84px', left: '-50%' }} />
-				{isMajor && (
-					<div
-						className='absolute -top-16 -left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-white/80 font-mono text-center'
-						style={{ transform: `rotate(${-angle}deg)` }}>
-						{value}
-					</div>
-				)}
-			</div>
-		))}
+		{TICKS.map(({ angle, value, isMajor }, index) => {
+			if (!isMajor && index > 35) return null
+			return (
+				<div key={index} className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 origin-center' style={{ transform: `rotate(${angle}deg)` }}>
+					<div className={`absolute rounded-sm ${isMajor ? 'w-0.5 h-3 bg-white/60' : 'w-px h-1.5 bg-white/30'}`} style={{ top: '-84px', left: '-50%' }} />
+					{isMajor && (
+						<div
+							className='absolute -top-16 -left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-white/80 font-mono text-center'
+							style={{ transform: `rotate(${-angle}deg)` }}>
+							{value}
+						</div>
+					)}
+				</div>
+			)
+		})}
 	</>
 ))
 TickMarks.displayName = 'TickMarks'
@@ -54,6 +57,12 @@ const Speedometer = memo(() => {
 	const lastUpdateRef = useRef(0)
 	const arrowContainerRef = useRef(null)
 	const arrowsRef = useRef(new Map())
+
+	// Refs for smooth interpolation
+	const targetRpmRef = useRef(850)
+	const currentRpmRef = useRef(850)
+	const needleRef = useRef(null)
+	const arcRef = useRef(null)
 
 	// Update player direction arrows via direct DOM manipulation
 	const updateArrows = useCallback(() => {
@@ -140,21 +149,44 @@ const Speedometer = memo(() => {
 		if (isMobile || !physicsEnabled) return
 
 		const update = (timestamp) => {
-			// Throttle updates to ~10fps (every 100ms)
+			// Sample physics values at ~10fps for state updates (speed, gear)
 			if (timestamp - lastUpdateRef.current >= 100) {
 				const speedKmh = Math.round(Math.abs(vehicleState.speed * 3.6))
-				const rpm = Math.round(vehicleState.rpm)
 				const gear = vehicleState.gear
 
 				setDisplaySpeed((prev) => (prev !== speedKmh ? speedKmh : prev))
-				setDisplayRpm((prev) => (prev !== rpm ? rpm : prev))
 				setDisplayGear((prev) => (prev !== gear ? gear : prev))
+
+				// Update target RPM for interpolation
+				targetRpmRef.current = vehicleState.rpm
 
 				// Update player arrows
 				updateArrows()
 
 				lastUpdateRef.current = timestamp
 			}
+
+			// Interpolate RPM smoothly every frame for needle/arc
+			const lerpFactor = 0.15 // Adjust for responsiveness vs smoothness
+			currentRpmRef.current += (targetRpmRef.current - currentRpmRef.current) * lerpFactor
+
+			// Update needle and arc directly via refs (avoids React re-renders)
+			const maxRpm = 10000
+			const normalizedRpm = Math.min(currentRpmRef.current / maxRpm, 1)
+			const needleRotation = -135 + normalizedRpm * 270
+			const clampedRpmRatio = Math.min(normalizedRpm, 0.7)
+
+			if (needleRef.current) {
+				needleRef.current.style.transform = `translate(-50%, -50%) rotate(${needleRotation}deg)`
+			}
+			if (arcRef.current) {
+				arcRef.current.setAttribute('stroke-dasharray', `${clampedRpmRatio * 198} 264`)
+			}
+
+			// Update display RPM less frequently for gear indicator redline check
+			const roundedRpm = Math.round(currentRpmRef.current)
+			setDisplayRpm((prev) => (Math.abs(prev - roundedRpm) > 50 ? roundedRpm : prev))
+
 			rafRef.current = requestAnimationFrame(update)
 		}
 
@@ -170,19 +202,9 @@ const Speedometer = memo(() => {
 	// Don't render on mobile or when physics are disabled
 	if (isMobile || !physicsEnabled) return null
 
-	// RPM calculations (matching TRANSMISSION constants from useVehiclePhysics)
-	const maxRpm = 10000 // Max RPM on dial (10k)
-
-	// Calculate needle rotation based on RPM (-135deg at 0, +135deg at max)
-	const normalizedRpm = Math.min(displayRpm / maxRpm, 1)
-	const needleRotation = -135 + normalizedRpm * 270
-
 	// Redline threshold (engine max RPM is 6200)
 	const engineMaxRpm = 6200
 	const isRedline = displayRpm > engineMaxRpm * 0.9 // Above 90% of engine max RPM
-
-	// Memoize RPM arc stroke color to avoid recalculating on every render
-	const rpmStrokeColor = normalizedRpm > 0.9 ? '#ef4444' : normalizedRpm > 0.8 ? '#f97316' : '#22c55e'
 
 	return (
 		<div className='absolute bottom-22 right-8 z-30 select-none pointer-events-none'>
@@ -209,18 +231,32 @@ const Speedometer = memo(() => {
 						transform='rotate(135 50 50)'
 					/>
 
-					{/* RPM arc - color based on current RPM level */}
+					{/* Redline arcs (7k-10k) */}
 					<circle
 						cx='50'
 						cy='50'
 						r='42'
 						fill='none'
-						stroke={rpmStrokeColor}
-						strokeWidth='4'
-						strokeDasharray={`${normalizedRpm * 198} 264`}
+						stroke='#ef4444'
+						strokeWidth='6'
+						strokeDasharray='0 138.6 19.2 0.6 19.2 0.6 19.8 264'
 						strokeDashoffset='0'
 						transform='rotate(135 50 50)'
-						className='transition-[stroke] duration-150'
+						className='opacity-80'
+					/>
+
+					{/* RPM arc - clamped to redline */}
+					<circle
+						ref={arcRef}
+						cx='50'
+						cy='50'
+						r='42'
+						fill='none'
+						stroke='#22c55e'
+						strokeWidth='4'
+						strokeDasharray='0 264'
+						strokeDashoffset='0'
+						transform='rotate(135 50 50)'
 					/>
 				</svg>
 
@@ -229,9 +265,10 @@ const Speedometer = memo(() => {
 
 				{/* Needle */}
 				<div
-					className='absolute left-1/2 top-1/2 origin-center transition-transform duration-100'
+					ref={needleRef}
+					className='absolute left-1/2 top-1/2 origin-center'
 					style={{
-						transform: `translate(-50%, -50%) rotate(${needleRotation}deg)`,
+						transform: 'translate(-50%, -50%) rotate(-135deg)',
 						filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.5))',
 					}}>
 					<svg width='20' height='120' viewBox='0 0 20 120' style={{ transform: 'translateY(-45px)' }}>
