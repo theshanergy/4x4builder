@@ -34,6 +34,10 @@ const useMultiplayerStore = create((set, get) => ({
 	// Public rooms list
 	publicRooms: [],
 	
+	// Chat state
+	chatMessages: [],
+	chatOpen: false,
+	
 	// Network manager instance
 	networkManager: null,
 	
@@ -131,6 +135,8 @@ const useMultiplayerStore = create((set, get) => ({
 					currentRoom: null,
 					isHost: false,
 					remotePlayers: {},
+					chatMessages: [],
+					chatOpen: false,
 				})
 			})
 			.on('onRoomState', (message) => {
@@ -145,6 +151,8 @@ const useMultiplayerStore = create((set, get) => ({
 					currentRoom: null,
 					isHost: false,
 					remotePlayers: {},
+					chatMessages: [],
+					chatOpen: false,
 					connectionError: message.reason,
 				})
 			})
@@ -258,6 +266,22 @@ const useMultiplayerStore = create((set, get) => ({
 			.on('onPublicRoomsUpdate', (message) => {
 				// Auto-update public rooms when server broadcasts changes
 				set({ publicRooms: message.rooms || [] })
+			})
+			.on('onChatMessage', (message) => {
+				const { playerId, playerName, text, timestamp } = message
+				set((state) => ({
+					chatMessages: [
+						...state.chatMessages.slice(-49), // Keep last 50 messages
+						{
+							id: `${playerId}-${timestamp}`,
+							playerId,
+							playerName,
+							text,
+							timestamp,
+							isLocal: playerId === get().localPlayerId,
+						},
+					],
+				}))
 			})
 		
 		set({ networkManager })
@@ -406,6 +430,18 @@ const useMultiplayerStore = create((set, get) => ({
 	
 	// Clear error
 	clearError: () => set({ connectionError: null }),
+	
+	// Chat methods
+	sendChatMessage: (text) => {
+		const networkManager = get().networkManager
+		if (networkManager?.isConnected() && get().currentRoom && text.trim()) {
+			networkManager.sendChatMessage(text.trim())
+		}
+	},
+	
+	setChatOpen: (open) => set({ chatOpen: open }),
+	
+	clearChat: () => set({ chatMessages: [] }),
 	
 	// Get remote player count
 	getRemotePlayerCount: () => Object.keys(get().remotePlayers).length,

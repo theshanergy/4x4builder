@@ -9,6 +9,7 @@ import Actions from './ui/Actions'
 import Speedometer from './ui/Speedometer'
 import Notification from './ui/Notification'
 import ControlsOverlay from './ui/ControlsOverlay'
+import Chat from './ui/Chat'
 
 export default function App() {
     // Get vehicle state from game store
@@ -28,6 +29,7 @@ export default function App() {
             <Actions />
             <ControlsOverlay />
             <Notification />
+            <Chat />
         </div>
     )
 }

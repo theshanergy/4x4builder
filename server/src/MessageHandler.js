@@ -59,6 +59,10 @@ export default class MessageHandler {
 				this.handlePlayerNameUpdate(player, message)
 				break
 				
+			case MessageTypes.CHAT_MESSAGE:
+				this.handleChatMessage(player, message)
+				break
+				
 			default:
 				player.send(createMessage(MessageTypes.ERROR, {
 					code: ErrorCodes.INVALID_MESSAGE,
@@ -281,6 +285,28 @@ export default class MessageHandler {
 		room.broadcastAll(createMessage(MessageTypes.PLAYER_NAME_UPDATE, {
 			playerId: player.id,
 			name: player.name,
+		}))
+	}
+	
+	// Handle chat message
+	handleChatMessage(player, message) {
+		const room = this.roomManager.getRoomForPlayer(player.id)
+		
+		if (!room) {
+			return
+		}
+		
+		// Validate chat message
+		const text = message.text
+		if (typeof text !== 'string' || text.trim().length === 0 || text.length > 200) {
+			return // Silently ignore invalid messages
+		}
+		
+		// Broadcast to all players in the room (including sender for confirmation)
+		room.broadcastAll(createMessage(MessageTypes.CHAT_MESSAGE, {
+			playerId: player.id,
+			playerName: player.name,
+			text: text.trim(),
 		}))
 	}
 	

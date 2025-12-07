@@ -30,6 +30,9 @@ export const MessageTypes = {
 	// Vehicle configuration
 	VEHICLE_CONFIG: 'vehicle_config',
 	VEHICLE_RESET: 'vehicle_reset',
+	
+	// Chat
+	CHAT_MESSAGE: 'chat_message',
 }
 
 // Error codes

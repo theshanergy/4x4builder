@@ -47,6 +47,7 @@ export default class NetworkManager {
 			onVehicleReset: null,
 			onPublicRoomsList: null,
 			onPublicRoomsUpdate: null,
+			onChatMessage: null,
 		}
 	}
 	
@@ -288,6 +289,10 @@ export default class NetworkManager {
 				this.callbacks.onPublicRoomsUpdate?.(message)
 				break
 				
+			case MessageTypes.CHAT_MESSAGE:
+				this.callbacks.onChatMessage?.(message)
+				break
+				
 			default:
 				console.warn('Unknown message type:', message.type)
 		}
@@ -336,6 +341,10 @@ export default class NetworkManager {
 	
 	getPublicRooms() {
 		return this.send(createMessage(MessageTypes.GET_PUBLIC_ROOMS))
+	}
+	
+	sendChatMessage(text) {
+		return this.send(createMessage(MessageTypes.CHAT_MESSAGE, { text }))
 	}
 	
 	// Get current latency
