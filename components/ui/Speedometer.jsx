@@ -66,27 +66,27 @@ const Speedometer = memo(() => {
 
 		for (const id in remotePlayers) {
 			const player = remotePlayers[id]
-			if (!player.transform?.position) continue
+
+			// Position can be at player.position (from updates) or player.transform.position (initial)
+			const pos = player.position || player.transform?.position
+			if (!pos) continue
 
 			activeIds.add(id)
-			const pos = player.transform.position
 
-			// Calculate relative position
-			const relX = pos[0] - localPos.x
-			const relZ = pos[2] - localPos.z
+			// Calculate relative position in world space (X = right, Z = forward in Three.js)
+			const dx = pos[0] - localPos.x
+			const dz = pos[2] - localPos.z
 
 			// Calculate distance
-			const distance = Math.sqrt(relX * relX + relZ * relZ)
+			const distance = Math.sqrt(dx * dx + dz * dz)
 
-			// Rotate relative position by heading (same as MiniMap)
-			const cosH = Math.cos(heading)
-			const sinH = Math.sin(heading)
-			const rotatedX = -(relX * cosH - relZ * sinH)
-			const rotatedZ = -(relX * sinH + relZ * cosH)
+			// Get world-space angle to the remote player
+			// atan2(dx, dz) gives angle where 0 = +Z direction, positive = clockwise when viewed from above
+			const worldAngle = Math.atan2(dx, dz)
 
-			// Calculate angle from rotated position (rotatedZ is forward, rotatedX is right)
-			// atan2(x, -z) gives angle where 0 = up on screen (forward)
-			const relativeAngle = Math.atan2(rotatedX, -rotatedZ)
+			// Subtract our heading to get the relative angle
+			// Negate to match screen coordinates (positive = right on screen)
+			const relativeAngle = -(worldAngle - heading)
 
 			// Calculate opacity and scale based on distance
 			const distanceFactor = Math.max(0, Math.min(1, (MAX_ARROW_DISTANCE - distance) / (MAX_ARROW_DISTANCE - MIN_ARROW_DISTANCE)))
@@ -111,11 +111,13 @@ const Speedometer = memo(() => {
 			const centerY = 112
 
 			// Calculate arrow position on the circle
+			// relativeAngle: 0 = forward (top of gauge), positive = clockwise
 			const arrowX = centerX + Math.sin(relativeAngle) * radius
 			const arrowY = centerY - Math.cos(relativeAngle) * radius
 
-			// Arrow should point toward the player (inward toward center, rotated to show direction)
-			const arrowRotation = (relativeAngle * 180) / Math.PI + 180
+			// Arrow SVG points UP by default. Rotate it to point outward from center
+			// (indicating the direction where the remote player is located)
+			const arrowRotation = (relativeAngle * 180) / Math.PI
 
 			arrow.style.left = `${arrowX}px`
 			arrow.style.top = `${arrowY}px`
