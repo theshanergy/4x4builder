@@ -3,7 +3,7 @@ import { Perf } from 'r3f-perf'
 /**
  * Performance Monitor - DEV ONLY
  * Shows FPS, memory, draw calls, triangles, and other Three.js stats.
- * 
+ *
  * To enable: set showPerfMonitor to true below
  * This component is completely excluded from production builds.
  */
@@ -14,15 +14,7 @@ const showPerfMonitor = true
 const PerformanceMonitor = () => {
 	if (!showPerfMonitor) return null
 
-	return (
-		<Perf
-			position='top-right'
-			showGraph={true}
-			matrixUpdate={false}
-			deepAnalyze={false}
-			style={{ top: '60px' }}
-		/>
-	)
+	return <Perf position='top-right' minimal={false} showGraph={false} matrixUpdate={false} deepAnalyze={false} style={{ right: '180px' }} />
 }
 
 export default PerformanceMonitor
