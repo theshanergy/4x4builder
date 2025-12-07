@@ -59,29 +59,24 @@ function MultiplayerPanel() {
 		[playerName, setPlayerName]
 	)
 
-	// Handle create room
-	const handleCreateRoom = useCallback(async () => {
-		if (!isConnected) {
-			const connected = await connect()
-			if (!connected) return
-		}
-		await createRoom()
-	}, [isConnected, connect, createRoom])
-
 	// Handle join room
 	const handleJoinRoom = useCallback(
 		async (roomIdOverride) => {
 			const roomIdToJoin = roomIdOverride || joinRoomId.trim()
-			if (!roomIdToJoin) return
 
 			if (!isConnected) {
 				const connected = await connect()
 				if (!connected) return
 			}
-			await joinRoom(roomIdToJoin)
-			setJoinRoomId('')
+
+			if (roomIdToJoin) {
+				await joinRoom(roomIdToJoin)
+				setJoinRoomId('')
+			} else {
+				await createRoom()
+			}
 		},
-		[isConnected, connect, joinRoom, joinRoomId]
+		[isConnected, connect, joinRoom, createRoom, joinRoomId]
 	)
 
 	// Handle leave room
@@ -251,37 +246,26 @@ function MultiplayerPanel() {
 						</div>
 					</div>
 
-					{/* Join Room */}
+					{/* Join or Create Room */}
 					<div className='field'>
-						<label>Join With Code</label>
+						<label>Join or Create Room</label>
 						<div className='flex gap-2 items-center'>
 							<input
 								type='text'
 								value={joinRoomId}
 								onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
 								onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
-								placeholder='Room code'
+								placeholder='ROOM ID'
 								maxLength={8}
 								className='w-full'
 							/>
 							<button
-								onClick={handleJoinRoom}
-								disabled={!joinRoomId.trim() || isConnecting || serverAvailable === null}
-								className={classNames('small', { 'opacity-50 cursor-not-allowed': !joinRoomId.trim() || isConnecting || serverAvailable === null })}>
-								Join
+								onClick={() => handleJoinRoom()}
+								disabled={isConnecting || serverAvailable === null}
+								className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting || serverAvailable === null })}>
+								{isConnecting ? 'Connecting...' : joinRoomId.trim() ? 'Join' : 'Create'}
 							</button>
 						</div>
-					</div>
-
-					{/* Create Room */}
-					<div className='field'>
-						<label>Or Create New Room</label>
-						<button
-							onClick={handleCreateRoom}
-							disabled={isConnecting || serverAvailable === null}
-							className={classNames('w-full justify-center', { 'opacity-50 cursor-not-allowed': isConnecting || serverAvailable === null })}>
-							{isConnecting ? 'Connecting...' : 'Create Room'}
-						</button>
 					</div>
 				</>
 			)}
