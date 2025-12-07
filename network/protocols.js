@@ -25,6 +25,7 @@ export const MessageTypes = {
 	PLAYER_JOINED: 'player_joined',
 	PLAYER_LEFT: 'player_left',
 	PLAYER_UPDATE: 'player_update',
+	PLAYER_NAME_UPDATE: 'player_name_update',
 	
 	// Vehicle configuration
 	VEHICLE_CONFIG: 'vehicle_config',

@@ -216,6 +216,24 @@ const useMultiplayerStore = create((set, get) => ({
 					})
 				}
 			})
+			.on('onPlayerNameUpdate', (message) => {
+				const { playerId, name } = message
+				if (playerId !== get().localPlayerId) {
+					set((state) => {
+						const existing = state.remotePlayers[playerId]
+						if (!existing) return state
+						return {
+							remotePlayers: {
+								...state.remotePlayers,
+								[playerId]: {
+									...existing,
+									name,
+								},
+							},
+						}
+					})
+				}
+			})
 			.on('onVehicleReset', (message) => {
 				const { playerId, position, rotation } = message
 				if (playerId !== get().localPlayerId) {
@@ -381,6 +399,12 @@ const useMultiplayerStore = create((set, get) => ({
 			const trimmedName = name.trim().slice(0, 20)
 			localStorage.setItem('playerName', trimmedName)
 			set({ playerName: trimmedName })
+			
+			// Send name update to server if in a room
+			const networkManager = get().networkManager
+			if (networkManager?.isConnected() && get().currentRoom) {
+				networkManager.sendPlayerNameUpdate(trimmedName)
+			}
 		}
 	},
 	

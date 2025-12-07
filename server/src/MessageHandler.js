@@ -55,6 +55,10 @@ export default class MessageHandler {
 				this.handleVehicleReset(player, message)
 				break
 				
+			case MessageTypes.PLAYER_NAME_UPDATE:
+				this.handlePlayerNameUpdate(player, message)
+				break
+				
 			default:
 				player.send(createMessage(MessageTypes.ERROR, {
 					code: ErrorCodes.INVALID_MESSAGE,
@@ -255,6 +259,29 @@ export default class MessageHandler {
 			position: message.position,
 			rotation: message.rotation,
 		}), player.id)
+	}
+	
+	// Handle player name update
+	handlePlayerNameUpdate(player, message) {
+		const room = this.roomManager.getRoomForPlayer(player.id)
+		
+		if (!room) {
+			return
+		}
+		
+		// Validate and set the new name
+		const newName = message.name
+		if (typeof newName !== 'string' || newName.trim().length === 0 || newName.length > 20) {
+			return // Silently ignore invalid names
+		}
+		
+		player.setName(newName)
+		
+		// Broadcast to all players including the sender (to confirm the update)
+		room.broadcastAll(createMessage(MessageTypes.PLAYER_NAME_UPDATE, {
+			playerId: player.id,
+			name: player.name,
+		}))
 	}
 	
 	// Handle player disconnection

@@ -42,6 +42,7 @@ export default class NetworkManager {
 			onPlayerJoined: null,
 			onPlayerLeft: null,
 			onPlayerUpdate: null,
+			onPlayerNameUpdate: null,
 			onVehicleConfig: null,
 			onVehicleReset: null,
 			onPublicRoomsList: null,
@@ -267,6 +268,10 @@ export default class NetworkManager {
 				this.callbacks.onPlayerUpdate?.(message)
 				break
 				
+			case MessageTypes.PLAYER_NAME_UPDATE:
+				this.callbacks.onPlayerNameUpdate?.(message)
+				break
+				
 			case MessageTypes.VEHICLE_CONFIG:
 				this.callbacks.onVehicleConfig?.(message)
 				break
@@ -311,6 +316,10 @@ export default class NetworkManager {
 	// Player update actions
 	sendPlayerUpdate(transform) {
 		return this.send(createMessage(MessageTypes.PLAYER_UPDATE, transform))
+	}
+	
+	sendPlayerNameUpdate(name) {
+		return this.send(createMessage(MessageTypes.PLAYER_NAME_UPDATE, { name }))
 	}
 	
 	sendVehicleConfig(config) {
