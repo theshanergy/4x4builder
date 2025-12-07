@@ -158,8 +158,8 @@ export default class Validator {
 	// Validate room code format
 	static isValidRoomCode(code) {
 		if (typeof code !== 'string') return false
-		// Room codes are alphanumeric, uppercase, 8 characters
-		return /^[A-Z0-9]{8}$/.test(code)
+		// Allow alphanumeric codes between 1-32 characters
+		return code.length >= 1 && code.length <= 32 && /^[A-Z0-9]+$/i.test(code)
 	}
 	
 	// Validate player name

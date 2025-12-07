@@ -101,7 +101,7 @@ export default class MessageHandler {
 			const roomId = message.roomId?.toUpperCase()
 			
 			if (!Validator.isValidRoomCode(roomId)) {
-				throw new Error('ROOM_NOT_FOUND')
+				throw new Error('INVALID_ROOM_CODE')
 			}
 			
 			// Set player name if provided
@@ -117,19 +117,32 @@ export default class MessageHandler {
 				}
 			}
 			
+			// Check if this is a new room (will be created)
+			const existingRoom = this.roomManager.getRoom(roomId)
+			const isNewRoom = !existingRoom
+			
 			const room = this.roomManager.joinRoom(roomId, player)
 			
-			// Notify existing players
-			room.broadcast(createMessage(MessageTypes.PLAYER_JOINED, {
-				player: player.getPublicData(),
-			}), player.id)
-			
-			// Send room state to joining player
-			player.send(createMessage(MessageTypes.ROOM_JOINED, {
-				roomId: room.id,
-				isHost: room.host === player.id,
-				roomState: room.getState(),
-			}))
+			if (isNewRoom) {
+				// Room was created, send ROOM_CREATED message
+				player.send(createMessage(MessageTypes.ROOM_CREATED, {
+					roomId: room.id,
+					isHost: true,
+					roomState: room.getState(),
+				}))
+			} else {
+				// Notify existing players
+				room.broadcast(createMessage(MessageTypes.PLAYER_JOINED, {
+					player: player.getPublicData(),
+				}), player.id)
+				
+				// Send room state to joining player
+				player.send(createMessage(MessageTypes.ROOM_JOINED, {
+					roomId: room.id,
+					isHost: room.host === player.id,
+					roomState: room.getState(),
+				}))
+			}
 		} catch (error) {
 			player.send(createMessage(MessageTypes.ERROR, {
 				code: error.message,
@@ -260,6 +273,8 @@ export default class MessageHandler {
 	// Get user-friendly error message
 	getErrorMessage(code) {
 		switch (code) {
+			case 'INVALID_ROOM_CODE':
+				return 'Invalid room code. Please enter a valid code.'
 			case 'ROOM_NOT_FOUND':
 				return 'Room not found. Check the room code and try again.'
 			case 'ROOM_FULL':

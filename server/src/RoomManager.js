@@ -105,23 +105,29 @@ export default class RoomManager {
 		this.cleanupInterval = setInterval(() => this.cleanup(), 60000) // Every minute
 	}
 	
-	// Create a new room
-	createRoom(hostPlayer) {
+	// Create a new room (optionally with a specific ID)
+	createRoom(hostPlayer, roomId = null) {
 		// Check if player is already in a room
 		if (this.playerRooms.has(hostPlayer.id)) {
 			throw new Error('ALREADY_IN_ROOM')
 		}
 		
-		// Generate unique room code
-		let roomId
-		let attempts = 0
-		do {
-			roomId = generateRoomCode()
-			attempts++
-			if (attempts > 100) {
-				throw new Error('Failed to generate room code')
+		if (roomId) {
+			// Check if specified room already exists
+			if (this.rooms.has(roomId)) {
+				throw new Error('ROOM_EXISTS')
 			}
-		} while (this.rooms.has(roomId))
+		} else {
+			// Generate unique room code
+			let attempts = 0
+			do {
+				roomId = generateRoomCode()
+				attempts++
+				if (attempts > 100) {
+					throw new Error('Failed to generate room code')
+				}
+			} while (this.rooms.has(roomId))
+		}
 		
 		// Create room
 		const room = new Room(roomId, hostPlayer.id)
@@ -135,17 +141,18 @@ export default class RoomManager {
 		return room
 	}
 	
-	// Join an existing room
+	// Join an existing room, or create it if it doesn't exist
 	joinRoom(roomId, player) {
 		// Check if player is already in a room
 		if (this.playerRooms.has(player.id)) {
 			throw new Error('ALREADY_IN_ROOM')
 		}
 		
-		const room = this.rooms.get(roomId)
+		let room = this.rooms.get(roomId)
 		
+		// If room doesn't exist, create it with this player as host
 		if (!room) {
-			throw new Error('ROOM_NOT_FOUND')
+			return this.createRoom(player, roomId)
 		}
 		
 		if (room.isFull()) {
