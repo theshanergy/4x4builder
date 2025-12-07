@@ -9,15 +9,17 @@ const MIN_ARROW_DISTANCE = 20 // Distance at which arrows are at full size/opaci
 // Pre-created arrow SVG to avoid innerHTML parsing in animation loop
 const ARROW_SVG = `<svg viewBox="0 0 10 10" fill="currentColor" style="width:100%;height:100%;filter:drop-shadow(0 0 2px rgba(0,0,0,0.5))"><polygon points="5,0 10,10 0,10"/></svg>`
 
-// Pre-computed tick marks data
+// Pre-computed tick marks data for RPM gauge (0-10k RPM)
 const TICKS = (() => {
 	const result = []
-	const maxSpeed = 200
-	const step = 20
-	for (let i = 0; i <= maxSpeed; i += step) {
-		const isMajor = i % 40 === 0
-		const angle = -135 + (i / maxSpeed) * 270
-		result.push({ angle, value: i, isMajor })
+	const majorTicks = 11 // 0 through 10 (representing 0-10k RPM)
+	const minorTicksBetween = 4 // 4 minor ticks between each major tick
+	const totalSegments = (majorTicks - 1) * (minorTicksBetween + 1) // 50 total segments
+	for (let i = 0; i <= totalSegments; i++) {
+		const isMajor = i % (minorTicksBetween + 1) === 0
+		const angle = -135 + (i / totalSegments) * 270
+		const value = isMajor ? i / (minorTicksBetween + 1) : null // Major tick values: 0, 1, 2, ... 10
+		result.push({ angle, value, isMajor })
 	}
 	return result
 })()
@@ -27,10 +29,10 @@ const TickMarks = memo(() => (
 	<>
 		{TICKS.map(({ angle, value, isMajor }, index) => (
 			<div key={index} className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 origin-center' style={{ transform: `rotate(${angle}deg)` }}>
-				<div className={`absolute bg-white/60 rounded-full ${isMajor ? 'w-1 h-3' : 'w-0.5 h-2'}`} style={{ top: '-84px', left: '-50%' }} />
+				<div className={`absolute rounded-sm ${isMajor ? 'w-0.5 h-3 bg-white/60' : 'w-px h-1.5 bg-white/30'}`} style={{ top: '-84px', left: '-50%' }} />
 				{isMajor && (
 					<div
-						className='absolute -top-[60px] -left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-white/80 font-mono text-center'
+						className='absolute -top-16 -left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-bold text-white/80 font-mono text-center'
 						style={{ transform: `rotate(${-angle}deg)` }}>
 						{value}
 					</div>
@@ -166,15 +168,16 @@ const Speedometer = memo(() => {
 	// Don't render on mobile or when physics are disabled
 	if (isMobile || !physicsEnabled) return null
 
-	// Calculate needle rotation (-135deg at 0, +135deg at max)
-	const maxSpeed = 200 // Max speed on dial (km/h)
-	const normalizedSpeed = Math.min(displaySpeed / maxSpeed, 1)
-	const needleRotation = -135 + normalizedSpeed * 270
-
 	// RPM calculations (matching TRANSMISSION constants from useVehiclePhysics)
-	const maxRpm = 6200
+	const maxRpm = 10000 // Max RPM on dial (10k)
+
+	// Calculate needle rotation based on RPM (-135deg at 0, +135deg at max)
 	const normalizedRpm = Math.min(displayRpm / maxRpm, 1)
-	const isRedline = normalizedRpm > 0.9 // Above 90% of max RPM
+	const needleRotation = -135 + normalizedRpm * 270
+
+	// Redline threshold (engine max RPM is 6200)
+	const engineMaxRpm = 6200
+	const isRedline = displayRpm > engineMaxRpm * 0.9 // Above 90% of engine max RPM
 
 	// Memoize RPM arc stroke color to avoid recalculating on every render
 	const rpmStrokeColor = normalizedRpm > 0.9 ? '#ef4444' : normalizedRpm > 0.8 ? '#f97316' : '#22c55e'
@@ -190,7 +193,7 @@ const Speedometer = memo(() => {
 				<div className='absolute inset-0 rounded-full bg-black/50 shadow-2xl backdrop-blur-md' />
 
 				{/* Speed arc background */}
-				<svg className='absolute inset-0 w-full h-full' viewBox='0 0 100 100'>
+				<svg className='absolute inset-0' viewBox='0 0 100 100'>
 					{/* Background arc */}
 					<circle
 						cx='50'
@@ -256,11 +259,9 @@ const Speedometer = memo(() => {
 				</div>
 
 				{/* Speed display */}
-				<div className='absolute inset-0 flex flex-col items-center justify-end pb-8'>
-					<div className='flex items-baseline gap-1'>
-						<span className='text-4xl font-black text-white tabular-nums tracking-tighter drop-shadow-lg'>{displaySpeed}</span>
-						<span className='text-xs font-bold text-white/60 uppercase'>km/h</span>
-					</div>
+				<div className='absolute inset-0 flex flex-col items-center justify-end pb-6'>
+					<span className='text-4xl font-black text-white tabular-nums tracking-tighter drop-shadow-lg'>{displaySpeed}</span>
+					<span className='text-[9px] font-bold text-white/60 uppercase'>km/h</span>
 				</div>
 			</div>
 		</div>
