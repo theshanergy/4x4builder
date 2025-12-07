@@ -7,7 +7,6 @@ import Sidebar from './ui/Sidebar'
 import Canvas from './scene/Canvas'
 import Actions from './ui/Actions'
 import Speedometer from './ui/Speedometer'
-import MiniMap from './ui/MiniMap'
 import Notification from './ui/Notification'
 import ControlsOverlay from './ui/ControlsOverlay'
 
@@ -26,7 +25,6 @@ export default function App() {
             <Canvas />
             <Sidebar />
             <Speedometer />
-            <MiniMap />
             <Actions />
             <ControlsOverlay />
             <Notification />
