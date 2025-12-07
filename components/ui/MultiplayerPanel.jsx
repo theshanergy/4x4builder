@@ -263,7 +263,7 @@ function MultiplayerPanel() {
 								onClick={() => handleJoinRoom()}
 								disabled={isConnecting || serverAvailable === null}
 								className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting || serverAvailable === null })}>
-								{isConnecting ? 'Connecting...' : joinRoomId.trim() ? 'Join' : 'Create'}
+								{isConnecting ? 'Connecting...' : 'Enter'}
 							</button>
 						</div>
 					</div>
