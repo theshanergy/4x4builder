@@ -130,21 +130,23 @@ function MultiplayerPanel() {
 	const status = getStatusInfo()
 
 	return (
-		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />}>
+		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />} onExpand={checkServerAvailability}>
 			{/* Player Name */}
 			<div className='field'>
 				<label>User Name</label>
 				<input type='text' defaultValue={playerName} onBlur={handleNameChange} onKeyDown={(e) => e.key === 'Enter' && e.target.blur()} maxLength={20} className='w-full' />
 			</div>
 
-			{/* Status */}
-			<div className='field'>
-				<label>Status</label>
-				<div className='flex items-center gap-2 text-sm'>
-					<span className={classNames('inline-block w-2 h-2 rounded-full', status.dotColor)} />
-					<span className={status.color}>{status.text}</span>
+			{/* Status - only show after connecting attempt */}
+			{(serverAvailable !== null || isConnecting || isConnected) && (
+				<div className='field'>
+					<label>Status</label>
+					<div className='flex items-center gap-2 text-sm'>
+						<span className={classNames('inline-block w-2 h-2 rounded-full', status.dotColor)} />
+						<span className={status.color}>{status.text}</span>
+					</div>
 				</div>
-			</div>
+			)}
 
 			{/* Server unavailable message */}
 			{serverAvailable === false && !isConnecting && (
@@ -169,101 +171,103 @@ function MultiplayerPanel() {
 				</div>
 			)}
 
-			{isInRoom ? (
-				<>
-					{/* Room Code Display */}
-					<div className='field'>
-						<label>Room</label>
-						<div className='flex gap-2'>
-							<div className='flex-1 p-2 bg-stone-900 border border-stone-800 rounded text-center font-mono text-xl tracking-widest select-all text-white'>
-								{currentRoom.id}
-							</div>
-							<button
-								onClick={handleCopyRoomCode}
-								className={classNames('secondary w-auto', { 'text-green-400': copied })}
-								title={copied ? 'Copied!' : 'Copy room code'}>
-								{copied ? <CheckIcon className='size-4' /> : <CopyIcon className='size-4' />}
-							</button>
-						</div>
-						<p className='text-stone-500 text-xs mb-2'>Share this code with friends to play together</p>
-					</div>
-
-					{/* Public Room Toggle (Host only) */}
-					{isHost && (
+			{/* Room controls - only show after server check */}
+			{serverAvailable === true &&
+				(isInRoom ? (
+					<>
+						{/* Room Code Display */}
 						<div className='field'>
-							<label className='flex items-center justify-between cursor-pointer'>
-								<span>Public Room</span>
-								<div
-									onClick={() => setRoomPublic(!currentRoom.isPublic)}
-									className={classNames('relative w-11 h-6 rounded-full transition-colors', currentRoom.isPublic ? 'bg-green-600' : 'bg-stone-600')}>
-									<span
-										className={classNames(
-											'absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform',
-											currentRoom.isPublic ? 'translate-x-5' : 'translate-x-0'
-										)}
-									/>
+							<label>Room</label>
+							<div className='flex gap-2'>
+								<div className='flex-1 p-2 bg-stone-900 border border-stone-800 rounded text-center font-mono text-xl tracking-widest select-all text-white'>
+									{currentRoom.id}
 								</div>
-							</label>
-							<p className='text-xs text-stone-400 mt-1'>{currentRoom.isPublic ? 'Anyone can see and join this room' : 'Only players with the code can join'}</p>
+								<button
+									onClick={handleCopyRoomCode}
+									className={classNames('secondary w-auto', { 'text-green-400': copied })}
+									title={copied ? 'Copied!' : 'Copy room code'}>
+									{copied ? <CheckIcon className='size-4' /> : <CopyIcon className='size-4' />}
+								</button>
+							</div>
+							<p className='text-stone-500 text-xs mb-2'>Share this code with friends to play together</p>
 						</div>
-					)}
 
-					{/* Player List */}
-					<PlayerList players={remotePlayers} isHost={isHost} />
-
-					{/* Leave Room Button */}
-					<button onClick={handleLeaveRoom} className='justify-center'>
-						Leave Room
-					</button>
-				</>
-			) : (
-				<>
-					{/* Public Rooms List */}
-					<div className='field'>
-						<label className='mb-2'>Public Rooms</label>
-						<div className='flex flex-col gap-1 max-h-32 overflow-y-auto'>
-							{publicRooms.length > 0 ? (
-								publicRooms.map((room) => (
+						{/* Public Room Toggle (Host only) */}
+						{isHost && (
+							<div className='field'>
+								<label className='flex items-center justify-between cursor-pointer'>
+									<span>Public Room</span>
 									<div
-										key={room.id}
-										onClick={() => handleJoinRoom(room.id)}
-										disabled={isConnecting}
-										className='flex items-center justify-between w-full px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded text-sm transition-colors cursor-pointer'>
-										<span className='font-mono'>{room.id}</span>
-										<span className='text-stone-400'>
-											{room.playerCount}/{room.maxPlayers} players
-										</span>
+										onClick={() => setRoomPublic(!currentRoom.isPublic)}
+										className={classNames('relative w-11 h-6 rounded-full transition-colors', currentRoom.isPublic ? 'bg-green-600' : 'bg-stone-600')}>
+										<span
+											className={classNames(
+												'absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform',
+												currentRoom.isPublic ? 'translate-x-5' : 'translate-x-0'
+											)}
+										/>
 									</div>
-								))
-							) : (
-								<p className='text-stone-500 text-sm py-2'>No public rooms available</p>
-							)}
-						</div>
-					</div>
+								</label>
+								<p className='text-xs text-stone-400 mt-1'>{currentRoom.isPublic ? 'Anyone can see and join this room' : 'Only players with the code can join'}</p>
+							</div>
+						)}
 
-					{/* Join or Create Room */}
-					<div className='field'>
-						<label>Join or Create Room</label>
-						<div className='flex gap-2 items-center'>
-							<input
-								type='text'
-								value={joinRoomId}
-								onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
-								onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
-								placeholder='ROOM ID'
-								maxLength={8}
-								className='w-full'
-							/>
-							<button
-								onClick={() => handleJoinRoom()}
-								disabled={isConnecting || serverAvailable === null}
-								className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting || serverAvailable === null })}>
-								{isConnecting ? 'Connecting...' : 'Enter'}
-							</button>
+						{/* Player List */}
+						<PlayerList players={remotePlayers} isHost={isHost} />
+
+						{/* Leave Room Button */}
+						<button onClick={handleLeaveRoom} className='justify-center'>
+							Leave Room
+						</button>
+					</>
+				) : (
+					<>
+						{/* Public Rooms List */}
+						<div className='field'>
+							<label className='mb-2'>Public Rooms</label>
+							<div className='flex flex-col gap-1 max-h-32 overflow-y-auto'>
+								{publicRooms.length > 0 ? (
+									publicRooms.map((room) => (
+										<div
+											key={room.id}
+											onClick={() => handleJoinRoom(room.id)}
+											disabled={isConnecting}
+											className='flex items-center justify-between w-full px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded text-sm transition-colors cursor-pointer'>
+											<span className='font-mono'>{room.id}</span>
+											<span className='text-stone-400'>
+												{room.playerCount}/{room.maxPlayers} players
+											</span>
+										</div>
+									))
+								) : (
+									<p className='text-stone-500 text-sm py-2'>No public rooms available</p>
+								)}
+							</div>
 						</div>
-					</div>
-				</>
-			)}
+
+						{/* Join or Create Room */}
+						<div className='field'>
+							<label>Join or Create Room</label>
+							<div className='flex gap-2 items-center'>
+								<input
+									type='text'
+									value={joinRoomId}
+									onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
+									onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
+									placeholder='ROOM ID'
+									maxLength={8}
+									className='w-full'
+								/>
+								<button
+									onClick={() => handleJoinRoom()}
+									disabled={isConnecting || serverAvailable === null}
+									className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting || serverAvailable === null })}>
+									{isConnecting ? 'Connecting...' : 'Enter'}
+								</button>
+							</div>
+						</div>
+					</>
+				))}
 		</EditorSection>
 	)
 }

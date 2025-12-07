@@ -14,9 +14,8 @@ export const getServerUrl = () => {
 // Multiplayer store
 const useMultiplayerStore = create((set, get) => ({
 	// Server availability
-	serverAvailable: null, // null = not checked, true = available, false = unavailable
-	serverCheckInProgress: false,
-	
+	serverAvailable: null,
+
 	// Connection state
 	connectionState: ConnectionState.DISCONNECTED,
 	connectionError: null,
@@ -49,11 +48,8 @@ const useMultiplayerStore = create((set, get) => ({
 	
 	// Check if server is available (with automatic retries)
 	checkServerAvailability: async () => {
-		// Don't check if already in progress or already available
-		if (get().serverCheckInProgress) return get().serverAvailable
+		// Skip if already available
 		if (get().serverAvailable === true) return true
-		
-		set({ serverCheckInProgress: true })
 		
 		const serverUrl = getServerUrl()
 		
@@ -78,7 +74,7 @@ const useMultiplayerStore = create((set, get) => ({
 			}
 		})
 		
-		set({ serverAvailable: result, serverCheckInProgress: false })
+		set({ serverAvailable: result })
 		
 		// If not available, start retry interval
 		if (!result && !get()._serverCheckRetryInterval) {
@@ -417,8 +413,5 @@ const useMultiplayerStore = create((set, get) => ({
 	// Check if in a room
 	isInRoom: () => get().currentRoom !== null,
 }))
-
-// Auto-start server availability check
-useMultiplayerStore.getState().checkServerAvailability()
 
 export default useMultiplayerStore
