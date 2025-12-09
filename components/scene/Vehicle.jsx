@@ -194,6 +194,7 @@ const Vehicle = (props) => {
 
 	// Get vehicle store
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
+	const isMobile = useGameStore((state) => state.isMobile)
 
 	// Check if in XR session
 	const isInXR = useXR((state) => state.mode !== null)
@@ -301,7 +302,7 @@ const Vehicle = (props) => {
 					/>
 				</group>
 			</RigidBody>
-			{!performanceDegraded && !isInXR && (
+			{!performanceDegraded && !isInXR && !isMobile && (
 				<>
 					<Dust vehicleController={vehicleController} wheelRefs={wheelRefs} />
 					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={(rim_width * 2.54) / 100} tireRadius={axleHeight} />
