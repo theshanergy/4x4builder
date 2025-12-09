@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import classNames from 'classnames'
-import useNetworkConnection from '../../hooks/useNetworkConnection'
+import useMultiplayerStore from '../../store/multiplayerStore'
 import EditorSection from './EditorSection'
 import PlayerList from './PlayerList'
 
@@ -35,7 +35,17 @@ function StatusMessage({ message, type = 'info' }) {
 
 // Multiplayer panel component
 function MultiplayerPanel() {
-	const { connectionError, currentRoom, playerName, remotePlayers, isConnecting, isInRoom, joinRoom, leaveRoom, setPlayerName } = useNetworkConnection()
+	const connectionState = useMultiplayerStore((state) => state.connectionState)
+	const connectionError = useMultiplayerStore((state) => state.connectionError)
+	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
+	const playerName = useMultiplayerStore((state) => state.playerName)
+	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
+	const joinRoom = useMultiplayerStore((state) => state.joinRoom)
+	const leaveRoom = useMultiplayerStore((state) => state.leaveRoom)
+	const setPlayerName = useMultiplayerStore((state) => state.setPlayerName)
+
+	const isConnecting = connectionState === 'connecting' || connectionState === 'reconnecting'
+	const isInRoom = currentRoom !== null
 
 	const [joinRoomId, setJoinRoomId] = useState('')
 	const [copied, setCopied] = useState(false)
@@ -74,11 +84,6 @@ function MultiplayerPanel() {
 		if (roomIdToJoin) setJoinRoomId('')
 	}, [joinRoom, joinRoomId])
 
-	// Handle leave room
-	const handleLeaveRoom = useCallback(() => {
-		leaveRoom()
-	}, [leaveRoom])
-
 	return (
 		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />}>
 			{/* Player Name */}
@@ -115,7 +120,7 @@ function MultiplayerPanel() {
 					<PlayerList players={remotePlayers} />
 
 					{/* Leave Room Button */}
-					<button onClick={handleLeaveRoom} className='justify-center'>
+					<button onClick={leaveRoom} className='justify-center'>
 						Leave Room
 					</button>
 				</>

@@ -278,10 +278,11 @@ const useMultiplayerStore = create((set, get) => ({
 	},
 	
 	// Join a room, or create one if no roomId provided (auto-connects if needed)
-	joinRoom: async (roomId, vehicleConfig) => {
+	joinRoom: async (roomId) => {
 		const connected = await get().ensureConnected()
 		if (!connected) return false
 		
+		const vehicleConfig = useGameStore.getState().currentVehicle
 		return get().networkManager.joinRoom(roomId, get().playerName, vehicleConfig)
 	},
 	
@@ -341,9 +342,6 @@ const useMultiplayerStore = create((set, get) => ({
 	
 	// Get remote player count
 	getRemotePlayerCount: () => Object.keys(get().remotePlayers).length,
-	
-	// Check if in a room
-	isInRoom: () => get().currentRoom !== null,
 }))
 
 export default useMultiplayerStore
