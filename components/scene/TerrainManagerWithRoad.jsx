@@ -7,7 +7,6 @@ import { useXR } from '@react-three/xr'
 
 import useGameStore, { vehicleState } from '../../store/gameStore'
 import GrassManager from './GrassManager'
-import DistantTerrain from './DistantTerrain'
 import { getRoadInfo } from '../../utils/roadMath'
 
 import terrainVertexShader from '../../shaders/terrain.vert.glsl?raw'
@@ -389,7 +388,6 @@ const TerrainManager = () => {
 
 	return (
 		<group name='TerrainManager'>
-			<DistantTerrain noise={noise} map={distantTexture} />
 			{activeTiles.map(({ key, position, shouldFade }) => (
 				<TerrainTile
 					key={key}
@@ -419,7 +417,7 @@ const TerrainManager = () => {
 					transitionEndDist={transitionEndDist}
 				/>
 			))}
-			{showGrass && <GrassManager activeTiles={activeTiles} tileSize={VISUAL_TILE_SIZE} getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
+			{showGrass && <GrassManager getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
 		</group>
 	)
 }
