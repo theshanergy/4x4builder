@@ -125,11 +125,9 @@ const useMultiplayerStore = create((set, get) => ({
 			})
 			.on('onPlayerUpdate', (message) => {
 				const { playerId, ...transform } = message
-				console.log('[multiplayerStore] onPlayerUpdate', playerId, 'localPlayerId:', get().localPlayerId)
 				if (playerId !== get().localPlayerId) {
 					// Push transform to vehicle via the handler (if registered)
 					const pushHandler = get()._pushTransformToVehicle
-					console.log('[multiplayerStore] pushHandler:', !!pushHandler)
 					if (pushHandler) {
 						pushHandler(playerId, transform)
 					}

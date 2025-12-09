@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, memo } from 'react'
+import { useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import useMultiplayerStore from '../../store/multiplayerStore'
 import RemoteVehicle from './RemoteVehicle'
 
@@ -9,7 +9,7 @@ import RemoteVehicle from './RemoteVehicle'
 const RemoteVehicleManager = () => {
 	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
 	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
-	
+
 	// Store refs to remote vehicle components for transform updates
 	const vehicleRefs = useRef(new Map())
 
@@ -26,33 +26,31 @@ const RemoteVehicleManager = () => {
 		// Create a handler for player updates that pushes transforms to vehicles
 		const handlePlayerUpdate = (playerId, transform) => {
 			const ref = vehicleRefs.current.get(playerId)
-			console.log('[RemoteVehicleManager] handlePlayerUpdate', playerId, 'ref:', !!ref, 'pushTransform:', !!ref?.userData?.pushTransform, 'vehicleRefs size:', vehicleRefs.current.size)
 			if (ref?.userData?.pushTransform) {
 				ref.userData.pushTransform(transform)
 			}
 		}
-		
+
 		// Store the handler on the multiplayerStore for the network callback to use
-		useMultiplayerStore.setState({ 
-			_pushTransformToVehicle: handlePlayerUpdate 
+		useMultiplayerStore.setState({
+			_pushTransformToVehicle: handlePlayerUpdate,
 		})
 
 		return () => {
-			useMultiplayerStore.setState({ 
-				_pushTransformToVehicle: null 
+			useMultiplayerStore.setState({
+				_pushTransformToVehicle: null,
 			})
 		}
 	}, [])
 
-	// Register/unregister vehicle refs
-	const registerVehicleRef = (playerId, ref) => {
-		console.log('[RemoteVehicleManager] registerVehicleRef', playerId, 'ref:', !!ref, 'pushTransform:', !!ref?.userData?.pushTransform)
+	// Register/unregister vehicle refs - memoized to prevent unnecessary effect re-runs in RemoteVehicle
+	const registerVehicleRef = useCallback((playerId, ref) => {
 		if (ref) {
 			vehicleRefs.current.set(playerId, ref)
 		} else {
 			vehicleRefs.current.delete(playerId)
 		}
-	}
+	}, [])
 
 	// Don't render if not in a room
 	if (!currentRoom) {
@@ -60,7 +58,7 @@ const RemoteVehicleManager = () => {
 	}
 
 	return (
-		<group name="RemoteVehicles">
+		<group name='RemoteVehicles'>
 			{playerArray.map((player) => (
 				<RemoteVehicleWrapper
 					key={player.id}
@@ -79,15 +77,7 @@ const RemoteVehicleManager = () => {
  * Wrapper component to handle ref registration
  */
 const RemoteVehicleWrapper = memo(({ playerId, playerName, vehicleConfig, initialTransform, onRef }) => {
-	return (
-		<RemoteVehicle
-			playerId={playerId}
-			playerName={playerName}
-			vehicleConfig={vehicleConfig}
-			initialTransform={initialTransform}
-			onRef={onRef}
-		/>
-	)
+	return <RemoteVehicle playerId={playerId} playerName={playerName} vehicleConfig={vehicleConfig} initialTransform={initialTransform} onRef={onRef} />
 })
 
 export default RemoteVehicleManager
