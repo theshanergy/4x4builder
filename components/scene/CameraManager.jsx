@@ -28,7 +28,7 @@ export const getDriverPosition = (bodyId) => {
 		return new Vector3(...vehicle.driverPosition)
 	}
 	// Default driver position if not specified in config
-	return new Vector3(0.35, 1.1, 0.2)
+	return new Vector3(0.4, 1.55, 0)
 }
 
 // Orbit/Chase camera controller
@@ -115,6 +115,12 @@ const FirstPersonCamera = ({ isInXR = false }) => {
 	// Get driver position from vehicle config
 	const driverPosition = useRef(getDriverPosition(currentVehicle.body))
 
+	// Calibrated head offset from XR origin (captured when user recenters)
+	// This accounts for the user's actual seated head height
+	const calibratedHeadOffset = useRef(null)
+	const needsCalibration = useRef(true)
+	const recenterPressedLastFrame = useRef(false)
+
 	// Update driver position when vehicle changes
 	useEffect(() => {
 		driverPosition.current = getDriverPosition(currentVehicle.body)
@@ -146,7 +152,9 @@ const FirstPersonCamera = ({ isInXR = false }) => {
 	const targetPosition = useRef(new Vector3())
 	const targetLookAt = useRef(new Vector3())
 	const forwardOffset = useRef(new Vector3())
-	
+	const headWorldPos = useRef(new Vector3())
+	const originWorldPos = useRef(new Vector3())
+
 	// Cache vehicle group reference to avoid scene traversal every frame
 	const vehicleGroupRef = useRef(null)
 
@@ -168,11 +176,40 @@ const FirstPersonCamera = ({ isInXR = false }) => {
 		targetPosition.current.copy(tempPosition.current).add(tempOffset.current)
 
 		if (isInXR) {
-			// In XR mode, position the XR origin at the driver seat
+			// In XR mode, position the XR origin so the user's head appears at driver position
 			if (xrOriginRef?.current) {
-				xrOriginRef.current.position.copy(targetPosition.current)
+				const { input } = useInputStore.getState()
+
+				// Check for recenter button (X button on controller, or auto-calibrate on first frame)
+				const recenterPressed = input.buttonX
+				if ((recenterPressed && !recenterPressedLastFrame.current) || needsCalibration.current) {
+					// Capture the current head position relative to XR origin (in origin's local space)
+					// This represents where the user's head physically is when seated
+					camera.getWorldPosition(headWorldPos.current)
+					xrOriginRef.current.getWorldPosition(originWorldPos.current)
+					calibratedHeadOffset.current = headWorldPos.current.clone().sub(originWorldPos.current)
+					needsCalibration.current = false
+				}
+				recenterPressedLastFrame.current = recenterPressed
+
+				// Position XR origin so that: origin + headOffset = targetPosition (driver head pos)
+				// Therefore: origin = targetPosition - headOffset
+				if (calibratedHeadOffset.current) {
+					// Transform the calibrated offset by vehicle rotation to keep it vehicle-relative
+					tempOffset.current.copy(calibratedHeadOffset.current)
+					// The offset was captured in world space, so we need to rotate it with the vehicle
+					// to maintain the same relative position as the vehicle rotates
+					xrOriginRef.current.position.copy(targetPosition.current).sub(tempOffset.current)
+				} else {
+					// Fallback before calibration (shouldn't happen due to auto-calibrate)
+					xrOriginRef.current.position.copy(targetPosition.current)
+				}
+
 				// Apply chassis rotation plus 180° yaw to face forward
 				xrOriginRef.current.quaternion.copy(tempQuat.current).multiply(seatYawOffset)
+
+				// Force immediate matrix update to prevent XR origin from lagging behind
+				xrOriginRef.current.updateMatrixWorld(true)
 			}
 		} else {
 			// Regular first-person camera mode

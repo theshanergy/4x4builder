@@ -42,7 +42,7 @@ export const useVehicleInput = () => {
 		const isDrifting = effectiveKeys.has('Shift')
 
 		// Reset vehicle (R key or Y button) - detect press, not hold
-		const resetPressed = effectiveKeys.has('r') || input.buttonY
+		const resetPressed = effectiveKeys.has('r') || input.buttonB
 		const shouldReset = resetPressed && !resetPressedLastFrame.current
 		resetPressedLastFrame.current = resetPressed
 
