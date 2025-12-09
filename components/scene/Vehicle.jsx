@@ -14,6 +14,7 @@ import useTireDirtMaterial from '../../hooks/useTireDirtMaterial'
 import useTransformBroadcast from '../../hooks/useTransformBroadcast'
 import EngineAudio from './EngineAudio'
 import Dust from './Dust'
+import TireTracks from './TireTracks'
 
 // Calculate point on line (a to b, at length).
 const linePoint = (a, b, length) => {
@@ -300,7 +301,12 @@ const Vehicle = (props) => {
 					/>
 				</group>
 			</RigidBody>
-			{!performanceDegraded && !isInXR && <Dust vehicleController={vehicleController} wheelRefs={wheelRefs} />}
+			{!performanceDegraded && !isInXR && (
+				<>
+					<Dust vehicleController={vehicleController} wheelRefs={wheelRefs} />
+					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={(rim_width * 2.54) / 100} tireRadius={axleHeight} />
+				</>
+			)}
 		</>
 	)
 }
