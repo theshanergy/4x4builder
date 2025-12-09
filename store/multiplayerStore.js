@@ -26,13 +26,9 @@ const useMultiplayerStore = create((set, get) => ({
 	
 	// Room state
 	currentRoom: null,
-	isHost: false,
 	
 	// Remote players (Map-like object: playerId -> playerState)
 	remotePlayers: {},
-	
-	// Public rooms list
-	publicRooms: [],
 	
 	// Chat state
 	chatMessages: [],
@@ -122,7 +118,6 @@ const useMultiplayerStore = create((set, get) => ({
 			.on('onRoomEntered', (message) => {
 				set({
 					currentRoom: message.roomState,
-					isHost: message.isHost,
 					connectionError: null,
 				})
 				// Initialize remote players from room state
@@ -133,7 +128,6 @@ const useMultiplayerStore = create((set, get) => ({
 			.on('onRoomLeft', () => {
 				set({
 					currentRoom: null,
-					isHost: false,
 					remotePlayers: {},
 					chatMessages: [],
 					chatOpen: false,
@@ -142,14 +136,12 @@ const useMultiplayerStore = create((set, get) => ({
 			.on('onRoomState', (message) => {
 				set({
 					currentRoom: message.roomState,
-					isHost: message.roomState.host === get().localPlayerId,
 				})
 				get().syncRemotePlayers(message.roomState.players)
 			})
 			.on('onRoomClosed', (message) => {
 				set({
 					currentRoom: null,
-					isHost: false,
 					remotePlayers: {},
 					chatMessages: [],
 					chatOpen: false,
@@ -260,13 +252,6 @@ const useMultiplayerStore = create((set, get) => ({
 					})
 				}
 			})
-			.on('onPublicRoomsList', (message) => {
-				set({ publicRooms: message.rooms || [] })
-			})
-			.on('onPublicRoomsUpdate', (message) => {
-				// Auto-update public rooms when server broadcasts changes
-				set({ publicRooms: message.rooms || [] })
-			})
 			.on('onChatMessage', (message) => {
 				const { playerId, playerName, text, timestamp } = message
 				set((state) => ({
@@ -328,7 +313,6 @@ const useMultiplayerStore = create((set, get) => ({
 		
 		set({
 			currentRoom: null,
-			isHost: false,
 			remotePlayers: {},
 			localPlayerId: null,
 		})
@@ -377,39 +361,6 @@ const useMultiplayerStore = create((set, get) => ({
 		const networkManager = get().networkManager
 		if (networkManager?.isConnected() && get().currentRoom) {
 			networkManager.sendVehicleConfig(config)
-		}
-	},
-	
-	// Set room public/private (host only)
-	setRoomPublic: (isPublic) => {
-		const networkManager = get().networkManager
-		if (networkManager?.isConnected() && get().currentRoom && get().isHost) {
-			networkManager.setRoomPublic(isPublic)
-		}
-	},
-	
-	// Fetch public rooms list
-	fetchPublicRooms: async () => {
-		const networkManager = get().networkManager
-		if (!networkManager) {
-			// Need to connect first to fetch rooms
-			const serverUrl = getServerUrl()
-			const nm = get().initNetworkManager(serverUrl)
-			try {
-				await nm.connect()
-				nm.getPublicRooms()
-			} catch (error) {
-				set({ connectionError: error.message })
-			}
-		} else if (networkManager.isConnected()) {
-			networkManager.getPublicRooms()
-		} else {
-			try {
-				await networkManager.connect()
-				networkManager.getPublicRooms()
-			} catch (error) {
-				set({ connectionError: error.message })
-			}
 		}
 	},
 	

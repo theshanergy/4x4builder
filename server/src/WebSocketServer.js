@@ -13,9 +13,6 @@ export default class WebSocketServer {
 		this.roomManager = new RoomManager()
 		this.messageHandler = new MessageHandler(this.roomManager, this)
 		
-		// Set broadcast callback on room manager
-		this.roomManager.setBroadcastCallback(() => this.broadcastPublicRoomsUpdate())
-		
 		this.setupConnectionHandler()
 		this.setupPingInterval()
 		
@@ -103,21 +100,6 @@ export default class WebSocketServer {
 			...this.roomManager.getStats(),
 			totalConnections: this.players.size,
 		}
-	}
-	
-	// Broadcast public rooms update to all connected players not in a room
-	broadcastPublicRoomsUpdate() {
-		const publicRooms = this.roomManager.getPublicRooms()
-		const message = JSON.stringify(createMessage(MessageTypes.PUBLIC_ROOMS_UPDATE, {
-			rooms: publicRooms,
-		}))
-		
-		this.players.forEach((player) => {
-			// Only send to players not in a room
-			if (!player.roomId && player.ws.readyState === 1) {
-				player.ws.send(message)
-			}
-		})
 	}
 	
 	// Graceful shutdown

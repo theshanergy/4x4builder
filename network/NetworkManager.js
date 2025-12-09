@@ -45,8 +45,6 @@ export default class NetworkManager {
 			onPlayerNameUpdate: null,
 			onVehicleConfig: null,
 			onVehicleReset: null,
-			onPublicRoomsList: null,
-			onPublicRoomsUpdate: null,
 			onChatMessage: null,
 		}
 	}
@@ -281,14 +279,6 @@ export default class NetworkManager {
 				this.callbacks.onVehicleReset?.(message)
 				break
 				
-			case MessageTypes.PUBLIC_ROOMS_LIST:
-				this.callbacks.onPublicRoomsList?.(message)
-				break
-				
-			case MessageTypes.PUBLIC_ROOMS_UPDATE:
-				this.callbacks.onPublicRoomsUpdate?.(message)
-				break
-				
 			case MessageTypes.CHAT_MESSAGE:
 				this.callbacks.onChatMessage?.(message)
 				break
@@ -333,14 +323,6 @@ export default class NetworkManager {
 	
 	sendVehicleReset(position, rotation) {
 		return this.send(createMessage(MessageTypes.VEHICLE_RESET, { position, rotation }))
-	}
-	
-	setRoomPublic(isPublic) {
-		return this.send(createMessage(MessageTypes.SET_ROOM_PUBLIC, { isPublic }))
-	}
-	
-	getPublicRooms() {
-		return this.send(createMessage(MessageTypes.GET_PUBLIC_ROOMS))
 	}
 	
 	sendChatMessage(text) {

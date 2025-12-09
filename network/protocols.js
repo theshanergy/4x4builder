@@ -16,10 +16,6 @@ export const MessageTypes = {
 	ROOM_LEFT: 'room_left',
 	ROOM_STATE: 'room_state',
 	ROOM_CLOSED: 'room_closed',
-	SET_ROOM_PUBLIC: 'set_room_public',
-	GET_PUBLIC_ROOMS: 'get_public_rooms',
-	PUBLIC_ROOMS_LIST: 'public_rooms_list',
-	PUBLIC_ROOMS_UPDATE: 'public_rooms_update',
 	
 	// Player events
 	PLAYER_JOINED: 'player_joined',

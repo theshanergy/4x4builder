@@ -8,16 +8,17 @@ import MultiplayerIcon from '../../assets/images/icons/Multiplayer.svg'
 import CopyIcon from '../../assets/images/icons/Copy.svg'
 import CheckIcon from '../../assets/images/icons/Check.svg'
 
+// Lobby room ID - shared room that everyone can join from the UI
+const LOBBY_ROOM_ID = 'LOBBY'
+
 // Multiplayer panel component
 function MultiplayerPanel() {
 	const {
 		connectionError,
 		currentRoom,
-		isHost,
 		playerName,
 		remotePlayers,
 		serverAvailable,
-		publicRooms,
 		isConnected,
 		isConnecting,
 		isInRoom,
@@ -29,11 +30,11 @@ function MultiplayerPanel() {
 		setPlayerName,
 		clearError,
 		checkServerAvailability,
-		setRoomPublic,
 	} = useNetworkConnection()
 
 	const [joinRoomId, setJoinRoomId] = useState('')
 	const [copied, setCopied] = useState(false)
+	const [waitingForServer, setWaitingForServer] = useState(false)
 
 	// Handle copy room code
 	const handleCopyRoomCode = useCallback(async () => {
@@ -57,32 +58,81 @@ function MultiplayerPanel() {
 		[playerName, setPlayerName]
 	)
 
-	// Handle join room
-	const handleJoinRoom = useCallback(
-		async (roomIdOverride) => {
-			const roomIdToJoin = roomIdOverride || joinRoomId.trim()
+	// Handle connect to lobby
+	const handleConnectToLobby = useCallback(async () => {
+		// If server not available yet, show waiting message
+		if (serverAvailable !== true) {
+			setWaitingForServer(true)
+			// Keep checking until server is available
+			const checkInterval = setInterval(async () => {
+				const available = await checkServerAvailability()
+				if (available) {
+					clearInterval(checkInterval)
+					setWaitingForServer(false)
+					// Now connect
+					const connected = await connect()
+					if (connected) {
+						await joinRoom(LOBBY_ROOM_ID)
+					}
+				}
+			}, 2000)
+			return
+		}
 
-			if (!isConnected) {
-				const connected = await connect()
-				if (!connected) return
-			}
+		if (!isConnected) {
+			const connected = await connect()
+			if (!connected) return
+		}
+		await joinRoom(LOBBY_ROOM_ID)
+	}, [serverAvailable, isConnected, connect, joinRoom, checkServerAvailability])
 
-			if (roomIdToJoin) {
-				await joinRoom(roomIdToJoin)
-				setJoinRoomId('')
-			} else {
-				await createRoom()
-			}
-		},
-		[isConnected, connect, joinRoom, createRoom, joinRoomId]
-	)
+	// Handle join room by ID or create new room
+	const handleJoinRoom = useCallback(async () => {
+		const roomIdToJoin = joinRoomId.trim()
+
+		// If server not available yet, show waiting message
+		if (serverAvailable !== true) {
+			setWaitingForServer(true)
+			// Keep checking until server is available
+			const checkInterval = setInterval(async () => {
+				const available = await checkServerAvailability()
+				if (available) {
+					clearInterval(checkInterval)
+					setWaitingForServer(false)
+					// Now connect and join/create
+					const connected = await connect()
+					if (connected) {
+						if (roomIdToJoin) {
+							await joinRoom(roomIdToJoin)
+							setJoinRoomId('')
+						} else {
+							await createRoom()
+						}
+					}
+				}
+			}, 2000)
+			return
+		}
+
+		if (!isConnected) {
+			const connected = await connect()
+			if (!connected) return
+		}
+
+		if (roomIdToJoin) {
+			await joinRoom(roomIdToJoin)
+			setJoinRoomId('')
+		} else {
+			await createRoom()
+		}
+	}, [serverAvailable, isConnected, connect, joinRoom, createRoom, joinRoomId, checkServerAvailability])
 
 	// Handle leave room
 	const handleLeaveRoom = useCallback(() => {
 		leaveRoom()
 	}, [leaveRoom])
 
-	// Get status text and color
+	// Get status text and color (only shown when in room)
 	const getStatusInfo = () => {
 		if (isInRoom) {
 			return {
@@ -98,33 +148,7 @@ function MultiplayerPanel() {
 				dotColor: 'bg-yellow-500 animate-pulse',
 			}
 		}
-		if (isConnected) {
-			return {
-				text: 'Connected',
-				color: 'text-blue-400',
-				dotColor: 'bg-blue-500',
-			}
-		}
-		// Server availability states when not connected
-		if (serverAvailable === null) {
-			return {
-				text: 'Checking server...',
-				color: 'text-yellow-400',
-				dotColor: 'bg-yellow-500 animate-pulse',
-			}
-		}
-		if (serverAvailable === false) {
-			return {
-				text: 'Server unavailable',
-				color: 'text-red-400',
-				dotColor: 'bg-red-500',
-			}
-		}
-		return {
-			text: 'Ready to connect',
-			color: 'text-stone-400',
-			dotColor: 'bg-stone-500',
-		}
+		return null
 	}
 
 	const status = getStatusInfo()
@@ -137,8 +161,8 @@ function MultiplayerPanel() {
 				<input type='text' defaultValue={playerName} onBlur={handleNameChange} onKeyDown={(e) => e.key === 'Enter' && e.target.blur()} maxLength={20} className='w-full' />
 			</div>
 
-			{/* Status - only show after connecting attempt */}
-			{(serverAvailable !== null || isConnecting || isConnected) && (
+			{/* Status - only show when connecting or in room */}
+			{status && (
 				<div className='field'>
 					<label>Status</label>
 					<div className='flex items-center gap-2 text-sm'>
@@ -148,18 +172,12 @@ function MultiplayerPanel() {
 				</div>
 			)}
 
-			{/* Server unavailable message */}
-			{serverAvailable === false && !isConnecting && (
-				<div className='bg-stone-800/50 border border-stone-700 rounded p-3 text-sm'>
-					<p className='text-stone-300 mb-2'>Unable to reach the multiplayer server. It may be starting up.</p>
-					<button onClick={checkServerAvailability} className='w-full justify-center secondary'>
-						Retry Connection
-					</button>
+			{/* Waiting for server message */}
+			{waitingForServer && (
+				<div className='bg-amber-900/50 border border-amber-700 rounded p-3 text-amber-200 text-sm'>
+					<p>You're the first one here! Please wait a moment for the server to start up...</p>
 				</div>
 			)}
-
-			{/* Checking server message */}
-			{serverAvailable === null && <p className='text-stone-400 text-sm'>The server may take up to a minute to start if it has been inactive.</p>}
 
 			{/* Connection Error */}
 			{connectionError && (
@@ -171,103 +189,76 @@ function MultiplayerPanel() {
 				</div>
 			)}
 
-			{/* Room controls - only show after server check */}
-			{serverAvailable === true &&
-				(isInRoom ? (
-					<>
-						{/* Room Code Display */}
-						<div className='field'>
-							<label>Room</label>
-							<div className='flex gap-2'>
-								<div className='flex-1 p-2 bg-stone-900 border border-stone-800 rounded text-center font-mono text-xl tracking-widest select-all text-white'>
-									{currentRoom.id}
-								</div>
-								<button
-									onClick={handleCopyRoomCode}
-									className={classNames('secondary w-auto', { 'text-green-400': copied })}
-									title={copied ? 'Copied!' : 'Copy room code'}>
-									{copied ? <CheckIcon className='size-4' /> : <CopyIcon className='size-4' />}
-								</button>
+			{/* Room controls */}
+			{isInRoom ? (
+				<>
+					{/* Room Code Display */}
+					<div className='field'>
+						<label>Room</label>
+						<div className='flex gap-2'>
+							<div className='flex-1 p-2 bg-stone-900 border border-stone-800 rounded text-center font-mono text-xl tracking-widest select-all text-white'>
+								{currentRoom.id}
 							</div>
-							<p className='text-stone-500 text-xs mb-2'>Share this code with friends to play together</p>
+							<button
+								onClick={handleCopyRoomCode}
+								className={classNames('secondary w-auto', { 'text-green-400': copied })}
+								title={copied ? 'Copied!' : 'Copy room code'}>
+								{copied ? <CheckIcon className='size-4' /> : <CopyIcon className='size-4' />}
+							</button>
 						</div>
+						<p className='text-stone-500 text-xs mb-2'>Share this code with friends to play together</p>
+					</div>
 
-						{/* Public Room Toggle (Host only) */}
-						{isHost && (
-							<div className='field'>
-								<label className='flex items-center justify-between cursor-pointer'>
-									<span>Public Room</span>
-									<div
-										onClick={() => setRoomPublic(!currentRoom.isPublic)}
-										className={classNames('relative w-11 h-6 rounded-full transition-colors', currentRoom.isPublic ? 'bg-green-600' : 'bg-stone-600')}>
-										<span
-											className={classNames(
-												'absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform',
-												currentRoom.isPublic ? 'translate-x-5' : 'translate-x-0'
-											)}
-										/>
-									</div>
-								</label>
-								<p className='text-xs text-stone-400 mt-1'>{currentRoom.isPublic ? 'Anyone can see and join this room' : 'Only players with the code can join'}</p>
-							</div>
-						)}
+					{/* Player List */}
+					<PlayerList players={remotePlayers} />
 
-						{/* Player List */}
-						<PlayerList players={remotePlayers} isHost={isHost} />
+					{/* Leave Room Button */}
+					<button onClick={handleLeaveRoom} className='justify-center'>
+						Leave Room
+					</button>
+				</>
+			) : (
+				<>
+					{/* Connect to Lobby Button */}
+					<button
+						onClick={handleConnectToLobby}
+						disabled={isConnecting || waitingForServer}
+						className={classNames('justify-center bg-green-600 hover:bg-green-500 text-white font-semibold py-3', {
+							'opacity-50 cursor-not-allowed': isConnecting || waitingForServer,
+						})}>
+						{isConnecting ? 'Connecting...' : waitingForServer ? 'Starting server...' : 'Connect to Lobby'}
+					</button>
 
-						{/* Leave Room Button */}
-						<button onClick={handleLeaveRoom} className='justify-center'>
-							Leave Room
-						</button>
-					</>
-				) : (
-					<>
-						{/* Public Rooms List */}
-						<div className='field'>
-							<label className='mb-2'>Public Rooms</label>
-							<div className='flex flex-col gap-1 max-h-32 overflow-y-auto'>
-								{publicRooms.length > 0 ? (
-									publicRooms.map((room) => (
-										<div
-											key={room.id}
-											onClick={() => handleJoinRoom(room.id)}
-											disabled={isConnecting}
-											className='flex items-center justify-between w-full px-3 py-2 bg-stone-800 hover:bg-stone-700 rounded text-sm transition-colors cursor-pointer'>
-											<span className='font-mono'>{room.id}</span>
-											<span className='text-stone-400'>
-												{room.playerCount}/{room.maxPlayers} players
-											</span>
-										</div>
-									))
-								) : (
-									<p className='text-stone-500 text-sm py-2'>No public rooms available</p>
-								)}
-							</div>
+					{/* OR separator */}
+					<div className='flex items-center gap-3 my-2'>
+						<div className='flex-1 border-t border-stone-700' />
+						<span className='text-stone-500 text-sm'>OR</span>
+						<div className='flex-1 border-t border-stone-700' />
+					</div>
+
+					{/* Join or Create Room */}
+					<div className='field'>
+						<label>Join or Create Private Room</label>
+						<div className='flex gap-2 items-center'>
+							<input
+								type='text'
+								value={joinRoomId}
+								onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
+								onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
+								placeholder='Enter code or leave blank to create'
+								maxLength={8}
+								className='w-full'
+							/>
+							<button
+								onClick={handleJoinRoom}
+								disabled={isConnecting || waitingForServer}
+								className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting || waitingForServer })}>
+								{isConnecting ? '...' : joinRoomId.trim() ? 'Join' : 'Create'}
+							</button>
 						</div>
-
-						{/* Join or Create Room */}
-						<div className='field'>
-							<label>Join or Create Room</label>
-							<div className='flex gap-2 items-center'>
-								<input
-									type='text'
-									value={joinRoomId}
-									onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
-									onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
-									placeholder='ROOM ID'
-									maxLength={8}
-									className='w-full'
-								/>
-								<button
-									onClick={() => handleJoinRoom()}
-									disabled={isConnecting || serverAvailable === null}
-									className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting || serverAvailable === null })}>
-									{isConnecting ? 'Connecting...' : 'Enter'}
-								</button>
-							</div>
-						</div>
-					</>
-				))}
+					</div>
+				</>
+			)}
 		</EditorSection>
 	)
 }

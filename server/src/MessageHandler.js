@@ -35,14 +35,6 @@ export default class MessageHandler {
 				this.handleLeaveRoom(player)
 				break
 				
-			case MessageTypes.SET_ROOM_PUBLIC:
-				this.handleSetRoomPublic(player, message)
-				break
-				
-			case MessageTypes.GET_PUBLIC_ROOMS:
-				this.handleGetPublicRooms(player)
-				break
-				
 			case MessageTypes.PLAYER_UPDATE:
 				this.handlePlayerUpdate(player, message)
 				break
@@ -100,7 +92,6 @@ export default class MessageHandler {
 			
 			player.send(createMessage(MessageTypes.ROOM_CREATED, {
 				roomId: room.id,
-				isHost: true,
 				roomState: room.getState(),
 			}))
 		} catch (error) {
@@ -143,7 +134,6 @@ export default class MessageHandler {
 				// Room was created, send ROOM_CREATED message
 				player.send(createMessage(MessageTypes.ROOM_CREATED, {
 					roomId: room.id,
-					isHost: true,
 					roomState: room.getState(),
 				}))
 			} else {
@@ -155,7 +145,6 @@ export default class MessageHandler {
 				// Send room state to joining player
 				player.send(createMessage(MessageTypes.ROOM_JOINED, {
 					roomId: room.id,
-					isHost: room.host === player.id,
 					roomState: room.getState(),
 				}))
 			}
@@ -182,12 +171,11 @@ export default class MessageHandler {
 		// Notify other players before leaving
 		room.broadcast(createMessage(MessageTypes.PLAYER_LEFT, {
 			playerId: player.id,
-			newHost: room.host === player.id ? null : room.host, // Will be updated after leave
 		}), player.id)
 		
 		this.roomManager.leaveRoom(player.id)
 		
-		// If room still exists, notify about host change
+		// If room still exists, notify remaining players
 		if (!room.isEmpty()) {
 			room.broadcastAll(createMessage(MessageTypes.ROOM_STATE, {
 				roomState: room.getState(),
@@ -345,36 +333,8 @@ export default class MessageHandler {
 				return 'You are already in a room. Leave first to join another.'
 			case 'NOT_IN_ROOM':
 				return 'You are not in a room.'
-			case 'NOT_HOST':
-				return 'Only the room host can perform this action.'
 			default:
 				return 'An error occurred. Please try again.'
 		}
-	}
-	
-	// Handle set room public/private
-	handleSetRoomPublic(player, message) {
-		try {
-			const isPublic = Boolean(message.isPublic)
-			const room = this.roomManager.setRoomPublic(player.id, isPublic)
-			
-			// Notify all players in room about the change
-			room.broadcastAll(createMessage(MessageTypes.ROOM_STATE, {
-				roomState: room.getState(),
-			}))
-		} catch (error) {
-			player.send(createMessage(MessageTypes.ERROR, {
-				code: error.message,
-				message: this.getErrorMessage(error.message),
-			}))
-		}
-	}
-	
-	// Handle get public rooms list
-	handleGetPublicRooms(player) {
-		const publicRooms = this.roomManager.getPublicRooms()
-		player.send(createMessage(MessageTypes.PUBLIC_ROOMS_LIST, {
-			rooms: publicRooms,
-		}))
 	}
 }

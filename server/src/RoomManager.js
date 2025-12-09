@@ -1,8 +1,5 @@
 import settings from '../config/settings.js'
 
-// Public room ID constant
-const PUBLIC_ROOM_ID = 'PUBLIC'
-
 // Generate a random room code
 function generateRoomCode() {
 	const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // Excluded I, O, 0, 1 for readability
@@ -15,13 +12,11 @@ function generateRoomCode() {
 
 // Room class
 class Room {
-	constructor(id, hostId) {
+	constructor(id) {
 		this.id = id
-		this.host = hostId
 		this.players = new Map()
 		this.createdAt = Date.now()
 		this.lastActivity = Date.now()
-		this.isPublic = false
 		this.settings = {
 			maxPlayers: settings.maxPlayersPerRoom,
 		}
@@ -32,11 +27,6 @@ class Room {
 		this.players.set(player.id, player)
 		player.roomId = this.id
 		this.lastActivity = Date.now()
-
-		// Assign host if there is none (except PUBLIC room which has no host)
-		if (!this.host && this.id !== PUBLIC_ROOM_ID) {
-			this.host = player.id
-		}
 	}
 
 	// Remove a player from the room
@@ -46,16 +36,6 @@ class Room {
 			player.roomId = null
 			this.players.delete(playerId)
 			this.lastActivity = Date.now()
-		}
-
-		// If host left, assign new host or clear if empty (except PUBLIC room)
-		if (playerId === this.host && this.id !== PUBLIC_ROOM_ID) {
-			if (this.players.size > 0) {
-				const newHost = this.players.keys().next().value
-				this.host = newHost
-			} else {
-				this.host = null
-			}
 		}
 	}
 
@@ -100,20 +80,9 @@ class Room {
 
 		return {
 			id: this.id,
-			host: this.host,
 			playerCount: this.players.size,
 			maxPlayers: this.settings.maxPlayers,
-			isPublic: this.isPublic,
 			players,
-		}
-	}
-
-	// Get public room info (less detailed)
-	getPublicInfo() {
-		return {
-			id: this.id,
-			playerCount: this.players.size,
-			maxPlayers: this.settings.maxPlayers,
 		}
 	}
 }
@@ -123,39 +92,15 @@ export default class RoomManager {
 	constructor() {
 		this.rooms = new Map() // roomId -> Room
 		this.playerRooms = new Map() // playerId -> roomId
-		this.onPublicRoomsChange = null // Callback for broadcasting public rooms updates
-
-		// Create the persistent PUBLIC room
-		this.createPersistentPublicRoom()
 
 		// Start cleanup interval
 		this.cleanupInterval = setInterval(() => this.cleanup(), 60000) // Every minute
 	}
-	
-	// Set callback for broadcasting public rooms updates
-	setBroadcastCallback(callback) {
-		this.onPublicRoomsChange = callback
-	}
-	
-	// Notify about public rooms change
-	notifyPublicRoomsChange() {
-		if (this.onPublicRoomsChange) {
-			this.onPublicRoomsChange()
-		}
-	}
-
-	// Create the persistent PUBLIC room (no host, always exists)
-	createPersistentPublicRoom() {
-		const room = new Room(PUBLIC_ROOM_ID, null)
-		room.isPublic = true
-		this.rooms.set(PUBLIC_ROOM_ID, room)
-		console.log(`Persistent ${PUBLIC_ROOM_ID} room created`)
-	}
 
 	// Create a new room (optionally with a specific ID)
-	createRoom(hostPlayer, roomId = null) {
+	createRoom(player, roomId = null) {
 		// Check if player is already in a room
-		if (this.playerRooms.has(hostPlayer.id)) {
+		if (this.playerRooms.has(player.id)) {
 			throw new Error('ALREADY_IN_ROOM')
 		}
 
@@ -177,16 +122,13 @@ export default class RoomManager {
 		}
 
 		// Create room
-		const room = new Room(roomId, hostPlayer.id)
-		room.addPlayer(hostPlayer)
+		const room = new Room(roomId)
+		room.addPlayer(player)
 
 		this.rooms.set(roomId, room)
-		this.playerRooms.set(hostPlayer.id, roomId)
+		this.playerRooms.set(player.id, roomId)
 
-		console.log(`Room ${roomId} created by player ${hostPlayer.id}`)
-		
-		// Notify about public rooms change (new room might become public later)
-		this.notifyPublicRoomsChange()
+		console.log(`Room ${roomId} created by player ${player.id}`)
 
 		return room
 	}
@@ -200,7 +142,7 @@ export default class RoomManager {
 
 		let room = this.rooms.get(roomId)
 
-		// If room doesn't exist, create it with this player as host
+		// If room doesn't exist, create it
 		if (!room) {
 			return this.createRoom(player, roomId)
 		}
@@ -213,11 +155,6 @@ export default class RoomManager {
 		this.playerRooms.set(player.id, roomId)
 
 		console.log(`Player ${player.id} joined room ${roomId}`)
-		
-		// Notify about public rooms change (player count changed)
-		if (room.isPublic) {
-			this.notifyPublicRoomsChange()
-		}
 
 		return room
 	}
@@ -230,13 +167,12 @@ export default class RoomManager {
 		}
 
 		const room = this.rooms.get(roomId)
-		const wasPublic = room?.isPublic
 		
 		if (room) {
 			room.removePlayer(playerId)
 
-			// Clean up empty rooms (except PUBLIC which is persistent)
-			if (room.isEmpty() && roomId !== PUBLIC_ROOM_ID) {
+			// Clean up empty rooms
+			if (room.isEmpty()) {
 				this.rooms.delete(roomId)
 				console.log(`Room ${roomId} deleted (empty)`)
 			}
@@ -244,11 +180,6 @@ export default class RoomManager {
 
 		this.playerRooms.delete(playerId)
 		console.log(`Player ${playerId} left room ${roomId}`)
-		
-		// Notify about public rooms change (room deleted or player count changed)
-		if (wasPublic) {
-			this.notifyPublicRoomsChange()
-		}
 
 		return room
 	}
@@ -271,8 +202,6 @@ export default class RoomManager {
 		const expiredRooms = []
 
 		this.rooms.forEach((room, roomId) => {
-			// Never expire the PUBLIC room
-			if (roomId === PUBLIC_ROOM_ID) return
 
 			if (now - room.lastActivity > settings.roomTimeout) {
 				expiredRooms.push(roomId)
@@ -282,8 +211,6 @@ export default class RoomManager {
 		expiredRooms.forEach((roomId) => {
 			const room = this.rooms.get(roomId)
 			if (room) {
-				const wasPublic = room.isPublic
-				
 				// Notify players
 				room.broadcastAll({
 					type: 'room_closed',
@@ -298,11 +225,6 @@ export default class RoomManager {
 
 				this.rooms.delete(roomId)
 				console.log(`Room ${roomId} deleted (timeout)`)
-				
-				// Notify about public rooms change
-				if (wasPublic) {
-					this.notifyPublicRoomsChange()
-				}
 			}
 		})
 	}
@@ -334,40 +256,5 @@ export default class RoomManager {
 			roomCount: this.rooms.size,
 			playerCount: totalPlayers,
 		}
-	}
-
-	// Get list of public rooms
-	getPublicRooms() {
-		const publicRooms = []
-		this.rooms.forEach((room) => {
-			if (room.isPublic && !room.isFull()) {
-				publicRooms.push(room.getPublicInfo())
-			}
-		})
-		return publicRooms
-	}
-
-	// Set room public/private
-	setRoomPublic(playerId, isPublic) {
-		const roomId = this.playerRooms.get(playerId)
-		if (!roomId) {
-			throw new Error('NOT_IN_ROOM')
-		}
-
-		const room = this.rooms.get(roomId)
-		if (!room) {
-			throw new Error('ROOM_NOT_FOUND')
-		}
-
-		if (room.host !== playerId) {
-			throw new Error('NOT_HOST')
-		}
-
-		room.isPublic = isPublic
-		
-		// Notify about public rooms change
-		this.notifyPublicRoomsChange()
-		
-		return room
 	}
 }

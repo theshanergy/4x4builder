@@ -15,10 +15,6 @@ export const MessageTypes = {
 	ROOM_LEFT: 'room_left',
 	ROOM_STATE: 'room_state',
 	ROOM_CLOSED: 'room_closed',
-	SET_ROOM_PUBLIC: 'set_room_public',
-	GET_PUBLIC_ROOMS: 'get_public_rooms',
-	PUBLIC_ROOMS_LIST: 'public_rooms_list',
-	PUBLIC_ROOMS_UPDATE: 'public_rooms_update',
 	
 	// Player events
 	PLAYER_JOINED: 'player_joined',
@@ -40,7 +36,6 @@ export const ErrorCodes = {
 	ROOM_FULL: 'ROOM_FULL',
 	ALREADY_IN_ROOM: 'ALREADY_IN_ROOM',
 	NOT_IN_ROOM: 'NOT_IN_ROOM',
-	NOT_HOST: 'NOT_HOST',
 	INVALID_MESSAGE: 'INVALID_MESSAGE',
 	RATE_LIMITED: 'RATE_LIMITED',
 	VALIDATION_ERROR: 'VALIDATION_ERROR',
