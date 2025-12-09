@@ -5,7 +5,7 @@ import { PerformanceMonitor } from '@react-three/drei'
 
 import useGameStore from '../../store/gameStore'
 import Environment from './Environment'
-import CameraControls from './CameraControls'
+import CameraManager from './CameraManager'
 import InputManager from './InputManager'
 import XRManager from './XRManager'
 import Loader from '../ui/Loader'
@@ -45,7 +45,7 @@ const ThreeCanvas = () => {
 				<XRManager>
 					<InputManager />
 
-					<CameraControls />
+					<CameraManager />
 
 					<Physics paused={!physicsEnabled}>
 						<Suspense fallback={null}>

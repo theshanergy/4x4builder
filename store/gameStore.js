@@ -61,14 +61,14 @@ const useGameStore = create((set, get) => {
 		hideNotification: () => set({ notification: null }),
 
 		// Camera state
+		cameraMode: 'orbit', // 'orbit', 'firstPerson' (extensible for future modes)
 		cameraAutoRotate: false,
+		setCameraMode: (mode) => set({ cameraMode: mode }),
 		setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
 
 		// XR state
 		xrOriginRef: null,
-		insideVehicle: false,
 		setXrOriginRef: (ref) => set({ xrOriginRef: ref }),
-		setInsideVehicle: (inside) => set({ insideVehicle: inside }),
 
 		// Saved vehicles
 		savedVehicles: (() => {

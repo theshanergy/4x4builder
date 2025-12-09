@@ -6,7 +6,6 @@ import { useXR } from '@react-three/xr'
 import { Vector3, Quaternion } from 'three'
 
 import useGameStore, { vehicleState } from '../../store/gameStore'
-import useInputStore from '../../store/inputStore'
 import vehicleConfigs from '../../vehicleConfigs'
 import useAnimateHeight from '../../hooks/useAnimateHeight'
 import useVehiclePhysics from '../../hooks/useVehiclePhysics'
@@ -194,22 +193,9 @@ const Vehicle = (props) => {
 
 	// Get vehicle store
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
-	const xrOriginRef = useGameStore((state) => state.xrOriginRef)
-	const insideVehicle = useGameStore((state) => state.insideVehicle)
-	const setInsideVehicle = useGameStore((state) => state.setInsideVehicle)
-
-	// Track toggle button state to detect press (not hold)
-	const togglePressedLastFrame = useRef(false)
 
 	// Check if in XR session
 	const isInXR = useXR((state) => state.mode !== null)
-
-	// Seat offset relative to vehicle body (driver position)
-	// Y is relative to the body, which is already positioned at vehicleHeight
-	const seatOffset = useMemo(() => new Vector3(0.35, 0.15, 0.2), [])
-
-	// 180 degree rotation to face forward
-	const seatYawOffset = useMemo(() => new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI), [])
 
 	const chassisRef = useRef(null)
 	const chassisGroupRef = useRef(null) // Reference to the visual group that follows interpolated physics
@@ -266,20 +252,11 @@ const Vehicle = (props) => {
 	// Reusable vectors/quaternions to avoid GC pressure
 	const tempWorldPos = useMemo(() => new Vector3(), [])
 	const tempQuat = useMemo(() => new Quaternion(), [])
-	const tempSeatOffset = useMemo(() => new Vector3(), [])
 
-	// Update camera target and XR origin each frame
+	// Update vehicle position for camera and other systems each frame
 	// Use the visual group's world position which is interpolated by Rapier
 	useFrame(() => {
 		if (!chassisGroupRef.current) return
-
-		// Check for toggle input (V key or X button) - trigger on press, not hold
-		const { keys, input } = useInputStore.getState()
-		const togglePressed = keys.has('c') || keys.has('C') || input.buttonX
-		if (togglePressed && !togglePressedLastFrame.current) {
-			setInsideVehicle(!insideVehicle)
-		}
-		togglePressedLastFrame.current = togglePressed
 
 		// Get interpolated world position and quaternion from the visual group
 		chassisGroupRef.current.getWorldPosition(tempWorldPos)
@@ -292,20 +269,6 @@ const Vehicle = (props) => {
 		const sinYaw = 2 * (tempQuat.w * tempQuat.y + tempQuat.x * tempQuat.z)
 		const cosYaw = 1 - 2 * (tempQuat.y * tempQuat.y + tempQuat.x * tempQuat.x)
 		vehicleState.heading = Math.atan2(sinYaw, cosYaw)
-
-		// Update XR origin to follow vehicle when inside
-		if (insideVehicle && xrOriginRef?.current) {
-			// Calculate seat world position (offset is relative to body, add vehicleHeight)
-			tempSeatOffset.copy(seatOffset).applyQuaternion(tempQuat)
-
-			xrOriginRef.current.position.set(
-				tempWorldPos.x + tempSeatOffset.x,
-				tempWorldPos.y + tempSeatOffset.y + vehicleHeight,
-				tempWorldPos.z + tempSeatOffset.z
-			)
-			// Apply chassis rotation plus 180° yaw to face forward
-			xrOriginRef.current.quaternion.copy(tempQuat).multiply(seatYawOffset)
-		}
 	})
 
 	// Collider props
