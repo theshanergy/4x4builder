@@ -11,6 +11,28 @@ import CheckIcon from '../../assets/images/icons/Check.svg'
 // Lobby room ID - shared room that everyone can join from the UI
 const LOBBY_ROOM_ID = 'LOBBY'
 
+// Status message component
+function StatusMessage({ message, type = 'info' }) {
+	const bgColor = type === 'error' ? 'bg-red-900/50' : 'bg-blue-900/20'
+	const borderColor = type === 'error' ? 'border-red-700' : 'border-blue-700/20'
+	const textColor = type === 'error' ? 'text-red-200' : 'text-blue-200'
+
+	return (
+		<div className={`${bgColor} border ${borderColor} rounded p-3 ${textColor} text-sm`}>
+			<div className='flex items-start gap-3'>
+				{type !== 'error' && (
+					<div className='shrink-0 mt-0.5'>
+						<div className='w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin' />
+					</div>
+				)}
+				<div>
+					<p className='font-semibold'>{message}</p>
+				</div>
+			</div>
+		</div>
+	)
+}
+
 // Multiplayer panel component
 function MultiplayerPanel() {
 	const {
@@ -18,23 +40,16 @@ function MultiplayerPanel() {
 		currentRoom,
 		playerName,
 		remotePlayers,
-		serverAvailable,
-		isConnected,
 		isConnecting,
 		isInRoom,
-		remotePlayerCount,
-		connect,
-		createRoom,
 		joinRoom,
 		leaveRoom,
 		setPlayerName,
-		clearError,
 		checkServerAvailability,
 	} = useNetworkConnection()
 
 	const [joinRoomId, setJoinRoomId] = useState('')
 	const [copied, setCopied] = useState(false)
-	const [waitingForServer, setWaitingForServer] = useState(false)
 
 	// Handle copy room code
 	const handleCopyRoomCode = useCallback(async () => {
@@ -59,99 +74,21 @@ function MultiplayerPanel() {
 	)
 
 	// Handle connect to lobby
-	const handleConnectToLobby = useCallback(async () => {
-		// If server not available yet, show waiting message
-		if (serverAvailable !== true) {
-			setWaitingForServer(true)
-			// Keep checking until server is available
-			const checkInterval = setInterval(async () => {
-				const available = await checkServerAvailability()
-				if (available) {
-					clearInterval(checkInterval)
-					setWaitingForServer(false)
-					// Now connect
-					const connected = await connect()
-					if (connected) {
-						await joinRoom(LOBBY_ROOM_ID)
-					}
-				}
-			}, 2000)
-			return
-		}
-
-		if (!isConnected) {
-			const connected = await connect()
-			if (!connected) return
-		}
-		await joinRoom(LOBBY_ROOM_ID)
-	}, [serverAvailable, isConnected, connect, joinRoom, checkServerAvailability])
+	const handleConnectToLobby = useCallback(() => {
+		joinRoom(LOBBY_ROOM_ID)
+	}, [joinRoom])
 
 	// Handle join room by ID or create new room
-	const handleJoinRoom = useCallback(async () => {
+	const handleJoinRoom = useCallback(() => {
 		const roomIdToJoin = joinRoomId.trim()
-
-		// If server not available yet, show waiting message
-		if (serverAvailable !== true) {
-			setWaitingForServer(true)
-			// Keep checking until server is available
-			const checkInterval = setInterval(async () => {
-				const available = await checkServerAvailability()
-				if (available) {
-					clearInterval(checkInterval)
-					setWaitingForServer(false)
-					// Now connect and join/create
-					const connected = await connect()
-					if (connected) {
-						if (roomIdToJoin) {
-							await joinRoom(roomIdToJoin)
-							setJoinRoomId('')
-						} else {
-							await createRoom()
-						}
-					}
-				}
-			}, 2000)
-			return
-		}
-
-		if (!isConnected) {
-			const connected = await connect()
-			if (!connected) return
-		}
-
-		if (roomIdToJoin) {
-			await joinRoom(roomIdToJoin)
-			setJoinRoomId('')
-		} else {
-			await createRoom()
-		}
-	}, [serverAvailable, isConnected, connect, joinRoom, createRoom, joinRoomId, checkServerAvailability])
+		joinRoom(roomIdToJoin || null)
+		if (roomIdToJoin) setJoinRoomId('')
+	}, [joinRoom, joinRoomId])
 
 	// Handle leave room
 	const handleLeaveRoom = useCallback(() => {
 		leaveRoom()
 	}, [leaveRoom])
-
-	// Get status text and color (only shown when in room)
-	const getStatusInfo = () => {
-		if (isInRoom) {
-			return {
-				text: remotePlayerCount === 0 ? 'Waiting for players...' : `In room with ${remotePlayerCount} player${remotePlayerCount !== 1 ? 's' : ''}`,
-				color: 'text-green-400',
-				dotColor: 'bg-green-500',
-			}
-		}
-		if (isConnecting) {
-			return {
-				text: 'Connecting...',
-				color: 'text-yellow-400',
-				dotColor: 'bg-yellow-500 animate-pulse',
-			}
-		}
-		return null
-	}
-
-	const status = getStatusInfo()
 
 	return (
 		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />} onExpand={checkServerAvailability}>
@@ -161,33 +98,9 @@ function MultiplayerPanel() {
 				<input type='text' defaultValue={playerName} onBlur={handleNameChange} onKeyDown={(e) => e.key === 'Enter' && e.target.blur()} maxLength={20} className='w-full' />
 			</div>
 
-			{/* Status - only show when connecting or in room */}
-			{status && (
-				<div className='field'>
-					<label>Status</label>
-					<div className='flex items-center gap-2 text-sm'>
-						<span className={classNames('inline-block w-2 h-2 rounded-full', status.dotColor)} />
-						<span className={status.color}>{status.text}</span>
-					</div>
-				</div>
-			)}
-
-			{/* Waiting for server message */}
-			{waitingForServer && (
-				<div className='bg-amber-900/50 border border-amber-700 rounded p-3 text-amber-200 text-sm'>
-					<p>You're the first one here! Please wait a moment for the server to start up...</p>
-				</div>
-			)}
-
-			{/* Connection Error */}
-			{connectionError && (
-				<div className='bg-red-900/50 border border-red-700 rounded p-3 text-red-200 text-sm flex gap-2 justify-between items-center'>
-					<span>{connectionError}</span>
-					<button onClick={clearError} className='secondary small'>
-						×
-					</button>
-				</div>
-			)}
+			{/* Status Messages */}
+			{isConnecting && <StatusMessage message='Connecting to server...' />}
+			{connectionError && <StatusMessage message={connectionError} type='error' />}
 
 			{/* Room controls */}
 			{isInRoom ? (
@@ -222,11 +135,11 @@ function MultiplayerPanel() {
 					{/* Connect to Lobby Button */}
 					<button
 						onClick={handleConnectToLobby}
-						disabled={isConnecting || waitingForServer}
+						disabled={isConnecting}
 						className={classNames('justify-center bg-green-600 hover:bg-green-500 text-white font-semibold py-3', {
-							'opacity-50 cursor-not-allowed': isConnecting || waitingForServer,
+							'opacity-50 cursor-not-allowed': isConnecting,
 						})}>
-						{isConnecting ? 'Connecting...' : waitingForServer ? 'Starting server...' : 'Connect to Lobby'}
+						{isConnecting ? 'Connecting...' : 'Connect to Lobby'}
 					</button>
 
 					{/* OR separator */}
@@ -251,8 +164,8 @@ function MultiplayerPanel() {
 							/>
 							<button
 								onClick={handleJoinRoom}
-								disabled={isConnecting || waitingForServer}
-								className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting || waitingForServer })}>
+								disabled={isConnecting}
+								className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting })}>
 								{isConnecting ? '...' : joinRoomId.trim() ? 'Join' : 'Create'}
 							</button>
 						</div>

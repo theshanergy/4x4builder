@@ -133,16 +133,21 @@ export default class RoomManager {
 		return room
 	}
 
-	// Join an existing room, or create it if it doesn't exist
+	// Join an existing room, or create one if roomId is null/doesn't exist
 	joinRoom(roomId, player) {
 		// Check if player is already in a room
 		if (this.playerRooms.has(player.id)) {
 			throw new Error('ALREADY_IN_ROOM')
 		}
 
+		// If no roomId provided, create a new room
+		if (!roomId) {
+			return this.createRoom(player)
+		}
+
 		let room = this.rooms.get(roomId)
 
-		// If room doesn't exist, create it
+		// If room doesn't exist, create it with the specified ID
 		if (!room) {
 			return this.createRoom(player, roomId)
 		}

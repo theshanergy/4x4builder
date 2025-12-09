@@ -304,6 +304,32 @@ const useMultiplayerStore = create((set, get) => ({
 		}
 	},
 	
+	// Ensure connected to server (waits for availability, then connects if needed)
+	ensureConnected: async () => {
+		const networkManager = get().networkManager
+		if (networkManager?.isConnected()) return true
+		
+		// Wait for server to be available
+		if (get().serverAvailable !== true) {
+			const available = await get().checkServerAvailability()
+			if (!available) {
+				// Wait for server with polling
+				await new Promise((resolve) => {
+					const check = async () => {
+						if (await get().checkServerAvailability()) {
+							resolve()
+						} else {
+							setTimeout(check, 2000)
+						}
+					}
+					setTimeout(check, 2000)
+				})
+			}
+		}
+		
+		return get().connect(getServerUrl())
+	},
+	
 	// Disconnect from server
 	disconnect: () => {
 		const networkManager = get().networkManager
@@ -318,26 +344,12 @@ const useMultiplayerStore = create((set, get) => ({
 		})
 	},
 	
-	// Create a room
-	createRoom: async (vehicleConfig) => {
-		const networkManager = get().networkManager
-		if (!networkManager?.isConnected()) {
-			set({ connectionError: 'Not connected to server' })
-			return false
-		}
-		
-		return networkManager.createRoom(get().playerName, vehicleConfig)
-	},
-	
-	// Join a room
+	// Join a room, or create one if no roomId provided (auto-connects if needed)
 	joinRoom: async (roomId, vehicleConfig) => {
-		const networkManager = get().networkManager
-		if (!networkManager?.isConnected()) {
-			set({ connectionError: 'Not connected to server' })
-			return false
-		}
+		const connected = await get().ensureConnected()
+		if (!connected) return false
 		
-		return networkManager.joinRoom(roomId, get().playerName, vehicleConfig)
+		return get().networkManager.joinRoom(roomId, get().playerName, vehicleConfig)
 	},
 	
 	// Leave current room

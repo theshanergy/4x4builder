@@ -238,7 +238,6 @@ export default class NetworkManager {
 				this.callbacks.onError?.(message)
 				break
 				
-			case MessageTypes.ROOM_CREATED:
 			case MessageTypes.ROOM_JOINED:
 				this.callbacks.onRoomEntered?.(message)
 				break
@@ -289,16 +288,9 @@ export default class NetworkManager {
 	}
 	
 	// Room actions
-	createRoom(playerName, vehicleConfig) {
-		return this.send(createMessage(MessageTypes.CREATE_ROOM, {
-			playerName,
-			vehicleConfig,
-		}))
-	}
-	
 	joinRoom(roomId, playerName, vehicleConfig) {
 		return this.send(createMessage(MessageTypes.JOIN_ROOM, {
-			roomId: roomId.toUpperCase(),
+			roomId: roomId?.toUpperCase() || null,
 			playerName,
 			vehicleConfig,
 		}))

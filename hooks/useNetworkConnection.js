@@ -15,7 +15,6 @@ export function useNetworkConnection() {
 	
 	const connect = useMultiplayerStore((state) => state.connect)
 	const disconnect = useMultiplayerStore((state) => state.disconnect)
-	const createRoom = useMultiplayerStore((state) => state.createRoom)
 	const joinRoom = useMultiplayerStore((state) => state.joinRoom)
 	const leaveRoom = useMultiplayerStore((state) => state.leaveRoom)
 	const setPlayerName = useMultiplayerStore((state) => state.setPlayerName)
@@ -30,12 +29,7 @@ export function useNetworkConnection() {
 		return connect(serverUrl)
 	}, [connect])
 	
-	// Create room with current vehicle config
-	const handleCreateRoom = useCallback(async () => {
-		return createRoom(currentVehicle)
-	}, [createRoom, currentVehicle])
-	
-	// Join room with current vehicle config
+	// Join room (or create if no roomId) with current vehicle config
 	const handleJoinRoom = useCallback(async (roomId) => {
 		return joinRoom(roomId, currentVehicle)
 	}, [joinRoom, currentVehicle])
@@ -68,7 +62,6 @@ export function useNetworkConnection() {
 		// Actions
 		connect: handleConnect,
 		disconnect,
-		createRoom: handleCreateRoom,
 		joinRoom: handleJoinRoom,
 		leaveRoom,
 		setPlayerName,

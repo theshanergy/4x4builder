@@ -8,10 +8,8 @@ export const MessageTypes = {
 	ERROR: 'error',
 	
 	// Room management
-	CREATE_ROOM: 'create_room',
 	JOIN_ROOM: 'join_room',
 	LEAVE_ROOM: 'leave_room',
-	ROOM_CREATED: 'room_created',
 	ROOM_JOINED: 'room_joined',
 	ROOM_LEFT: 'room_left',
 	ROOM_STATE: 'room_state',

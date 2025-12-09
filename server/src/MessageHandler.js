@@ -23,10 +23,6 @@ export default class MessageHandler {
 				this.handlePing(player, message)
 				break
 				
-			case MessageTypes.CREATE_ROOM:
-				this.handleCreateRoom(player, message)
-				break
-				
 			case MessageTypes.JOIN_ROOM:
 				this.handleJoinRoom(player, message)
 				break
@@ -72,42 +68,13 @@ export default class MessageHandler {
 		}))
 	}
 	
-	// Handle create room
-	handleCreateRoom(player, message) {
-		try {
-			// Set player name if provided
-			if (message.playerName) {
-				player.setName(message.playerName)
-			}
-			
-			// Set vehicle config if provided
-			if (message.vehicleConfig) {
-				const validation = Validator.validateVehicleConfig(message.vehicleConfig)
-				if (validation.valid) {
-					player.updateVehicleConfig(message.vehicleConfig)
-				}
-			}
-			
-			const room = this.roomManager.createRoom(player)
-			
-			player.send(createMessage(MessageTypes.ROOM_CREATED, {
-				roomId: room.id,
-				roomState: room.getState(),
-			}))
-		} catch (error) {
-			player.send(createMessage(MessageTypes.ERROR, {
-				code: error.message,
-				message: this.getErrorMessage(error.message),
-			}))
-		}
-	}
-	
-	// Handle join room
+	// Handle join room (or create if no roomId provided)
 	handleJoinRoom(player, message) {
 		try {
-			const roomId = message.roomId?.toUpperCase()
+			const roomId = message.roomId?.toUpperCase() || null
 			
-			if (!Validator.isValidRoomCode(roomId)) {
+			// Validate room code if provided
+			if (roomId && !Validator.isValidRoomCode(roomId)) {
 				throw new Error('INVALID_ROOM_CODE')
 			}
 			
@@ -125,14 +92,14 @@ export default class MessageHandler {
 			}
 			
 			// Check if this is a new room (will be created)
-			const existingRoom = this.roomManager.getRoom(roomId)
+			const existingRoom = roomId ? this.roomManager.getRoom(roomId) : null
 			const isNewRoom = !existingRoom
 			
 			const room = this.roomManager.joinRoom(roomId, player)
 			
 			if (isNewRoom) {
-				// Room was created, send ROOM_CREATED message
-				player.send(createMessage(MessageTypes.ROOM_CREATED, {
+				// Room was created
+				player.send(createMessage(MessageTypes.ROOM_JOINED, {
 					roomId: room.id,
 					roomState: room.getState(),
 				}))
