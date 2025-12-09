@@ -13,9 +13,6 @@ export const getServerUrl = () => {
 
 // Multiplayer store
 const useMultiplayerStore = create((set, get) => ({
-	// Server availability
-	serverAvailable: null,
-
 	// Connection state
 	connectionState: ConnectionState.DISCONNECTED,
 	connectionError: null,
@@ -42,55 +39,6 @@ const useMultiplayerStore = create((set, get) => ({
 	
 	// Handler for pushing transforms to vehicles (set by RemoteVehicleManager)
 	_pushTransformToVehicle: null,
-	
-	// Retry interval reference
-	_serverCheckRetryInterval: null,
-	
-	// Check if server is available (with automatic retries)
-	checkServerAvailability: async () => {
-		// Skip if already available
-		if (get().serverAvailable === true) return true
-		
-		const serverUrl = getServerUrl()
-		
-		const result = await new Promise((resolve) => {
-			const ws = new WebSocket(serverUrl)
-			let resolved = false
-			
-			const cleanup = (value) => {
-				if (resolved) return
-				resolved = true
-				clearTimeout(timeout)
-				try { ws.close() } catch (e) {}
-				resolve(value)
-			}
-			
-			const timeout = setTimeout(() => cleanup(false), 5000)
-			
-			ws.onopen = () => cleanup(true)
-			ws.onerror = () => cleanup(false)
-			ws.onclose = () => {
-				if (!resolved) cleanup(false)
-			}
-		})
-		
-		set({ serverAvailable: result })
-		
-		// If not available, start retry interval
-		if (!result && !get()._serverCheckRetryInterval) {
-			const interval = setInterval(() => {
-				if (get().serverAvailable === true) {
-					clearInterval(interval)
-					set({ _serverCheckRetryInterval: null })
-				} else {
-					get().checkServerAvailability()
-				}
-			}, 5000)
-			set({ _serverCheckRetryInterval: interval })
-		}
-		
-		return result
-	},
 	
 	// Initialize network manager
 	initNetworkManager: (serverUrl) => {
@@ -299,33 +247,18 @@ const useMultiplayerStore = create((set, get) => ({
 			await networkManager.connect()
 			return true
 		} catch (error) {
-			set({ connectionError: error.message })
+			set({ 
+				connectionError: error.message,
+				connectionState: ConnectionState.DISCONNECTED,
+			})
 			return false
 		}
 	},
 	
-	// Ensure connected to server (waits for availability, then connects if needed)
+	// Ensure connected to server (connects if needed, with retry for cold boot)
 	ensureConnected: async () => {
 		const networkManager = get().networkManager
 		if (networkManager?.isConnected()) return true
-		
-		// Wait for server to be available
-		if (get().serverAvailable !== true) {
-			const available = await get().checkServerAvailability()
-			if (!available) {
-				// Wait for server with polling
-				await new Promise((resolve) => {
-					const check = async () => {
-						if (await get().checkServerAvailability()) {
-							resolve()
-						} else {
-							setTimeout(check, 2000)
-						}
-					}
-					setTimeout(check, 2000)
-				})
-			}
-		}
 		
 		return get().connect(getServerUrl())
 	},

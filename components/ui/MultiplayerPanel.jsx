@@ -35,18 +35,7 @@ function StatusMessage({ message, type = 'info' }) {
 
 // Multiplayer panel component
 function MultiplayerPanel() {
-	const {
-		connectionError,
-		currentRoom,
-		playerName,
-		remotePlayers,
-		isConnecting,
-		isInRoom,
-		joinRoom,
-		leaveRoom,
-		setPlayerName,
-		checkServerAvailability,
-	} = useNetworkConnection()
+	const { connectionError, currentRoom, playerName, remotePlayers, isConnecting, isInRoom, joinRoom, leaveRoom, setPlayerName } = useNetworkConnection()
 
 	const [joinRoomId, setJoinRoomId] = useState('')
 	const [copied, setCopied] = useState(false)
@@ -91,7 +80,7 @@ function MultiplayerPanel() {
 	}, [leaveRoom])
 
 	return (
-		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />} onExpand={checkServerAvailability}>
+		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />}>
 			{/* Player Name */}
 			<div className='field'>
 				<label>User Name</label>
@@ -158,14 +147,11 @@ function MultiplayerPanel() {
 								value={joinRoomId}
 								onChange={(e) => setJoinRoomId(e.target.value.toUpperCase())}
 								onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
-								placeholder='Enter code or leave blank to create'
+								placeholder='ROOM CODE'
 								maxLength={8}
 								className='w-full'
 							/>
-							<button
-								onClick={handleJoinRoom}
-								disabled={isConnecting}
-								className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting })}>
+							<button onClick={handleJoinRoom} disabled={isConnecting} className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting })}>
 								{isConnecting ? '...' : joinRoomId.trim() ? 'Join' : 'Create'}
 							</button>
 						</div>

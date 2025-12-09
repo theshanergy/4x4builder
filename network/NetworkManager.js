@@ -25,6 +25,9 @@ export default class NetworkManager {
 		this.reconnectDelay = options.reconnectDelay || 1000
 		this.reconnectTimer = null
 		
+		// Connection retry timer (for initial connection attempts)
+		this.connectionRetryTimer = null
+		
 		// Latency tracking
 		this.latency = 0
 		this.pingInterval = null
@@ -65,47 +68,69 @@ export default class NetworkManager {
 		return this
 	}
 	
-	// Connect to server
-	connect() {
+	// Connect to server (with retry for cold boot scenarios)
+	connect(retryForColdBoot = true) {
 		if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
 			console.log('Already connected or connecting')
 			return Promise.resolve()
 		}
 		
+		// For cold boot, allow more attempts over a longer period (up to ~90 seconds)
+		const maxAttempts = retryForColdBoot ? 30 : 1
+		const baseDelay = 3000 // 3 seconds between retries
+		
 		return new Promise((resolve, reject) => {
-			this.setState(ConnectionState.CONNECTING)
+			let attempts = 0
 			
-			try {
-				this.ws = new WebSocket(this.serverUrl)
+			const tryConnect = () => {
+				attempts++
+				this.setState(ConnectionState.CONNECTING)
 				
-				this.ws.onopen = () => {
-					console.log('Connected to multiplayer server')
-					this.reconnectAttempts = 0
-					this.setState(ConnectionState.CONNECTED)
-					this.startPingInterval()
-					resolve()
-				}
-				
-				this.ws.onclose = (event) => {
-					console.log('Disconnected from server:', event.code, event.reason)
-					this.stopPingInterval()
-					this.handleDisconnect()
-				}
-				
-				this.ws.onerror = (error) => {
-					console.error('WebSocket error:', error)
-					if (this.state === ConnectionState.CONNECTING) {
-						reject(new Error('Failed to connect to server'))
+				try {
+					this.ws = new WebSocket(this.serverUrl)
+					
+					this.ws.onopen = () => {
+						console.log('Connected to multiplayer server')
+						this.reconnectAttempts = 0
+						this.setState(ConnectionState.CONNECTED)
+						this.startPingInterval()
+						resolve()
 					}
+					
+					this.ws.onclose = (event) => {
+						console.log('Disconnected from server:', event.code, event.reason)
+						this.stopPingInterval()
+						// Only handle reconnect if we were previously connected (not during initial connect)
+						if (this.state === ConnectionState.CONNECTED) {
+							this.handleDisconnect()
+						}
+					}
+					
+					this.ws.onerror = (error) => {
+						console.error('WebSocket error:', error)
+						if (this.state === ConnectionState.CONNECTING) {
+							// Retry if we haven't exceeded max attempts
+							if (attempts < maxAttempts) {
+								console.log(`Connection failed, retrying in ${baseDelay}ms (attempt ${attempts}/${maxAttempts})`)
+								this.connectionRetryTimer = setTimeout(tryConnect, baseDelay)
+							} else {
+								this.connectionRetryTimer = null
+								this.setState(ConnectionState.DISCONNECTED)
+								reject(new Error('Failed to connect to server. Please check if the server is running.'))
+							}
+						}
+					}
+					
+					this.ws.onmessage = (event) => {
+						this.handleMessage(event.data)
+					}
+				} catch (error) {
+					this.setState(ConnectionState.DISCONNECTED)
+					reject(error)
 				}
-				
-				this.ws.onmessage = (event) => {
-					this.handleMessage(event.data)
-				}
-			} catch (error) {
-				this.setState(ConnectionState.DISCONNECTED)
-				reject(error)
 			}
+			
+			tryConnect()
 		})
 	}
 	
@@ -113,6 +138,12 @@ export default class NetworkManager {
 	disconnect() {
 		this.stopReconnect()
 		this.stopPingInterval()
+		
+		// Cancel any pending connection retry
+		if (this.connectionRetryTimer) {
+			clearTimeout(this.connectionRetryTimer)
+			this.connectionRetryTimer = null
+		}
 		
 		if (this.ws) {
 			this.ws.close(1000, 'Client disconnect')
