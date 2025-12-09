@@ -88,7 +88,7 @@ function MultiplayerPanel() {
 		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />}>
 			{/* Player Name */}
 			<div className='field'>
-				<label>User Name</label>
+				<label>Player Name</label>
 				<input type='text' defaultValue={playerName} onBlur={handleNameChange} onKeyDown={(e) => e.key === 'Enter' && e.target.blur()} maxLength={20} className='w-full' />
 			</div>
 

@@ -19,7 +19,7 @@ const useMultiplayerStore = create((set, get) => ({
 	
 	// Player identity
 	localPlayerId: null,
-	playerName: localStorage.getItem('playerName') || 'Driver',
+	playerName: localStorage.getItem('playerName') || 'Player',
 	
 	// Room state
 	currentRoom: null,
