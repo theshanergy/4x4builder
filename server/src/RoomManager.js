@@ -172,7 +172,7 @@ export default class RoomManager {
 		}
 
 		const room = this.rooms.get(roomId)
-		
+
 		if (room) {
 			room.removePlayer(playerId)
 
@@ -207,7 +207,6 @@ export default class RoomManager {
 		const expiredRooms = []
 
 		this.rooms.forEach((room, roomId) => {
-
 			if (now - room.lastActivity > settings.roomTimeout) {
 				expiredRooms.push(roomId)
 			}
@@ -253,13 +252,21 @@ export default class RoomManager {
 	// Get stats
 	getStats() {
 		let totalPlayers = 0
-		this.rooms.forEach((room) => {
-			totalPlayers += room.players.size
+		let publicLobbyPlayerCount = 0
+
+		this.rooms.forEach((room, roomId) => {
+			const playerCount = room.players.size
+			totalPlayers += playerCount
+			
+			if (roomId === settings.publicLobbyId) {
+				publicLobbyPlayerCount = playerCount
+			}
 		})
 
 		return {
 			roomCount: this.rooms.size,
-			playerCount: totalPlayers,
+			lobbyPlayerCount: publicLobbyPlayerCount,
+			totalPlayerCount: totalPlayers,
 		}
 	}
 }

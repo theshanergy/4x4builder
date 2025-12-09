@@ -27,10 +27,12 @@ export default class WebSocketServer {
 			
 			console.log(`Player connected: ${playerId} (${this.players.size} total)`)
 			
-			// Send welcome message with player ID
+			// Send welcome message with player ID and lobby stats
+			const stats = this.roomManager.getStats()
 			player.send(createMessage(MessageTypes.WELCOME, {
 				playerId: playerId,
 				serverTime: Date.now(),
+				lobbyPlayerCount: stats.lobbyPlayerCount,
 			}))
 			
 			// Handle incoming messages

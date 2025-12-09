@@ -37,6 +37,7 @@ export default class NetworkManager {
 		this.callbacks = {
 			onStateChange: null,
 			onWelcome: null,
+			onLobbyInfo: null,
 			onError: null,
 			onRoomEntered: null,
 			onRoomLeft: null,
@@ -98,16 +99,16 @@ export default class NetworkManager {
 					}
 					
 					this.ws.onclose = (event) => {
-						console.log('Disconnected from server:', event.code, event.reason)
 						this.stopPingInterval()
-						// Only handle reconnect if we were previously connected (not during initial connect)
+						// Only log and handle reconnect if we were previously connected (not during initial connect)
 						if (this.state === ConnectionState.CONNECTED) {
+							console.log('Disconnected from server:', event.code, event.reason)
 							this.handleDisconnect()
 						}
 					}
 					
-					this.ws.onerror = (error) => {
-						console.error('WebSocket error:', error)
+					this.ws.onerror = () => {
+						// Silently handle errors during connection attempts - they will trigger retries
 						if (this.state === ConnectionState.CONNECTING) {
 							// Retry if we haven't exceeded max attempts
 							if (attempts < maxAttempts) {
@@ -258,6 +259,10 @@ export default class NetworkManager {
 			case MessageTypes.WELCOME:
 				this.playerId = message.playerId
 				this.callbacks.onWelcome?.(message)
+				break
+				
+			case MessageTypes.LOBBY_INFO:
+				this.callbacks.onLobbyInfo?.(message)
 				break
 				
 			case MessageTypes.PONG:

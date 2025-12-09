@@ -16,6 +16,10 @@ const useMultiplayerStore = create((set, get) => ({
 	// Connection state
 	connectionState: ConnectionState.DISCONNECTED,
 	connectionError: null,
+	joiningRoom: false, // True when user has initiated a join (shows connecting UI)
+	
+	// Lobby info (available before joining)
+	lobbyPlayerCount: 0,
 	
 	// Player identity
 	localPlayerId: null,
@@ -58,15 +62,20 @@ const useMultiplayerStore = create((set, get) => ({
 				set({ 
 					localPlayerId: message.playerId,
 					connectionError: null,
+					lobbyPlayerCount: message.lobbyPlayerCount || 0,
 				})
 			})
+			.on('onLobbyInfo', (message) => {
+				set({ lobbyPlayerCount: message.lobbyPlayerCount || 0 })
+			})
 			.on('onError', (message) => {
-				set({ connectionError: message.message })
+				set({ connectionError: message.message, joiningRoom: false })
 			})
 			.on('onRoomEntered', (message) => {
 				set({
 					currentRoom: message.roomState,
 					connectionError: null,
+					joiningRoom: false,
 				})
 				// Initialize remote players from room state
 				get().syncRemotePlayers(message.roomState.players)
@@ -235,6 +244,23 @@ const useMultiplayerStore = create((set, get) => ({
 		set({ remotePlayers })
 	},
 	
+	// Preconnect to server (silent, for warming up cold server and getting lobby info)
+	preconnect: async () => {
+		const existing = get().networkManager
+		if (existing?.isConnected()) return true
+		
+		const networkManager = get().initNetworkManager(getServerUrl())
+		
+		try {
+			await networkManager.connect()
+			return true
+		} catch (error) {
+			// Silent fail for preconnect - don't show error to user
+			console.log('Preconnect failed:', error.message)
+			return false
+		}
+	},
+	
 	// Connect to server
 	connect: async (serverUrl) => {
 		let networkManager = get().networkManager
@@ -279,8 +305,13 @@ const useMultiplayerStore = create((set, get) => ({
 	
 	// Join a room, or create one if no roomId provided (auto-connects if needed)
 	joinRoom: async (roomId) => {
+		set({ joiningRoom: true, connectionError: null })
+		
 		const connected = await get().ensureConnected()
-		if (!connected) return false
+		if (!connected) {
+			set({ joiningRoom: false })
+			return false
+		}
 		
 		const vehicleConfig = useGameStore.getState().currentVehicle
 		return get().networkManager.joinRoom(roomId, get().playerName, vehicleConfig)

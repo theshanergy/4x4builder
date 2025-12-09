@@ -6,6 +6,7 @@ export const MessageTypes = {
 	PONG: 'pong',
 	WELCOME: 'welcome',
 	ERROR: 'error',
+	LOBBY_INFO: 'lobby_info',
 	
 	// Room management
 	JOIN_ROOM: 'join_room',

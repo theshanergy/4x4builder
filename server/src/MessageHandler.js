@@ -1,10 +1,12 @@
 import { MessageTypes, ErrorCodes, createMessage } from './types.js'
 import Validator from './Validator.js'
+import settings from '../config/settings.js'
 
 // Handle incoming messages
 export default class MessageHandler {
-	constructor(roomManager) {
+	constructor(roomManager, wsServer) {
 		this.roomManager = roomManager
+		this.wsServer = wsServer
 	}
 	
 	// Process a message from a player
@@ -68,6 +70,25 @@ export default class MessageHandler {
 		}))
 	}
 	
+	// Broadcast lobby info to all connected players (only when public lobby changes)
+	broadcastLobbyInfo(roomId) {
+		// Only broadcast if the change affects the public lobby
+		if (roomId && roomId !== settings.publicLobbyId) {
+			return
+		}
+		
+		const stats = this.roomManager.getStats()
+		const message = JSON.stringify(createMessage(MessageTypes.LOBBY_INFO, {
+			lobbyPlayerCount: stats.lobbyPlayerCount,
+		}))
+		
+		this.wsServer.wss.clients.forEach((client) => {
+			if (client.readyState === 1) {
+				client.send(message)
+			}
+		})
+	}
+	
 	// Handle join room (or create if no roomId provided)
 	handleJoinRoom(player, message) {
 		try {
@@ -115,6 +136,9 @@ export default class MessageHandler {
 					roomState: room.getState(),
 				}))
 			}
+			
+			// Broadcast updated lobby count to all connected players
+			this.broadcastLobbyInfo(room.id)
 		} catch (error) {
 			player.send(createMessage(MessageTypes.ERROR, {
 				code: error.message,
@@ -150,6 +174,9 @@ export default class MessageHandler {
 		}
 		
 		player.send(createMessage(MessageTypes.ROOM_LEFT, {}))
+		
+		// Broadcast updated lobby count to all connected players
+		this.broadcastLobbyInfo(room.id)
 	}
 	
 	// Handle player position/rotation update
@@ -284,6 +311,9 @@ export default class MessageHandler {
 					roomState: room.getState(),
 				}))
 			}
+			
+			// Broadcast updated lobby count to all connected players
+			this.broadcastLobbyInfo(room.id)
 		}
 	}
 	

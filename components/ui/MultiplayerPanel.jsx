@@ -1,15 +1,13 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import classNames from 'classnames'
 import useMultiplayerStore from '../../store/multiplayerStore'
+import { PUBLIC_LOBBY_ID } from '../../shared/constants.js'
 import EditorSection from './EditorSection'
 import PlayerList from './PlayerList'
 
 import MultiplayerIcon from '../../assets/images/icons/Multiplayer.svg'
 import CopyIcon from '../../assets/images/icons/Copy.svg'
 import CheckIcon from '../../assets/images/icons/Check.svg'
-
-// Lobby room ID - shared room that everyone can join from the UI
-const LOBBY_ROOM_ID = 'LOBBY'
 
 // Status message component
 function StatusMessage({ message, type = 'info' }) {
@@ -37,14 +35,20 @@ function StatusMessage({ message, type = 'info' }) {
 function MultiplayerPanel() {
 	const connectionState = useMultiplayerStore((state) => state.connectionState)
 	const connectionError = useMultiplayerStore((state) => state.connectionError)
+	const joiningRoom = useMultiplayerStore((state) => state.joiningRoom)
 	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
 	const playerName = useMultiplayerStore((state) => state.playerName)
 	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
+	const lobbyPlayerCount = useMultiplayerStore((state) => state.lobbyPlayerCount)
+	const preconnect = useMultiplayerStore((state) => state.preconnect)
 	const joinRoom = useMultiplayerStore((state) => state.joinRoom)
 	const leaveRoom = useMultiplayerStore((state) => state.leaveRoom)
 	const setPlayerName = useMultiplayerStore((state) => state.setPlayerName)
 
-	const isConnecting = connectionState === 'connecting' || connectionState === 'reconnecting'
+	// Preconnect to server on mount (warms up cold server and gets lobby player count)
+	useEffect(() => {
+		preconnect()
+	}, [preconnect])
 	const isInRoom = currentRoom !== null
 
 	const [joinRoomId, setJoinRoomId] = useState('')
@@ -74,7 +78,7 @@ function MultiplayerPanel() {
 
 	// Handle connect to lobby
 	const handleConnectToLobby = useCallback(() => {
-		joinRoom(LOBBY_ROOM_ID)
+		joinRoom(PUBLIC_LOBBY_ID)
 	}, [joinRoom])
 
 	// Handle join room by ID or create new room
@@ -85,7 +89,7 @@ function MultiplayerPanel() {
 	}, [joinRoom, joinRoomId])
 
 	return (
-		<EditorSection title='Co-Op' icon={<MultiplayerIcon className='icon' />}>
+		<EditorSection title='Online' icon={<MultiplayerIcon className='icon' />} badge={lobbyPlayerCount}>
 			{/* Player Name */}
 			<div className='field'>
 				<label>Player Name</label>
@@ -93,7 +97,7 @@ function MultiplayerPanel() {
 			</div>
 
 			{/* Status Messages */}
-			{isConnecting && <StatusMessage message='Connecting to server...' />}
+			{joiningRoom && <StatusMessage message='Connecting to server...' />}
 			{connectionError && <StatusMessage message={connectionError} type='error' />}
 
 			{/* Room controls */}
@@ -129,11 +133,11 @@ function MultiplayerPanel() {
 					{/* Connect to Lobby Button */}
 					<button
 						onClick={handleConnectToLobby}
-						disabled={isConnecting}
+						disabled={joiningRoom}
 						className={classNames('justify-center bg-green-600 hover:bg-green-500 text-white font-semibold py-3', {
-							'opacity-50 cursor-not-allowed': isConnecting,
+							'opacity-50 cursor-not-allowed': joiningRoom,
 						})}>
-						{isConnecting ? 'Connecting...' : 'Connect to Lobby'}
+						{joiningRoom ? 'Joining...' : 'Join Lobby'}
 					</button>
 
 					{/* OR separator */}
@@ -156,8 +160,8 @@ function MultiplayerPanel() {
 								maxLength={8}
 								className='w-full'
 							/>
-							<button onClick={handleJoinRoom} disabled={isConnecting} className={classNames('small', { 'opacity-50 cursor-not-allowed': isConnecting })}>
-								{isConnecting ? '...' : joinRoomId.trim() ? 'Join' : 'Create'}
+							<button onClick={handleJoinRoom} disabled={joiningRoom} className={classNames('small', { 'opacity-50 cursor-not-allowed': joiningRoom })}>
+								{joiningRoom ? '...' : joinRoomId.trim() ? 'Join' : 'Create'}
 							</button>
 						</div>
 					</div>

@@ -1,3 +1,5 @@
+import { PUBLIC_LOBBY_ID } from '../../shared/constants.js'
+
 // Server configuration settings
 export default {
 	// Server
@@ -7,6 +9,7 @@ export default {
 	maxPlayersPerRoom: 8,
 	roomCodeLength: 8,
 	roomTimeout: 30 * 60 * 1000, // 30 minutes of inactivity
+	publicLobbyId: PUBLIC_LOBBY_ID,
 	
 	// Rate limiting
 	maxMessagesPerSecond: 60,
