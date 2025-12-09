@@ -15,6 +15,9 @@ const GRADIENT_EPSILON = 0.01
 // Fade-in duration for new tiles (in seconds)
 const TILE_FADE_DURATION = 0.5
 
+// Regional height modulation scale (size of flat/hilly regions)
+const REGION_SCALE = 240
+
 // Default terrain configuration
 const DEFAULT_TERRAIN_CONFIG = {
 	viewDistance: 160,
@@ -24,8 +27,54 @@ const DEFAULT_TERRAIN_CONFIG = {
 	maxHeight: 4,
 }
 
+// Shared terrain height calculation utilities
+const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDist) => {
+	const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
+	const transitionEndDistSq = transitionEndDist * transitionEndDist
+
+	// Get raw height value at any world position (normalized 0-1)
+	const getRawHeight = (worldX, worldZ) => {
+		const distSq = worldX * worldX + worldZ * worldZ
+		if (distSq < flatAreaRadiusSq) return 0
+
+		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
+		const normalizedHeight = (noiseValue + 1) / 2
+
+		// Regional height modulation - creates dispersed flatter areas
+		const regionNoise = noise.perlin2(worldX / REGION_SCALE + 100, worldZ / REGION_SCALE + 100)
+		// Map to 0.1-1.0 range: some areas have 10% height (much flatter), others full height
+		const regionModifier = 0.1 + (regionNoise + 1) * 0.45
+
+		if (distSq < transitionEndDistSq) {
+			const t = (Math.sqrt(distSq) - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
+			return normalizedHeight * (t * t * (3 - 2 * t)) * regionModifier
+		}
+		return normalizedHeight * regionModifier
+	}
+
+	// Get terrain height at any world position (in world units)
+	const getHeight = (worldX, worldZ, maxHeight) => {
+		return getRawHeight(worldX, worldZ) * maxHeight
+	}
+
+	// Get terrain normal at any world position
+	const getNormal = (worldX, worldZ, maxHeight, target) => {
+		const hL = getRawHeight(worldX - GRADIENT_EPSILON, worldZ) * maxHeight
+		const hR = getRawHeight(worldX + GRADIENT_EPSILON, worldZ) * maxHeight
+		const hD = getRawHeight(worldX, worldZ - GRADIENT_EPSILON) * maxHeight
+		const hU = getRawHeight(worldX, worldZ + GRADIENT_EPSILON) * maxHeight
+
+		const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
+		const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
+
+		return target.set(-dhdx, 1, -dhdz).normalize()
+	}
+
+	return { getRawHeight, getHeight, getNormal }
+}
+
 // TerrainTile component
-const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeight, noise, map, normalMap, shouldFade = true }) => {
+const TerrainTile = memo(({ position, tileSize, resolution, maxHeight, terrainHelpers, map, normalMap, shouldFade = true }) => {
 	const materialRef = useRef()
 	const opacityRef = useRef(shouldFade ? 0 : 1)
 
@@ -50,34 +99,15 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 		}
 	}, [map, normalMap])
 
-	// Helper to compute height at any world position (for gradient calculation)
-	const getHeightAtPosition = (worldX, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) => {
-		const distSq = worldX * worldX + worldZ * worldZ
-		if (distSq < flatAreaRadiusSq) return 0
-
-		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
-		const normalizedHeight = (noiseValue + 1) / 2
-
-		if (isCenterTile || distSq < transitionEndDistSq) {
-			const t = (Math.sqrt(distSq) - Math.sqrt(flatAreaRadiusSq)) / (Math.sqrt(transitionEndDistSq) - Math.sqrt(flatAreaRadiusSq))
-			return normalizedHeight * (t * t * (3 - 2 * t))
-		}
-		return normalizedHeight
-	}
-
 	// Generate heights, UVs, and normals together to avoid redundant calculations
 	const heights = useMemo(() => {
+		const { getRawHeight, getNormal } = terrainHelpers
 		const values = []
 		const vertexCount = (resolution + 1) * (resolution + 1)
 		const positions = new Float32Array(vertexCount * 3)
 		const uvs = new Float32Array(vertexCount * 2)
 		const normals = new Float32Array(vertexCount * 3)
-		const flatAreaRadiusSq = (tileSize * 0.5) ** 2
-		const transitionEndDistSq = (tileSize * 2) ** 2
 		const step = tileSize / resolution
-		const tileX = Math.floor(position[0] / tileSize)
-		const tileZ = Math.floor(position[2] / tileSize)
-		const isCenterTile = tileX >= -1 && tileX <= 0 && tileZ >= -1 && tileZ <= 0
 
 		const normal = new Vector3()
 
@@ -86,7 +116,7 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 				const worldX = position[0] + i * step - tileSize / 2
 				const worldZ = position[2] + j * step - tileSize / 2
 
-				const height = getHeightAtPosition(worldX, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile)
+				const height = getRawHeight(worldX, worldZ)
 				values.push(height)
 
 				const vertIndex = i + (resolution + 1) * j
@@ -95,16 +125,8 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 				positions[posIndex + 1] = height * maxHeight
 				positions[posIndex + 2] = (j / resolution) * tileSize - tileSize / 2
 
-				// Compute normal analytically using finite differences on the height function
-				const hL = getHeightAtPosition(worldX - GRADIENT_EPSILON, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) * maxHeight
-				const hR = getHeightAtPosition(worldX + GRADIENT_EPSILON, worldZ, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) * maxHeight
-				const hD = getHeightAtPosition(worldX, worldZ - GRADIENT_EPSILON, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) * maxHeight
-				const hU = getHeightAtPosition(worldX, worldZ + GRADIENT_EPSILON, flatAreaRadiusSq, transitionEndDistSq, isCenterTile) * maxHeight
-
-				// Normal from gradient: n = normalize(-dh/dx, 1, -dh/dz)
-				const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
-				const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
-				normal.set(-dhdx, 1, -dhdz).normalize()
+				// Compute normal using shared helper
+				getNormal(worldX, worldZ, maxHeight, normal)
 
 				normals[posIndex] = normal.x
 				normals[posIndex + 1] = normal.y
@@ -118,7 +140,7 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 		}
 
 		return { values, positions, uvs, normals }
-	}, [position, tileSize, resolution, smoothness, noise, maxHeight])
+	}, [position, tileSize, resolution, terrainHelpers, maxHeight])
 
 	// Create geometry for terrain mesh
 	const geometry = useMemo(() => {
@@ -181,48 +203,31 @@ const TerrainManager = () => {
 
 	const distantTexture = useMemo(() => sandTexture.clone(), [sandTexture])
 
-	// Flat area and transition parameters (same as used in TerrainTile)
+	// Flat area and transition parameters
 	const flatAreaRadius = tileSize * 0.5
 	const transitionEndDist = tileSize * 2
+
+	// Create shared terrain helpers (memoized for stable reference)
+	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, smoothness, flatAreaRadius, transitionEndDist), [noise, smoothness, flatAreaRadius, transitionEndDist])
 
 	// Scratch vector for normal calculations (reused to avoid allocations)
 	const normalScratch = useMemo(() => new Vector3(), [])
 
-	// Get raw height value at any world position (normalized 0-1)
-	const getRawHeight = useCallback((worldX, worldZ) => {
-		const distSq = worldX * worldX + worldZ * worldZ
-		const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
-		const transitionEndDistSq = transitionEndDist * transitionEndDist
-
-		if (distSq < flatAreaRadiusSq) return 0
-
-		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
-		const normalizedHeight = (noiseValue + 1) / 2
-
-		if (distSq < transitionEndDistSq) {
-			const t = (Math.sqrt(distSq) - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
-			return normalizedHeight * (t * t * (3 - 2 * t))
-		}
-		return normalizedHeight
-	}, [noise, smoothness, flatAreaRadius, transitionEndDist])
-
 	// Get terrain height at any world position (in world units)
-	const getTerrainHeight = useCallback((worldX, worldZ) => {
-		return getRawHeight(worldX, worldZ) * maxHeight
-	}, [getRawHeight, maxHeight])
+	const getTerrainHeight = useCallback(
+		(worldX, worldZ) => {
+			return terrainHelpers.getHeight(worldX, worldZ, maxHeight)
+		},
+		[terrainHelpers, maxHeight]
+	)
 
 	// Get terrain normal at any world position (optionally pass target vector to avoid allocation)
-	const getTerrainNormal = useCallback((worldX, worldZ, target = normalScratch) => {
-		const hL = getRawHeight(worldX - GRADIENT_EPSILON, worldZ) * maxHeight
-		const hR = getRawHeight(worldX + GRADIENT_EPSILON, worldZ) * maxHeight
-		const hD = getRawHeight(worldX, worldZ - GRADIENT_EPSILON) * maxHeight
-		const hU = getRawHeight(worldX, worldZ + GRADIENT_EPSILON) * maxHeight
-
-		const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
-		const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
-
-		return target.set(-dhdx, 1, -dhdz).normalize()
-	}, [getRawHeight, maxHeight, normalScratch])
+	const getTerrainNormal = useCallback(
+		(worldX, worldZ, target = normalScratch) => {
+			return terrainHelpers.getNormal(worldX, worldZ, maxHeight, target)
+		},
+		[terrainHelpers, maxHeight, normalScratch]
+	)
 
 	// Update tiles based on vehicle position
 	useFrame(() => {
@@ -292,19 +297,13 @@ const TerrainManager = () => {
 					shouldFade={shouldFade}
 					tileSize={tileSize}
 					resolution={resolution}
-					smoothness={smoothness}
 					maxHeight={maxHeight}
-					noise={noise}
+					terrainHelpers={terrainHelpers}
 					map={sandTexture}
 					normalMap={sandNormalMap}
 				/>
 			))}
-			{showGrass && (
-				<GrassManager 
-					getTerrainHeight={getTerrainHeight} 
-					getTerrainNormal={getTerrainNormal} 
-				/>
-			)}
+			{showGrass && <GrassManager getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
 		</group>
 	)
 }
