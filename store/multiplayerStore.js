@@ -281,14 +281,18 @@ const useMultiplayerStore = create((set, get) => ({
 	joinRoom: async (roomId) => {
 		set({ joiningRoom: true, connectionError: null })
 		
-		const connected = await get().connect()
-		if (!connected) {
-			set({ joiningRoom: false })
+		try {
+			// Wait for connection (will retry for up to ~90 seconds for cold boot)
+			await get().connect()
+			
+			// Once connected, join the room
+			const vehicleConfig = useGameStore.getState().currentVehicle
+			return get().networkManager.joinRoom(roomId, get().playerName, vehicleConfig)
+		} catch (error) {
+			console.error('Failed to join room:', error)
+			set({ joiningRoom: false, connectionError: error.message })
 			return false
 		}
-		
-		const vehicleConfig = useGameStore.getState().currentVehicle
-		return get().networkManager.joinRoom(roomId, get().playerName, vehicleConfig)
 	},
 	
 	// Leave current room

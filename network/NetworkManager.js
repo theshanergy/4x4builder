@@ -19,6 +19,9 @@ export default class NetworkManager {
 		this.state = ConnectionState.DISCONNECTED
 		this.playerId = null
 		
+		// Track ongoing connection promise
+		this.connectPromise = null
+		
 		// Reconnection settings
 		this.reconnectAttempts = 0
 		this.maxReconnectAttempts = options.maxReconnectAttempts || 5
@@ -71,16 +74,22 @@ export default class NetworkManager {
 	
 	// Connect to server (with retry for cold boot scenarios)
 	connect(retryForColdBoot = true) {
-		if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
-			console.log('Already connected or connecting')
+		// If already connected, return immediately
+		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
 			return Promise.resolve()
+		}
+		
+		// If currently connecting, return the existing promise
+		if (this.connectPromise) {
+			console.log('Connection already in progress, waiting...')
+			return this.connectPromise
 		}
 		
 		// For cold boot, allow more attempts over a longer period (up to ~90 seconds)
 		const maxAttempts = retryForColdBoot ? 30 : 1
 		const baseDelay = 3000 // 3 seconds between retries
 		
-		return new Promise((resolve, reject) => {
+		this.connectPromise = new Promise((resolve, reject) => {
 			let attempts = 0
 			
 			const tryConnect = () => {
@@ -95,6 +104,7 @@ export default class NetworkManager {
 						this.reconnectAttempts = 0
 						this.setState(ConnectionState.CONNECTED)
 						this.startPingInterval()
+						this.connectPromise = null
 						resolve()
 					}
 					
@@ -117,6 +127,7 @@ export default class NetworkManager {
 							} else {
 								this.connectionRetryTimer = null
 								this.setState(ConnectionState.DISCONNECTED)
+								this.connectPromise = null
 								reject(new Error('Failed to connect to server. Please check if the server is running.'))
 							}
 						}
@@ -127,12 +138,15 @@ export default class NetworkManager {
 					}
 				} catch (error) {
 					this.setState(ConnectionState.DISCONNECTED)
+					this.connectPromise = null
 					reject(error)
 				}
 			}
 			
 			tryConnect()
 		})
+		
+		return this.connectPromise
 	}
 	
 	// Disconnect from server
@@ -145,6 +159,9 @@ export default class NetworkManager {
 			clearTimeout(this.connectionRetryTimer)
 			this.connectionRetryTimer = null
 		}
+		
+		// Clear connection promise
+		this.connectPromise = null
 		
 		if (this.ws) {
 			this.ws.close(1000, 'Client disconnect')
@@ -232,8 +249,9 @@ export default class NetworkManager {
 	// Send message to server
 	send(message) {
 		if (!this.isConnected()) {
-			console.warn('Cannot send message: not connected')
-			return false
+			const error = new Error('Cannot send message: not connected to server')
+			console.warn(error.message)
+			throw error
 		}
 		
 		try {
@@ -241,7 +259,7 @@ export default class NetworkManager {
 			return true
 		} catch (error) {
 			console.error('Failed to send message:', error)
-			return false
+			throw error
 		}
 	}
 	
