@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useXRInputSourceState } from '@react-three/xr'
-import useInputStore from '../../store/inputStore'
-import useMultiplayerStore from '../../store/multiplayerStore'
+import useInputStore from '../../../store/inputStore'
+import useMultiplayerStore from '../../../store/multiplayerStore'
 
 // Standard gamepad button/axis indices (Xbox layout)
 const GAMEPAD = {

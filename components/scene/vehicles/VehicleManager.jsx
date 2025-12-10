@@ -1,4 +1,4 @@
-import useGameStore from '../../store/gameStore'
+import useGameStore from '../../../store/gameStore'
 import Vehicle from './Vehicle'
 
 // Vehicle manager component

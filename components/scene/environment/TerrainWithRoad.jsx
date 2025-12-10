@@ -5,12 +5,12 @@ import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader, ShaderMaterial, 
 import { Noise } from 'noisejs'
 import { useXR } from '@react-three/xr'
 
-import useGameStore, { vehicleState } from '../../store/gameStore'
-import GrassManager from './GrassManager'
-import { getRoadInfo } from '../../utils/roadMath'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
+import Grass from './Grass'
+import { getRoadInfo } from '../../../utils/roadMath'
 
-import terrainVertexShader from '../../shaders/terrain.vert.glsl?raw'
-import terrainFragmentShader from '../../shaders/terrain.frag.glsl?raw'
+import terrainVertexShader from '../../../shaders/terrain.vert.glsl?raw'
+import terrainFragmentShader from '../../../shaders/terrain.frag.glsl?raw'
 
 // Terrain tile dimensions
 const VISUAL_TILE_SIZE = 256 // World units per visual tile
@@ -214,7 +214,7 @@ const TerrainTile = memo(({ position, tileSize, resolution, smoothness, maxHeigh
 })
 
 // Manages dynamic tile loading/unloading based on camera position
-const TerrainManager = () => {
+const Terrain = () => {
 	const [activeTiles, setActiveTiles] = useState([])
 	const [activePhysicsTiles, setActivePhysicsTiles] = useState([])
 	const lastTileCoord = useRef({ x: null, z: null })
@@ -387,7 +387,7 @@ const TerrainManager = () => {
 	})
 
 	return (
-		<group name='TerrainManager'>
+		<group name='Terrain'>
 			{activeTiles.map(({ key, position, shouldFade }) => (
 				<TerrainTile
 					key={key}
@@ -417,9 +417,9 @@ const TerrainManager = () => {
 					transitionEndDist={transitionEndDist}
 				/>
 			))}
-			{showGrass && <GrassManager getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
+			{showGrass && <Grass getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
 		</group>
 	)
 }
 
-export default TerrainManager
+export default Terrain

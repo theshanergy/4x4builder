@@ -1,8 +1,8 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BackSide, Vector3 } from 'three'
-import skyVertexShader from '../../shaders/sky.vert.glsl'
-import skyFragmentShader from '../../shaders/sky.frag.glsl'
+import skyVertexShader from '../../../shaders/sky.vert.glsl'
+import skyFragmentShader from '../../../shaders/sky.frag.glsl'
 
 // Custom Atmospheric Sky component with procedural clouds
 const AtmosphericSky = ({ sunPosition = [1, 0.5, 1] }) => {

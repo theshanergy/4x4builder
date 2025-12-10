@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useCallback, memo } from 'react'
-import useMultiplayerStore from '../../store/multiplayerStore'
+import useMultiplayerStore from '../../../store/multiplayerStore'
 import RemoteVehicle from './RemoteVehicle'
 
 /**

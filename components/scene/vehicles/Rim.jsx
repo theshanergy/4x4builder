@@ -1,9 +1,9 @@
 import { memo, useMemo, useEffect } from 'react'
 import { useGLTF } from '@react-three/drei'
 
-import vehicleConfigs from '../../vehicleConfigs'
-import useMaterialProperties from '../../hooks/useMaterialProperties'
-import cloneWithMaterials from '../../utils/cloneWithMaterials'
+import vehicleConfigs from '../../../vehicleConfigs'
+import useMaterialProperties from '../../../hooks/useMaterialProperties'
+import cloneWithMaterials from '../../../utils/cloneWithMaterials'
 
 // Rim component - loads and renders a single rim
 const Rim = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, color, roughness, cloneMaterials = false }) => {

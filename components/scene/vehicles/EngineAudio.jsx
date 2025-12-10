@@ -1,8 +1,8 @@
 import { memo, useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { AudioListener, PositionalAudio } from 'three'
-import useGameStore, { vehicleState } from '../../store/gameStore'
-import { workletCode } from '../../hooks/engineWorklet'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
+import { workletCode } from '../../../hooks/engineWorklet'
 
 class AudioEngine {
 	constructor() {

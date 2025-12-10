@@ -3,11 +3,11 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF, Html } from '@react-three/drei'
 import { Vector3, Quaternion, MathUtils } from 'three'
 
-import vehicleConfigs from '../../vehicleConfigs'
-import useAnimateHeight from '../../hooks/useAnimateHeight'
-import useMaterialProperties from '../../hooks/useMaterialProperties'
-import useVehicleDimensions from '../../hooks/useVehicleDimensions'
-import cloneWithMaterials from '../../utils/cloneWithMaterials'
+import vehicleConfigs from '../../../vehicleConfigs'
+import useAnimateHeight from '../../../hooks/useAnimateHeight'
+import useMaterialProperties from '../../../hooks/useMaterialProperties'
+import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
+import cloneWithMaterials from '../../../utils/cloneWithMaterials'
 import Wheels from './Wheels'
 
 // Interpolation settings

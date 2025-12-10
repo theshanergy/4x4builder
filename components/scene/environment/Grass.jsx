@@ -14,9 +14,9 @@ import {
 	Matrix4 
 } from 'three'
 
-import useGameStore, { vehicleState } from '../../store/gameStore'
-import grassVertexShader from '../../shaders/grass.vert.glsl'
-import grassFragmentShader from '../../shaders/grass.frag.glsl'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
+import grassVertexShader from '../../../shaders/grass.vert.glsl'
+import grassFragmentShader from '../../../shaders/grass.frag.glsl'
 
 // Seeded random number generator (mulberry32) - inlined for performance
 const createSeededRandom = (seed) => {
@@ -336,8 +336,8 @@ const GrassChunk = memo(({ chunkKey, chunkPosition, chunkSize, lodFactor, getTer
 	return <primitive ref={meshRef} object={instancedMesh} />
 })
 
-// Main GrassManager component - shares geometry and material across all chunks
-const GrassManager = memo(({ getTerrainHeight, getTerrainNormal }) => {
+// Main Grass component - shares geometry and material across all chunks
+const Grass = memo(({ getTerrainHeight, getTerrainNormal }) => {
 	const chunkCache = useRef(new Map())
 	const frameCount = useRef(0)
 	// Use useReducer for batch updates instead of useState (more efficient for arrays)
@@ -449,7 +449,7 @@ const GrassManager = memo(({ getTerrainHeight, getTerrainNormal }) => {
 	}, [sharedGeometry, sharedMaterial])
 
 	return (
-		<group name="GrassManager">
+		<group name="Grass">
 			{activeChunks && activeChunks.map(({ key, position, lodFactor }) => (
 				<GrassChunk
 					key={key}
@@ -467,4 +467,4 @@ const GrassManager = memo(({ getTerrainHeight, getTerrainNormal }) => {
 	)
 })
 
-export default GrassManager
+export default Grass

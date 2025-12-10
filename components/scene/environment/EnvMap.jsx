@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { CubeCamera, WebGLCubeRenderTarget, HalfFloatType, LinearMipmapLinearFilter } from 'three'
 
-import useGameStore from '../../store/gameStore'
+import useGameStore from '../../../store/gameStore'
 
 // Dynamic environment map using CubeCamera - captures sky and terrain for reflections
 // Renders in realtime during initial load to avoid flash, then locks in after scene is loaded

@@ -2,7 +2,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RingGeometry, Color, BufferAttribute, Vector3, RepeatWrapping } from 'three'
 
-import { vehicleState } from '../../store/gameStore'
+import { vehicleState } from '../../../store/gameStore'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01

@@ -5,8 +5,8 @@ import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 import { useXR } from '@react-three/xr'
 
-import useGameStore, { vehicleState } from '../../store/gameStore'
-import GrassManager from './GrassManager'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
+import Grass from './Grass'
 import DistantTerrain from './DistantTerrain'
 
 // Epsilon for numerical gradient approximation
@@ -180,8 +180,8 @@ const TerrainTile = memo(({ position, tileSize, resolution, maxHeight, terrainHe
 	)
 })
 
-// Main TerrainManager component
-const TerrainManager = () => {
+// Main Terrain component
+const Terrain = () => {
 	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
 	const [activeTiles, setActiveTiles] = useState([])
 	const lastTileCoord = useRef({ x: null, z: null })
@@ -288,7 +288,7 @@ const TerrainManager = () => {
 	})
 
 	return (
-		<group name='TerrainManager'>
+		<group name='Terrain'>
 			<DistantTerrain noise={noise} map={distantTexture} />
 			{activeTiles.map(({ key, position, shouldFade }) => (
 				<TerrainTile
@@ -303,9 +303,9 @@ const TerrainManager = () => {
 					normalMap={sandNormalMap}
 				/>
 			))}
-			{showGrass && <GrassManager getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
+			{showGrass && <Grass getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
 		</group>
 	)
 }
 
-export default TerrainManager
+export default Terrain

@@ -4,9 +4,9 @@ import { OrbitControls } from '@react-three/drei'
 import { useXR } from '@react-three/xr'
 import { Vector3, Raycaster, MathUtils, Quaternion } from 'three'
 
-import useGameStore, { vehicleState } from '../../store/gameStore'
-import useInputStore from '../../store/inputStore'
-import vehicleConfigs from '../../vehicleConfigs'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
+import useInputStore from '../../../store/inputStore'
+import vehicleConfigs from '../../../vehicleConfigs'
 
 // Camera modes enum
 export const CameraMode = {
@@ -69,7 +69,7 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastT
 
 			for (let i = 0; i < scene.children.length; i++) {
 				const obj = scene.children[i]
-				if (obj.name === 'TerrainManager' || obj.name.includes('Terrain')) {
+				if (obj.name === 'Terrain' || obj.name.includes('Terrain')) {
 					obj.traverse((child) => {
 						if (child.isMesh) {
 							terrainMeshesCache.current.push(child)

@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
 import { Vector3 } from 'three'
 
-import TerrainManager from './TerrainManager'
+import Terrain from './Terrain'
 import Sky from './Sky'
 import EnvMap from './EnvMap'
 import Sun from './Sun'
@@ -30,7 +30,7 @@ const SceneEnvironment = memo(() => {
 			<EnvMap />
 
 			{/* Terrain with integrated grass */}
-			<TerrainManager />
+			<Terrain />
 
 			{/* Flying Hawk */}
 			<Hawk />

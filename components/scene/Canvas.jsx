@@ -4,19 +4,19 @@ import { Physics } from '@react-three/rapier'
 import { PerformanceMonitor } from '@react-three/drei'
 
 import useGameStore from '../../store/gameStore'
-import Environment from './Environment'
-import CameraManager from './CameraManager'
-import InputManager from './InputManager'
-import XRManager from './XRManager'
+import Environment from './environment/Environment'
+import CameraManager from './managers/CameraManager'
+import InputManager from './managers/InputManager'
+import XRManager from './managers/XRManager'
 import Loader from '../ui/Loader'
-import VehicleManager from './VehicleManager'
-import RemoteVehicleManager from './RemoteVehicleManager'
+import VehicleManager from './vehicles/VehicleManager'
+import RemoteVehicleManager from './vehicles/RemoteVehicleManager'
 import Screenshot from '../ui/Screenshot'
 import useConfigSync from '../../hooks/useConfigSync'
 
 // Dev-only performance monitor - completely excluded from production bundle
 const PerfMonitor = import.meta.env.DEV
-	? (await import('./PerformanceMonitor')).default
+	? (await import('./managers/PerformanceMonitor')).default
 	: () => null
 
 // Canvas component

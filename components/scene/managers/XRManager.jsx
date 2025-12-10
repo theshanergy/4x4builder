@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { createXRStore, XR, XROrigin } from '@react-three/xr'
 
-import useGameStore from '../../store/gameStore'
+import useGameStore from '../../../store/gameStore'
 
 // Create XR store instance
 export const xrStore = createXRStore({
