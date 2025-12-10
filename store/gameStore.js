@@ -40,6 +40,7 @@ const useGameStore = create((set, get) => {
 		performanceDegraded: false,
 		controlsVisible: false,
 		muted: true, // Audio muted by default
+		lightsOn: false, // Vehicle lights state
 		
 		setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
 		setPhysicsEnabled: (enabled) => set((state) => {
@@ -54,6 +55,7 @@ const useGameStore = create((set, get) => {
 		setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
 		setControlsVisible: (visible) => set({ controlsVisible: visible }),
 		toggleMute: () => set((state) => ({ muted: !state.muted })),
+		toggleLights: () => set((state) => ({ lightsOn: !state.lightsOn })),
 
 		// Notification state
 		notification: null,
@@ -140,9 +142,10 @@ const useGameStore = create((set, get) => {
 					// Get new vehicle id
 					const newBodyId = state.currentVehicle.body
 
-					// If vehicle body changed, reset addons
+					// If vehicle body changed, reset addons and lighting
 					if (newBodyId !== prevBodyId && updater.body) {
 						state.currentVehicle.addons = vehicleConfigs.vehicles[newBodyId]?.default_addons || {}
+						state.currentVehicle.lighting = {}
 					}
 				})
 			),

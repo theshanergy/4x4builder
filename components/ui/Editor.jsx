@@ -9,6 +9,7 @@ import RimIcon from '../../assets/images/icons/Rim.svg'
 import TireIcon from '../../assets/images/icons/Tire.svg'
 import ToolIcon from '../../assets/images/icons/Tool.svg'
 import GearIcon from '../../assets/images/icons/Gear.svg'
+import LightIcon from '../../assets/images/icons/Light.svg'
 
 function Editor() {
     // Get vehicle state from store using granular selectors
@@ -26,6 +27,7 @@ function Editor() {
     const tire_diameter = useGameStore((state) => state.currentVehicle?.tire_diameter)
     const tire_muddiness = useGameStore((state) => state.currentVehicle?.tire_muddiness) || 0
     const addons = useGameStore((state) => state.currentVehicle?.addons) || {}
+    const lighting = useGameStore((state) => state.currentVehicle?.lighting) || {}
 
     const setVehicle = useGameStore((state) => state.setVehicle)
     const physicsEnabled = useGameStore((state) => state.physicsEnabled)
@@ -49,11 +51,17 @@ function Editor() {
         tire_diameter,
         tire_muddiness,
         addons,
+        lighting,
     }
 
     // Check if current vehicle has addons.
     function addonsExist() {
         return currentVehicle.body && Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons).length > 0 ? true : false
+    }
+
+    // Check if current vehicle has lighting options.
+    function lightingExists() {
+        return currentVehicle.body && vehicleConfigs.vehicles[currentVehicle.body]?.lighting && Object.keys(vehicleConfigs.vehicles[currentVehicle.body].lighting).length > 0
     }
 
     // Group object by key.
@@ -240,6 +248,23 @@ function Editor() {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+                    ))}
+                </EditorSection>
+            )}
+
+            {/* Lighting */}
+            {lightingExists() && (
+                <EditorSection title='Lighting' icon={<LightIcon className='icon' />}>
+                    {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].lighting).map((lightKey) => (
+                        <div key={lightKey} className={`field field-light-${lightKey}`}>
+                            <input
+                                type='checkbox'
+                                id={`light-${lightKey}`}
+                                checked={currentVehicle.lighting[lightKey] === true}
+                                onChange={(e) => setVehicle({ lighting: { ...currentVehicle.lighting, [lightKey]: e.target.checked } })}
+                            />
+                            <label htmlFor={`light-${lightKey}`}>{vehicleConfigs.vehicles[currentVehicle.body].lighting[lightKey].name}</label>
                         </div>
                     ))}
                 </EditorSection>

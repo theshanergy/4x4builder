@@ -12,6 +12,8 @@ import useMultiplayerStore from '../store/multiplayerStore'
 export const useVehicleInput = () => {
 	// Track reset button state to detect press (not hold)
 	const resetPressedLastFrame = useRef(false)
+	// Track lights key state to detect press (not hold)
+	const lightsKeyPressedLastFrame = useRef(false)
 
 	// Smoothed keyboard steering for lerping
 	const smoothedKeyboardSteering = useRef(0)
@@ -46,6 +48,11 @@ export const useVehicleInput = () => {
 		const shouldReset = resetPressed && !resetPressedLastFrame.current
 		resetPressedLastFrame.current = resetPressed
 
+		// Lights toggle (L key) - detect press, not hold
+		const lightsKeyPressed = effectiveKeys.has('l')
+		const shouldToggleLights = lightsKeyPressed && !lightsKeyPressedLastFrame.current
+		lightsKeyPressedLastFrame.current = lightsKeyPressed
+
 		// Calculate keyboard steering target (-1, 0, or 1)
 		const keyboardSteerTarget = (effectiveKeys.has('ArrowRight') || effectiveKeys.has('d') ? -1 : 0) + (effectiveKeys.has('ArrowLeft') || effectiveKeys.has('a') ? 1 : 0)
 
@@ -77,6 +84,7 @@ export const useVehicleInput = () => {
 			steerInput,
 			isDrifting,
 			shouldReset,
+			shouldToggleLights,
 			// Airborne controls
 			pitchInput,
 			rollInput,

@@ -125,6 +125,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Get vehicle input processor
 	const getVehicleInput = useVehicleInput()
 
+	// Get lights toggle function from store
+	const toggleLights = useGameStore((state) => state.toggleLights)
+
 	// Reset vehicle function
 	const resetVehicle = useCallback(() => {
 		const vehicle = vehicleRef.current
@@ -248,11 +251,16 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		}
 
 		// Get processed vehicle input
-		const { throttleInput, brakeInput, steerInput, isDrifting, shouldReset, pitchInput, rollInput, yawInput } = getVehicleInput(delta, forwardSpeed)
+		const { throttleInput, brakeInput, steerInput, isDrifting, shouldReset, shouldToggleLights, pitchInput, rollInput, yawInput } = getVehicleInput(delta, forwardSpeed)
 
 		// Handle reset
 		if (shouldReset) {
 			resetVehicle()
+		}
+
+		// Handle lights toggle
+		if (shouldToggleLights) {
+			toggleLights()
 		}
 
 		// Handle drift mode with smooth transition
