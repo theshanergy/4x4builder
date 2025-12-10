@@ -126,27 +126,15 @@ const useMultiplayerStore = create((set, get) => ({
 			.on('onPlayerUpdate', (message) => {
 				const { playerId, ...transform } = message
 				if (playerId !== get().localPlayerId) {
-					// Push transform to vehicle via the handler (if registered)
+					// Push transform directly to vehicle via the handler (if registered)
+					// This bypasses React state updates for performance - transforms are
+					// handled imperatively in useFrame, not through React re-renders
 					const pushHandler = get()._pushTransformToVehicle
 					if (pushHandler) {
 						pushHandler(playerId, transform)
 					}
-					
-					// Also update store state
-					set((state) => {
-						const existing = state.remotePlayers[playerId]
-						if (!existing) return state
-						return {
-							remotePlayers: {
-								...state.remotePlayers,
-								[playerId]: {
-									...existing,
-									...transform,
-									lastUpdate: Date.now(),
-								},
-							},
-						}
-					})
+					// Note: We intentionally do NOT update remotePlayers state here
+					// as it would cause expensive re-renders on every frame
 				}
 			})
 			.on('onVehicleConfig', (message) => {

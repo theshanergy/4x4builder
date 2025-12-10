@@ -66,7 +66,7 @@ const RemoteVehicleManager = () => {
 					playerName={player.name || player.playerName || 'Player'}
 					vehicleConfig={player.vehicleConfig}
 					initialTransform={player.transform}
-					onRef={(ref) => registerVehicleRef(player.id, ref)}
+					registerVehicleRef={registerVehicleRef}
 				/>
 			))}
 		</group>
@@ -75,8 +75,12 @@ const RemoteVehicleManager = () => {
 
 /**
  * Wrapper component to handle ref registration
+ * Uses registerVehicleRef callback with playerId to avoid creating new function references
  */
-const RemoteVehicleWrapper = memo(({ playerId, playerName, vehicleConfig, initialTransform, onRef }) => {
+const RemoteVehicleWrapper = memo(({ playerId, playerName, vehicleConfig, initialTransform, registerVehicleRef }) => {
+	// Create stable onRef callback that won't break memoization
+	const onRef = useCallback((ref) => registerVehicleRef(playerId, ref), [playerId, registerVehicleRef])
+	
 	return <RemoteVehicle playerId={playerId} playerName={playerName} vehicleConfig={vehicleConfig} initialTransform={initialTransform} onRef={onRef} />
 })
 
