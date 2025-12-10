@@ -1,3 +1,8 @@
+// Shared constants and protocols between client and server
+
+// Public lobby identifier
+export const PUBLIC_LOBBY_ID = 'LOBBY'
+
 // Message type definitions for client-server communication
 export const MessageTypes = {
 	// Connection

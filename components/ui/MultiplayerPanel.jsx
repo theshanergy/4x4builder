@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import classNames from 'classnames'
 import useMultiplayerStore from '../../store/multiplayerStore'
-import { PUBLIC_LOBBY_ID } from '../../shared/constants.js'
+import { PUBLIC_LOBBY_ID } from '../../shared/protocol.js'
 import EditorSection from './EditorSection'
 import PlayerList from './PlayerList'
 

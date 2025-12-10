@@ -4,7 +4,7 @@ import settings from '../config/settings.js'
 import Player from './Player.js'
 import RoomManager from './RoomManager.js'
 import MessageHandler from './MessageHandler.js'
-import { parseMessage, createMessage, MessageTypes } from './types.js'
+import { parseMessage, createMessage, MessageTypes } from '../../shared/protocol.js'
 
 export default class WebSocketServer {
 	constructor(server) {

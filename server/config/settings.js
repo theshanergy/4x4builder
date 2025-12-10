@@ -1,4 +1,4 @@
-import { PUBLIC_LOBBY_ID } from '../../shared/constants.js'
+import { PUBLIC_LOBBY_ID } from '../../shared/protocol.js'
 
 // Server configuration settings
 export default {
