@@ -1,7 +1,7 @@
 import { memo, useMemo, useRef, useEffect, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
-import { useGLTF, Gltf } from '@react-three/drei'
+import { Gltf } from '@react-three/drei'
 import { useXR } from '@react-three/xr'
 import { Vector3, Quaternion } from 'three'
 
@@ -10,142 +10,12 @@ import vehicleConfigs from '../../vehicleConfigs'
 import useAnimateHeight from '../../hooks/useAnimateHeight'
 import useVehiclePhysics from '../../hooks/useVehiclePhysics'
 import useMaterialProperties from '../../hooks/useMaterialProperties'
-import useTireDirtMaterial from '../../hooks/useTireDirtMaterial'
 import useTransformBroadcast from '../../hooks/useTransformBroadcast'
+import useVehicleDimensions from '../../hooks/useVehicleDimensions'
 import EngineAudio from './EngineAudio'
 import Dust from './Dust'
 import TireTracks from './TireTracks'
-
-// Calculate point on line (a to b, at length).
-const linePoint = (a, b, length) => {
-	let dir = b.clone().sub(a).normalize().multiplyScalar(length)
-	return a.clone().add(dir)
-}
-
-// Rim component - loads and renders a single rim
-const Rim = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, color, roughness }) => {
-	const { setObjectMaterials } = useMaterialProperties()
-
-	// Load rim model
-	const rimGltf = useGLTF(vehicleConfigs.wheels.rims[rim].model)
-
-	// Clone rim scene
-	const rimScene = useMemo(() => rimGltf.scene.clone(), [rimGltf.scene])
-
-	// Calculate rim scale as a percentage of diameter.
-	const odScale = useMemo(() => ((rim_diameter * 2.54) / 100 + 0.03175) / vehicleConfigs.wheels.rims[rim].od, [rim, rim_diameter])
-
-	// Calculate rim width.
-	const widthScale = useMemo(() => (rim_width * 2.54) / 100 / vehicleConfigs.wheels.rims[rim].width, [rim, rim_width])
-
-	// Set rim color.
-	useEffect(() => {
-		setObjectMaterials(rimScene, color, roughness, rim_color, rim_color_secondary)
-	}, [rimScene, setObjectMaterials, rim_color, rim_color_secondary, color, roughness])
-
-	return <primitive name='Rim' object={rimScene} scale={[odScale, odScale, widthScale]} />
-})
-
-// Tire component - loads and renders a single tire
-const Tire = memo(({ tire, tire_diameter, tire_muddiness, rim_diameter, rim_width }) => {
-	// Load tire model
-	const tireGltf = useGLTF(vehicleConfigs.wheels.tires[tire].model)
-
-	// Scale tire.
-	const tireGeometry = useMemo(() => {
-		// Determine y scale as a percentage of width.
-		const wheelWidth = (rim_width * 2.54) / 100
-		const wheelWidthScale = wheelWidth / vehicleConfigs.wheels.tires[tire].width
-
-		const tireOD = vehicleConfigs.wheels.tires[tire].od / 2
-		const tireID = vehicleConfigs.wheels.tires[tire].id / 2
-
-		const newOd = (tire_diameter * 2.54) / 10 / 2
-		const newId = (rim_diameter * 2.54) / 10 / 2
-
-		// Create a copy of the original geometry.
-		const geometry = tireGltf.scene.children[0].geometry.clone()
-
-		// Scale to match wheel width.
-		geometry.scale(1, 1, wheelWidthScale)
-
-		// Get position attributes.
-		const positionAttribute = geometry.getAttribute('position')
-		const positionArray = positionAttribute.array
-
-		// Loop through vertices.
-		for (var i = 0, l = positionAttribute.count; i < l; i++) {
-			// Start vector.
-			let startVector = new Vector3().fromBufferAttribute(positionAttribute, i)
-
-			// Center vector.
-			let centerVector = new Vector3(0, 0, startVector.z)
-
-			// Distance from center.
-			let centerDist = centerVector.distanceTo(startVector)
-
-			// Distance from rim.
-			let rimDist = centerDist - tireID
-
-			// Percentage from rim.
-			let percentOut = rimDist / (tireOD - tireID)
-
-			// New distance from center.
-			let newRimDist = (percentOut * (newOd - newId) + newId) / 10
-
-			// End vector.
-			let setVector = linePoint(centerVector, startVector, newRimDist)
-
-			// Set x,y
-			positionArray[i * 3] = setVector.x
-			positionArray[i * 3 + 1] = setVector.y
-		}
-
-		return geometry
-	}, [tireGltf.scene.children, rim_diameter, rim_width, tire, tire_diameter])
-
-	// Calculate tire radius for shader
-	const tireRadius = useMemo(() => (tire_diameter * 2.54) / 100 / 2, [tire_diameter])
-	const rimRadius = useMemo(() => (rim_diameter * 2.54) / 100 / 2, [rim_diameter])
-
-	// Create dirt shader callback
-	const dirtShaderCallback = useTireDirtMaterial({ tireRadius, rimRadius, coverage: tire_muddiness })
-
-	return (
-		<mesh name='Tire' geometry={tireGeometry} castShadow receiveShadow>
-			<meshStandardMaterial color='#121212' metalness={0} roughness={0.75} flatShading={true} onBeforeCompile={dirtShaderCallback} />
-		</mesh>
-	)
-})
-
-// Wheels - container component that positions wheel groups
-const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, color, roughness, wheelPositions, wheelRefs }) => {
-	return (
-		<group name='Wheels'>
-			{wheelPositions.map(({ key, rotation, ...transform }, index) => (
-				<group key={key} ref={wheelRefs[index]} {...transform}>
-					{/* Add an inner group with the correct visual rotation */}
-					<group rotation={rotation}>
-						<Suspense fallback={null}>
-							<Rim
-								rim={rim}
-								rim_diameter={rim_diameter}
-								rim_width={rim_width}
-								rim_color={rim_color}
-								rim_color_secondary={rim_color_secondary}
-								color={color}
-								roughness={roughness}
-							/>
-						</Suspense>
-						<Suspense fallback={null}>
-							<Tire tire={tire} tire_diameter={tire_diameter} tire_muddiness={tire_muddiness} rim_diameter={rim_diameter} rim_width={rim_width} />
-						</Suspense>
-					</group>
-				</group>
-			))}
-		</group>
-	)
-})
+import Wheels from './Wheels'
 
 // Body.
 const Body = memo(({ id, height, color, roughness, addons }) => {
@@ -187,10 +57,11 @@ const Body = memo(({ id, height, color, roughness, addons }) => {
 // Vehicle component with physics
 const Vehicle = (props) => {
 	// Get vehicle properties from props or defaults
-	const { body, color, roughness, lift, wheel_offset, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, addons } = {
+	const config = {
 		...vehicleConfigs.defaults,
 		...props,
 	}
+	const { body, color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, addons } = config
 
 	// Get vehicle store
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
@@ -204,32 +75,8 @@ const Vehicle = (props) => {
 	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
 	const wheelRefs = wheelRefsArray.current
 
-	// Get wheel (axle) height
-	const axleHeight = useMemo(() => (tire_diameter * 2.54) / 100 / 2, [tire_diameter])
-
-	// Get lift height in meters
-	const liftHeight = useMemo(() => ((lift || 0) * 2.54) / 100, [lift])
-
-	// Get vehicle height
-	const vehicleHeight = useMemo(() => axleHeight + liftHeight, [axleHeight, liftHeight])
-
-	// Get wheel offset and wheelbase
-	const offset = vehicleConfigs.vehicles[body]['wheel_offset'] + parseFloat(wheel_offset)
-	const wheelbase = vehicleConfigs.vehicles[body]['wheelbase']
-
-	// Get wheel rotation
-	const rotation = (Math.PI * 90) / 180
-
-	// Set wheel positions
-	const wheelPositions = useMemo(
-		() => [
-			{ key: 'FL', name: 'FL', position: [offset, axleHeight, wheelbase / 2], rotation: [0, rotation, 0] },
-			{ key: 'FR', name: 'FR', position: [-offset, axleHeight, wheelbase / 2], rotation: [0, -rotation, 0] },
-			{ key: 'RL', name: 'RL', position: [offset, axleHeight, -wheelbase / 2], rotation: [0, rotation, 0] },
-			{ key: 'RR', name: 'RR', position: [-offset, axleHeight, -wheelbase / 2], rotation: [0, -rotation, 0] },
-		],
-		[offset, axleHeight, wheelbase, rotation]
-	)
+	// Get vehicle dimensions and wheel positions from shared hook
+	const { axleHeight, vehicleHeight, wheelbase, wheelPositions } = useVehicleDimensions(config)
 
 	// Create wheel configurations
 	const physicsWheels = useMemo(() => {
