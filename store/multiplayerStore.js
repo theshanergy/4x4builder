@@ -242,24 +242,8 @@ const useMultiplayerStore = create((set, get) => ({
 		set({ remotePlayers })
 	},
 	
-	// Connect to server
+	// Connect to server (idempotent - safe to call multiple times)
 	connect: async () => {
-		const existing = get().networkManager
-		if (existing?.isConnected()) return true
-		
-		const networkManager = get().initNetworkManager(getServerUrl())
-		
-		try {
-			await networkManager.connect()
-			return true
-		} catch (error) {
-			console.log('Connect failed:', error.message)
-			return false
-		}
-	},
-	
-	// Ensure connected to server (connects if needed)
-	ensureConnected: async () => {
 		let networkManager = get().networkManager
 		if (networkManager?.isConnected()) return true
 		
@@ -297,7 +281,7 @@ const useMultiplayerStore = create((set, get) => ({
 	joinRoom: async (roomId) => {
 		set({ joiningRoom: true, connectionError: null })
 		
-		const connected = await get().ensureConnected()
+		const connected = await get().connect()
 		if (!connected) {
 			set({ joiningRoom: false })
 			return false
