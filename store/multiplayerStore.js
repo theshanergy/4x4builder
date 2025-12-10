@@ -242,8 +242,8 @@ const useMultiplayerStore = create((set, get) => ({
 		set({ remotePlayers })
 	},
 	
-	// Preconnect to server (silent, for warming up cold server and getting lobby info)
-	preconnect: async () => {
+	// Connect to server
+	connect: async () => {
 		const existing = get().networkManager
 		if (existing?.isConnected()) return true
 		
@@ -253,18 +253,18 @@ const useMultiplayerStore = create((set, get) => ({
 			await networkManager.connect()
 			return true
 		} catch (error) {
-			// Silent fail for preconnect - don't show error to user
-			console.log('Preconnect failed:', error.message)
+			console.log('Connect failed:', error.message)
 			return false
 		}
 	},
 	
-	// Connect to server
-	connect: async (serverUrl) => {
+	// Ensure connected to server (connects if needed)
+	ensureConnected: async () => {
 		let networkManager = get().networkManager
+		if (networkManager?.isConnected()) return true
 		
 		if (!networkManager) {
-			networkManager = get().initNetworkManager(serverUrl)
+			networkManager = get().initNetworkManager(getServerUrl())
 		}
 		
 		try {
@@ -277,14 +277,6 @@ const useMultiplayerStore = create((set, get) => ({
 			})
 			return false
 		}
-	},
-	
-	// Ensure connected to server (connects if needed, with retry for cold boot)
-	ensureConnected: async () => {
-		const networkManager = get().networkManager
-		if (networkManager?.isConnected()) return true
-		
-		return get().connect(getServerUrl())
 	},
 	
 	// Disconnect from server

@@ -33,22 +33,21 @@ function StatusMessage({ message, type = 'info' }) {
 
 // Multiplayer panel component
 function MultiplayerPanel() {
-	const connectionState = useMultiplayerStore((state) => state.connectionState)
-	const connectionError = useMultiplayerStore((state) => state.connectionError)
-	const joiningRoom = useMultiplayerStore((state) => state.joiningRoom)
-	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
 	const playerName = useMultiplayerStore((state) => state.playerName)
+	const setPlayerName = useMultiplayerStore((state) => state.setPlayerName)
 	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
 	const lobbyPlayerCount = useMultiplayerStore((state) => state.lobbyPlayerCount)
-	const preconnect = useMultiplayerStore((state) => state.preconnect)
+	const connect = useMultiplayerStore((state) => state.connect)
+	const connectionError = useMultiplayerStore((state) => state.connectionError)
 	const joinRoom = useMultiplayerStore((state) => state.joinRoom)
+	const joiningRoom = useMultiplayerStore((state) => state.joiningRoom)
+	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
 	const leaveRoom = useMultiplayerStore((state) => state.leaveRoom)
-	const setPlayerName = useMultiplayerStore((state) => state.setPlayerName)
 
-	// Preconnect to server on mount (warms up cold server and gets lobby player count)
+	// Connect to server on mount (warms up cold server and gets lobby player count)
 	useEffect(() => {
-		preconnect()
-	}, [preconnect])
+		connect()
+	}, [connect])
 	const isInRoom = currentRoom !== null
 
 	const [joinRoomId, setJoinRoomId] = useState('')
@@ -97,7 +96,7 @@ function MultiplayerPanel() {
 			</div>
 
 			{/* Status Messages */}
-			{joiningRoom && <StatusMessage message='Connecting to server...' />}
+			{joiningRoom && <StatusMessage message='Joining room...' />}
 			{connectionError && <StatusMessage message={connectionError} type='error' />}
 
 			{/* Room controls */}
