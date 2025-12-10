@@ -67,6 +67,12 @@ const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, p
 	const reflectorInstanceRef = useRef()
 	const ledInstanceRef = useRef()
 
+	// Track if light has ever been activated
+	const lightsActive = useRef(false)
+	if (intensity > 0 && !lightsActive.current) {
+		lightsActive.current = true
+	}
+
 	// Calculate dimensions
 	const unitSize = 0.04 // Spacing between LED centers (40mm)
 	const paddingX = 0.015
@@ -202,7 +208,8 @@ const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, p
 			<instancedMesh ref={ledInstanceRef} args={[LED_GEOMETRY, ledMaterial, ledCount]} frustumCulled={false} />
 
 			{/* RectAreaLight - creates light from the entire bar surface, rotated to face forward */}
-			{intensity > 0 && (
+			{/* Only load if light has ever been activated */}
+			{lightsActive.current && (
 				<rectAreaLight
 					position={[0, 0, housingDepth / 2 - 0.015]}
 					rotation={[0, Math.PI, 0]}
