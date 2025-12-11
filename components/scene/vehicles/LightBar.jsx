@@ -1,222 +1,215 @@
 import { memo, useMemo, useRef, useEffect } from 'react'
-import * as THREE from 'three'
+import {
+	CylinderGeometry,
+	BoxGeometry,
+	MeshStandardMaterial,
+	DoubleSide,
+	Color,
+	BufferGeometry,
+	Float32BufferAttribute,
+	Matrix4,
+	Vector3,
+	Quaternion,
+	Euler,
+	Shape,
+	ShapeGeometry,
+} from 'three'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 
-// Initialize RectAreaLight support (only needs to happen once)
 RectAreaLightUniformsLib.init()
 
-// Shared geometry and materials (created once, reused across all instances)
-const REFLECTOR_GEOMETRY = new THREE.CylinderGeometry(0.018, 0.006, 0.015, 8, 1, true).scale(-1, 1, 1)
-const LED_GEOMETRY = new THREE.BoxGeometry(0.006, 0.006, 0.003)
-const REFLECTOR_MATERIAL = new THREE.MeshStandardMaterial({
-	color: '#e0e0e0',
-	metalness: 1.0,
-	roughness: 0.1,
-})
+const R = 0.018,
+	UNIT_SIZE = R * 2,
+	REFLECTOR_DEPTH = 0.015,
+	BOX_DEPTH = 0.025,
+	HOUSING_THICKNESS = 0.008
+const REFLECTOR_GEOMETRY = new CylinderGeometry(R, 0.006, 0.015, 8, 1, true).scale(-1, 1, 1)
+const LED_GEOMETRY = new BoxGeometry(0.006, 0.006, 0.003)
+const BRACKET_GEOMETRY = new BoxGeometry(0.015, 0.025, 0.02)
+const HOUSING_MATERIAL = new MeshStandardMaterial({ color: '#111', roughness: 0.6, metalness: 0, side: DoubleSide })
+const LED_COLORS = { amber: '#ffaa00', warm: '#ffcc00', cool: '#ccffff', white: '#ffffff' }
 
-// Rotation for reflector cylinders
-const REFLECTOR_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0)
+const HOUSING_FRONT_GEOMETRY = (() => {
+	const vertices = [],
+		cos45 = R * Math.SQRT1_2
+	;[
+		[R, R, R, 0, 0, R, cos45, cos45],
+		[-R, R, 0, R, -R, 0, -cos45, cos45],
+		[-R, -R, -R, 0, 0, -R, -cos45, -cos45],
+		[R, -R, 0, -R, R, 0, cos45, -cos45],
+	].forEach(([cx, cy, v1x, v1y, v2x, v2y, mx, my]) => {
+		vertices.push(v1x, 0, v1y, cx, 0, cy, mx, 0, my, cx, 0, cy, v2x, 0, v2y, mx, 0, my)
+	})
+	const geom = new BufferGeometry()
+	geom.setAttribute('position', new Float32BufferAttribute(vertices, 3))
+	geom.computeVertexNormals()
+	return geom
+})()
 
-// Shared housing materials
-const HOUSING_MATERIAL = new THREE.MeshStandardMaterial({
-	color: '#111',
-	roughness: 0.6,
-	metalness: 0,
-	side: THREE.DoubleSide,
-})
-const GLASS_MATERIAL = new THREE.MeshStandardMaterial({
-	color: 'white',
-	transparent: true,
-	opacity: 0.15,
-	roughness: 0,
-	metalness: 1,
-	depthWrite: true,
-})
-const BRACKET_GEOMETRY = new THREE.BoxGeometry(0.015, 0.025, 0.02)
-
-// Create a rounded rectangle shape (centered at origin)
-const createRoundedRectShape = (w, h, r) => {
-	const shape = new THREE.Shape()
-	shape.moveTo(-w / 2 + r, -h / 2)
-	shape.lineTo(w / 2 - r, -h / 2)
-	shape.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r)
-	shape.lineTo(w / 2, h / 2 - r)
-	shape.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2)
-	shape.lineTo(-w / 2 + r, h / 2)
-	shape.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r)
-	shape.lineTo(-w / 2, -h / 2 + r)
-	shape.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2)
-	return shape
-}
-
-// Main LightBar component
-const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, position = [0, 0, 0], rotation = [0, 0, 0], edgeRadius = 0.02 }) => {
-	// Refs for instanced meshes
-	const reflectorInstanceRef = useRef()
-	const ledInstanceRef = useRef()
-
-	// Track if light has ever been activated
+const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, position = [0, 0, 0], rotation = [0, 0, 0], curvature }) => {
+	const refs = { reflector: useRef(), led: useRef(), housingFront: useRef() }
 	const lightsActive = useRef(false)
-	if (intensity > 0 && !lightsActive.current) {
-		lightsActive.current = true
-	}
+	if (intensity > 0) lightsActive.current = true
 
-	// Calculate dimensions
-	const unitSize = 0.04 // Spacing between LED centers (40mm)
-	const paddingX = width > rows ? 0.015 : 0.01
-	// Reduce vertical padding if bar is wider than it is tall
-	const paddingY = width > rows ? 0.005 : 0.01
+	const cols = Math.max(1, width),
+		ledCount = rows * cols,
+		housingHeight = rows * UNIT_SIZE
+	const radius = curvature ? Math.max(0.8, cols * UNIT_SIZE * curvature) : 999999,
+		faceRadius = radius + BOX_DEPTH / 2
+	const stepAngle = 2 * Math.asin(UNIT_SIZE / (2 * faceRadius)),
+		angularSpan = cols * stepAngle
+	const extensionAngle = HOUSING_THICKNESS / faceRadius
 
-	// Width now represents number of horizontal LEDs (columns)
-	const cols = Math.max(1, width)
-	const ledCount = rows * cols
+	const ledColor = useMemo(() => new Color(LED_COLORS[color] || LED_COLORS.white), [color])
+	const ledMaterial = useMemo(() => new MeshStandardMaterial({ color: ledColor, emissive: ledColor, emissiveIntensity: 0, toneMapped: false }), [ledColor])
+	const reflectorMaterial = useMemo(() => new MeshStandardMaterial({ color: '#e0e0e0', metalness: 1, roughness: 0.1, emissive: ledColor, emissiveIntensity: 0, toneMapped: false }), [ledColor])
 
-	const housingWidth = cols * unitSize + paddingX * 2
-	const housingHeight = rows * unitSize + paddingY * 2
-	const housingDepth = 0.07 // Housing depth
-
-	// LED Color Calculation based on color prop
-	const ledColor = useMemo(() => {
-		switch (color) {
-			case 'amber':
-				return new THREE.Color('#ffaa00')
-			case 'warm':
-				return new THREE.Color('#ffcc00')
-			case 'cool':
-				return new THREE.Color('#ccffff')
-			case 'white':
-			default:
-				return new THREE.Color('#ffffff')
-		}
-	}, [color])
-
-	// LED material - memoized and updated when color/intensity changes
-	const ledMaterial = useMemo(
-		() =>
-			new THREE.MeshStandardMaterial({
-				color: ledColor,
-				emissive: ledColor,
-				emissiveIntensity: intensity * 2,
-				toneMapped: false,
-			}),
-		[ledColor, intensity]
-	)
-
-	// Generate LED grid positions
-	const leds = useMemo(() => {
-		const items = []
-		for (let r = 0; r < rows; r++) {
-			for (let c = 0; c < cols; c++) {
-				const x = (c - (cols - 1) / 2) * unitSize
-				const y = -(r - (rows - 1) / 2) * unitSize
-				// Position reflectors so they sit flush with the front face
-				items.push({ key: `${r}-${c}`, position: [x, y, housingDepth / 2 - 0.0075], x, y })
-			}
-		}
-		return items
-	}, [rows, cols, unitSize, housingDepth])
-
-	// Update instanced mesh transforms when LEDs change
+	// Update emissive intensity when it changes (keeps material reference stable for instanced mesh)
 	useEffect(() => {
-		if (!reflectorInstanceRef.current || !ledInstanceRef.current) return
+		ledMaterial.emissiveIntensity = intensity * 2
+		ledMaterial.needsUpdate = true
+		reflectorMaterial.emissiveIntensity = intensity * 0.5
+		reflectorMaterial.needsUpdate = true
+	}, [ledMaterial, reflectorMaterial, intensity])
 
-		const tempMatrix = new THREE.Matrix4()
-		const tempPosition = new THREE.Vector3()
-		const tempQuaternion = new THREE.Quaternion().setFromEuler(REFLECTOR_ROTATION)
-		const tempScale = new THREE.Vector3(1, 1, 1)
-		const identityQuaternion = new THREE.Quaternion()
+	const leds = useMemo(() => {
+		const frontRadius = faceRadius * Math.cos(stepAngle / 2),
+			startAngle = (-(cols - 1) * stepAngle) / 2
+		return Array.from({ length: ledCount }, (_, i) => {
+			const angle = startAngle + (i % cols) * stepAngle
+			return { position: [frontRadius * Math.sin(angle), -(Math.floor(i / cols) - (rows - 1) / 2) * UNIT_SIZE, frontRadius * Math.cos(angle) - radius], angle }
+		})
+	}, [rows, cols, ledCount, faceRadius, stepAngle, radius])
+
+	useEffect(() => {
+		if (!refs.reflector.current || !refs.led.current || !refs.housingFront.current) return
+		const matrix = new Matrix4(),
+			pos = new Vector3(),
+			quat = new Quaternion(),
+			scale = new Vector3(1, 1, 1),
+			ledRadius = faceRadius - 0.0125
 
 		leds.forEach((led, i) => {
-			// Reflector instance (rotated)
-			tempPosition.set(led.position[0], led.position[1], led.position[2])
-			tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
-			reflectorInstanceRef.current.setMatrixAt(i, tempMatrix)
+			pos.set(led.position[0], led.position[1], led.position[2] - REFLECTOR_DEPTH / 2)
+			quat.setFromEuler(new Euler(Math.PI / 2, led.angle, 0, 'YXZ'))
+			matrix.compose(pos, quat, scale)
+			refs.reflector.current.setMatrixAt(i, matrix)
 
-			// LED chip instance (offset in z, no rotation)
-			tempPosition.set(led.position[0], led.position[1], led.position[2] - 0.005)
-			tempMatrix.compose(tempPosition, identityQuaternion, tempScale)
-			ledInstanceRef.current.setMatrixAt(i, tempMatrix)
+			pos.fromArray(led.position)
+			matrix.compose(pos, quat, scale)
+			refs.housingFront.current.setMatrixAt(i, matrix)
+
+			pos.set(ledRadius * Math.sin(led.angle), led.position[1], ledRadius * Math.cos(led.angle) - radius)
+			quat.setFromEuler(new Euler(0, led.angle, 0))
+			matrix.compose(pos, quat, scale)
+			refs.led.current.setMatrixAt(i, matrix)
 		})
+		refs.reflector.current.instanceMatrix.needsUpdate = refs.led.current.instanceMatrix.needsUpdate = refs.housingFront.current.instanceMatrix.needsUpdate = true
+	}, [leds, faceRadius, radius])
 
-		reflectorInstanceRef.current.instanceMatrix.needsUpdate = true
-		ledInstanceRef.current.instanceMatrix.needsUpdate = true
-	}, [leds])
+	// Generate profile points for housing cross-section
+	const getProfilePoints = (halfH) => {
+		const halfTotal = halfH + HOUSING_THICKNESS,
+			curve = halfTotal * 0.6,
+			pts = [
+				[0, -halfH],
+				[0, -halfTotal],
+				[-BOX_DEPTH, -halfTotal],
+			]
+		for (let i = 0; i <= 16; i++) {
+			const theta = -Math.PI / 2 + (Math.PI * i) / 16
+			pts.push([-BOX_DEPTH - Math.cos(theta) * curve, Math.sin(theta) * halfTotal])
+		}
+		return [...pts, [-BOX_DEPTH, halfTotal], [0, halfTotal], [0, halfH]]
+	}
 
-	// Housing geometry with cutouts for reflectors
 	const housingGeometry = useMemo(() => {
-		// Outer shape (rounded rectangle)
-		const shape = createRoundedRectShape(housingWidth, housingHeight, edgeRadius)
+		const profilePoints = getProfilePoints(housingHeight / 2),
+			vertices = [],
+			indices = [],
+			extendedCols = cols + 2
 
-		// Add holes for each LED reflector
-		const holeRadius = 0.019 // Slightly larger than reflector (0.018)
-		for (const led of leds) {
-			const hole = new THREE.Path()
-			hole.absarc(led.x, led.y, holeRadius, 0, Math.PI * 2, true)
-			shape.holes.push(hole)
+		for (let i = 0; i <= extendedCols; i++) {
+			const angle = i === 0 ? -angularSpan / 2 - extensionAngle : i === extendedCols ? angularSpan / 2 + extensionAngle : -angularSpan / 2 + ((i - 1) / cols) * angularSpan
+			for (const [localZ, localY] of profilePoints) {
+				const r = faceRadius + localZ
+				vertices.push(r * Math.sin(angle), localY, r * Math.cos(angle) - radius)
+			}
 		}
 
-		// Extrude settings
-		const extrudeSettings = {
-			depth: housingDepth,
-			bevelEnabled: false,
+		const n = profilePoints.length
+		for (let i = 0; i < extendedCols; i++) {
+			for (let j = 0; j < n - 1; j++) {
+				const a = i * n + j,
+					b = (i + 1) * n + j
+				indices.push(a, a + 1, b, b, a + 1, b + 1)
+			}
 		}
 
-		const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
-		// Center the geometry on z-axis
-		geometry.translate(0, 0, -housingDepth / 2)
+		const geom = new BufferGeometry()
+		geom.setAttribute('position', new Float32BufferAttribute(vertices, 3))
+		geom.setIndex(indices)
+		geom.computeVertexNormals()
+		return geom
+	}, [radius, housingHeight, angularSpan, faceRadius, cols, extensionAngle])
 
-		return geometry
-	}, [housingWidth, housingHeight, housingDepth, leds, edgeRadius])
+	const endCapGeometry = useMemo(() => {
+		const shape = new Shape()
+		getProfilePoints(housingHeight / 2).forEach(([x, y], i) => (i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)))
+		return new ShapeGeometry(shape)
+	}, [housingHeight])
 
-	// Memoized rounded rectangle shape for the back plate
-	const backShape = useMemo(() => {
-		return createRoundedRectShape(housingWidth, housingHeight, edgeRadius)
-	}, [housingWidth, housingHeight, edgeRadius])
+	const sideFillGeometry = useMemo(() => {
+		const halfH = housingHeight / 2,
+			inner = angularSpan / 2,
+			outer = inner + extensionAngle
+		const vertices = [],
+			corners = [
+				[inner, -halfH],
+				[outer, -halfH],
+				[outer, halfH],
+				[inner, halfH],
+			]
+		;[0, 1, 2, 0, 2, 3].forEach((idx) => {
+			const [angle, y] = corners[idx]
+			vertices.push(faceRadius * Math.sin(angle), y, faceRadius * Math.cos(angle) - radius)
+		})
+		const geom = new BufferGeometry()
+		geom.setAttribute('position', new Float32BufferAttribute(vertices, 3))
+		geom.computeVertexNormals()
+		return geom
+	}, [housingHeight, angularSpan, faceRadius, radius, extensionAngle])
 
-	// Memoized rounded rectangle shape for the glass front
-	const glassShape = useMemo(() => {
-		return createRoundedRectShape(housingWidth - 0.02, housingHeight - 0.02, edgeRadius * 0.625)
-	}, [housingWidth, housingHeight, edgeRadius])
+	const extendedAngularSpan = angularSpan + 2 * extensionAngle
+	const capPos = (angle) => [faceRadius * Math.sin(angle), 0, faceRadius * Math.cos(angle) - radius]
+	const bracketPos = (sign) => {
+		const angle = angularSpan * 0.2 * sign,
+			r = faceRadius - 0.04
+		return [r * Math.sin(angle), 0, r * Math.cos(angle) - radius - 0.008]
+	}
 
 	return (
 		<group position={position} rotation={rotation}>
-			{/* Main Housing Body with cutouts */}
 			<mesh geometry={housingGeometry} material={HOUSING_MATERIAL} />
-
-			{/* Back Plate */}
-			<mesh position={[0, 0, -housingDepth / 2 - 0.0005]} rotation={[0, Math.PI, 0]}>
-				<shapeGeometry args={[backShape]} />
-				<primitive object={HOUSING_MATERIAL} attach='material' />
-			</mesh>
-
-			{/* Instanced Reflector Cups */}
-			<instancedMesh ref={reflectorInstanceRef} args={[REFLECTOR_GEOMETRY, REFLECTOR_MATERIAL, ledCount]} frustumCulled={false} />
-
-			{/* Instanced LED Chips */}
-			<instancedMesh ref={ledInstanceRef} args={[LED_GEOMETRY, ledMaterial, ledCount]} frustumCulled={false} />
-
-			{/* RectAreaLight - creates light from the entire bar surface, rotated to face forward */}
-			{/* Only load if light has ever been activated */}
+			<mesh geometry={endCapGeometry} material={HOUSING_MATERIAL} position={capPos(-extendedAngularSpan / 2)} rotation={[0, -extendedAngularSpan / 2 - Math.PI / 2, 0]} />
+			<mesh geometry={endCapGeometry} material={HOUSING_MATERIAL} position={capPos(extendedAngularSpan / 2)} rotation={[0, extendedAngularSpan / 2 + Math.PI / 2, Math.PI]} />
+			<mesh geometry={sideFillGeometry} material={HOUSING_MATERIAL} />
+			<mesh geometry={sideFillGeometry} material={HOUSING_MATERIAL} scale={[-1, 1, 1]} />
+			<instancedMesh ref={refs.reflector} args={[REFLECTOR_GEOMETRY, reflectorMaterial, ledCount]} frustumCulled={false} />
+			<instancedMesh ref={refs.housingFront} args={[HOUSING_FRONT_GEOMETRY, HOUSING_MATERIAL, ledCount]} frustumCulled={false} />
+			<instancedMesh ref={refs.led} args={[LED_GEOMETRY, ledMaterial, ledCount]} frustumCulled={false} />
 			{lightsActive.current && (
 				<rectAreaLight
-					position={[0, 0, housingDepth / 2 - 0.015]}
+					position={[0, 0, 0]}
 					rotation={[0, Math.PI, 0]}
-					width={housingWidth - 0.02}
+					width={cols * UNIT_SIZE * 0.9}
 					height={housingHeight * 0.8}
 					intensity={intensity * 15}
 					color={ledColor}
 				/>
 			)}
-
-			{/* Glass Front Face - 2D plane with rounded corners */}
-			<mesh position={[0, 0, housingDepth / 2 + 0.002]}>
-				<shapeGeometry args={[glassShape]} />
-				<primitive object={GLASS_MATERIAL} attach='material' />
-			</mesh>
-
-			{/* Mounting Brackets */}
-			<mesh position={[housingWidth * 0.3, 0, -housingDepth / 2 - 0.008]} geometry={BRACKET_GEOMETRY} material={HOUSING_MATERIAL} />
-			<mesh position={[-housingWidth * 0.3, 0, -housingDepth / 2 - 0.008]} geometry={BRACKET_GEOMETRY} material={HOUSING_MATERIAL} />
+			<mesh position={bracketPos(-1)} geometry={BRACKET_GEOMETRY} material={HOUSING_MATERIAL} />
+			<mesh position={bracketPos(1)} geometry={BRACKET_GEOMETRY} material={HOUSING_MATERIAL} />
 		</group>
 	)
 })

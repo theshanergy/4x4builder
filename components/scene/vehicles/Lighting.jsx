@@ -5,54 +5,31 @@ import LightBar from './LightBar'
 
 const Lighting = memo(({ id, lighting }) => {
 	const lightsOn = useGameStore((state) => state.lightsOn)
-
-	// Get lighting config for this vehicle
 	const lightingConfig = vehicleConfigs.vehicles[id]?.lighting || {}
 
-	// Build array of lights to render (handles pair mirroring)
 	const lightsToRender = useMemo(() => {
-		const lights = []
-		Object.entries(lightingConfig).forEach(([key, light]) => {
-			// Check if this light is enabled in the lighting prop
-			const isEnabled = lighting?.[key] === true
-			if (!isEnabled) return
+		return Object.entries(lightingConfig).flatMap(([key, light]) => {
+			if (!lighting?.[key]) return []
 
-			// Merge with any overrides from lighting prop
-			const lightConfig = { ...light }
+			const createLight = (key, pos, rot) => ({
+				key,
+				width: light.width,
+				rows: light.rows,
+				color: light.color,
+				position: pos,
+				rotation: rot,
+				curvature: light.curvature,
+			})
 
-			if (lightConfig.pair) {
-				// Create right side light
-				lights.push({
-					key: `${key}_right`,
-					width: lightConfig.width,
-					rows: lightConfig.rows,
-					color: lightConfig.color,
-					position: lightConfig.position,
-					rotation: lightConfig.rotation,
-				})
-				// Create left side light (mirror X position and Y rotation)
-				lights.push({
-					key: `${key}_left`,
-					width: lightConfig.width,
-					rows: lightConfig.rows,
-					color: lightConfig.color,
-					position: [-lightConfig.position[0], lightConfig.position[1], lightConfig.position[2]],
-					rotation: [lightConfig.rotation[0], -lightConfig.rotation[1], lightConfig.rotation[2]],
-				})
-			} else {
-				// Single light
-				lights.push({
-					key,
-					width: lightConfig.width,
-					rows: lightConfig.rows,
-					color: lightConfig.color,
-					position: lightConfig.position,
-					rotation: lightConfig.rotation,
-				})
+			if (light.pair) {
+				return [
+					createLight(`${key}_right`, light.position, light.rotation),
+					createLight(`${key}_left`, [-light.position[0], light.position[1], light.position[2]], [light.rotation[0], -light.rotation[1], light.rotation[2]]),
+				]
 			}
+			return [createLight(key, light.position, light.rotation)]
 		})
-		return lights
-	}, [lightingConfig, lighting])
+	}, [id, lighting])
 
 	if (lightsToRender.length === 0) return null
 
@@ -67,6 +44,7 @@ const Lighting = memo(({ id, lighting }) => {
 					intensity={lightsOn ? 1 : 0}
 					position={light.position}
 					rotation={light.rotation}
+					curvature={light.curvature}
 				/>
 			))}
 		</group>

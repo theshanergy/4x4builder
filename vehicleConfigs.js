@@ -148,11 +148,12 @@ const vehicleConfigs = {
 			lighting: {
 				roof_bar: {
 					name: 'Roof Light Bar',
-					width: 32,
-					rows: 2,
+					width: 35,
+					rows: 1,
 					color: 'white',
-					position: [0, 1.375, 0.475],
+					position: [0, 1.37, 0.485],
 					rotation: [0, 0, 0],
+					curvature: 6,
 				},
 				ditch_lights: {
 					name: 'Ditch Lights',
