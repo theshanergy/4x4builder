@@ -1,7 +1,8 @@
-import { Suspense, useMemo, useEffect } from 'react'
+import { Suspense, useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { PerformanceMonitor } from '@react-three/drei'
+import { PCFShadowMap } from 'three'
 
 import useGameStore from '../../store/gameStore'
 import Environment from './environment/Environment'
@@ -15,9 +16,7 @@ import Screenshot from '../ui/Screenshot'
 import useConfigSync from '../../hooks/useConfigSync'
 
 // Dev-only performance monitor - completely excluded from production bundle
-const PerfMonitor = import.meta.env.DEV
-	? (await import('./managers/PerformanceMonitor')).default
-	: () => null
+const PerfMonitor = import.meta.env.DEV ? (await import('./managers/PerformanceMonitor')).default : () => null
 
 // Canvas component
 const ThreeCanvas = () => {
@@ -39,7 +38,7 @@ const ThreeCanvas = () => {
 		<div id='canvas' className='absolute inset-0 overflow-hidden'>
 			<Loader />
 
-			<Canvas shadows={!performanceDegraded} dpr={performanceDegraded ? 1 : [1, 1.5]} camera={cameraConfig}>
+			<Canvas shadows={{ type: PCFShadowMap, enabled: !performanceDegraded }} dpr={performanceDegraded ? 1 : [1, 1.5]} camera={cameraConfig}>
 				<PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 				<PerfMonitor />
 				<XRManager>
