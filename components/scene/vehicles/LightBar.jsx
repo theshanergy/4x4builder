@@ -6,13 +6,12 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 RectAreaLightUniformsLib.init()
 
 // Shared geometry and materials (created once, reused across all instances)
-const REFLECTOR_GEOMETRY = new THREE.CylinderGeometry(0.018, 0.006, 0.015, 8, 1, true)
+const REFLECTOR_GEOMETRY = new THREE.CylinderGeometry(0.018, 0.006, 0.015, 8, 1, true).scale(-1, 1, 1)
 const LED_GEOMETRY = new THREE.BoxGeometry(0.006, 0.006, 0.003)
 const REFLECTOR_MATERIAL = new THREE.MeshStandardMaterial({
 	color: '#e0e0e0',
 	metalness: 1.0,
 	roughness: 0.1,
-	side: THREE.DoubleSide,
 })
 
 // Rotation for reflector cylinders
@@ -22,27 +21,16 @@ const REFLECTOR_ROTATION = new THREE.Euler(Math.PI / 2, 0, 0)
 const HOUSING_MATERIAL = new THREE.MeshStandardMaterial({
 	color: '#111',
 	roughness: 0.6,
-	metalness: 0.8,
-})
-const HOUSING_MATERIAL_DOUBLE = new THREE.MeshStandardMaterial({
-	color: '#111',
-	roughness: 0.6,
-	metalness: 0.8,
+	metalness: 0,
 	side: THREE.DoubleSide,
-})
-const BRACKET_MATERIAL = new THREE.MeshStandardMaterial({
-	color: '#333',
-	roughness: 0.5,
-	metalness: 0.8,
 })
 const GLASS_MATERIAL = new THREE.MeshStandardMaterial({
 	color: 'white',
 	transparent: true,
 	opacity: 0.15,
-	roughness: 0.1,
-	metalness: 0,
-	side: THREE.DoubleSide,
-	depthWrite: false,
+	roughness: 0,
+	metalness: 1,
+	depthWrite: true,
 })
 const BRACKET_GEOMETRY = new THREE.BoxGeometry(0.015, 0.025, 0.02)
 
@@ -62,7 +50,7 @@ const createRoundedRectShape = (w, h, r) => {
 }
 
 // Main LightBar component
-const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, position = [0, 0, 0], rotation = [0, 0, 0] }) => {
+const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, position = [0, 0, 0], rotation = [0, 0, 0], edgeRadius = 0.02 }) => {
 	// Refs for instanced meshes
 	const reflectorInstanceRef = useRef()
 	const ledInstanceRef = useRef()
@@ -75,9 +63,9 @@ const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, p
 
 	// Calculate dimensions
 	const unitSize = 0.04 // Spacing between LED centers (40mm)
-	const paddingX = 0.015
+	const paddingX = width > rows ? 0.015 : 0.01
 	// Reduce vertical padding if bar is wider than it is tall
-	const paddingY = width > rows ? 0.008 : 0.015
+	const paddingY = width > rows ? 0.005 : 0.01
 
 	// Width now represents number of horizontal LEDs (columns)
 	const cols = Math.max(1, width)
@@ -157,7 +145,7 @@ const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, p
 	// Housing geometry with cutouts for reflectors
 	const housingGeometry = useMemo(() => {
 		// Outer shape (rounded rectangle)
-		const shape = createRoundedRectShape(housingWidth, housingHeight, 0.008)
+		const shape = createRoundedRectShape(housingWidth, housingHeight, edgeRadius)
 
 		// Add holes for each LED reflector
 		const holeRadius = 0.019 // Slightly larger than reflector (0.018)
@@ -178,17 +166,17 @@ const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, p
 		geometry.translate(0, 0, -housingDepth / 2)
 
 		return geometry
-	}, [housingWidth, housingHeight, housingDepth, leds])
+	}, [housingWidth, housingHeight, housingDepth, leds, edgeRadius])
 
 	// Memoized rounded rectangle shape for the back plate
 	const backShape = useMemo(() => {
-		return createRoundedRectShape(housingWidth, housingHeight, 0.008)
-	}, [housingWidth, housingHeight])
+		return createRoundedRectShape(housingWidth, housingHeight, edgeRadius)
+	}, [housingWidth, housingHeight, edgeRadius])
 
 	// Memoized rounded rectangle shape for the glass front
 	const glassShape = useMemo(() => {
-		return createRoundedRectShape(housingWidth - 0.02, housingHeight - 0.02, 0.005)
-	}, [housingWidth, housingHeight])
+		return createRoundedRectShape(housingWidth - 0.02, housingHeight - 0.02, edgeRadius * 0.625)
+	}, [housingWidth, housingHeight, edgeRadius])
 
 	return (
 		<group position={position} rotation={rotation}>
@@ -198,7 +186,7 @@ const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, p
 			{/* Back Plate */}
 			<mesh position={[0, 0, -housingDepth / 2 - 0.0005]} rotation={[0, Math.PI, 0]}>
 				<shapeGeometry args={[backShape]} />
-				<primitive object={HOUSING_MATERIAL_DOUBLE} attach='material' />
+				<primitive object={HOUSING_MATERIAL} attach='material' />
 			</mesh>
 
 			{/* Instanced Reflector Cups */}
@@ -227,8 +215,8 @@ const LightBar = memo(({ width = 12, rows = 1, color = 'white', intensity = 0, p
 			</mesh>
 
 			{/* Mounting Brackets */}
-			<mesh position={[housingWidth * 0.3, 0, -housingDepth / 2 - 0.008]} geometry={BRACKET_GEOMETRY} material={BRACKET_MATERIAL} />
-			<mesh position={[-housingWidth * 0.3, 0, -housingDepth / 2 - 0.008]} geometry={BRACKET_GEOMETRY} material={BRACKET_MATERIAL} />
+			<mesh position={[housingWidth * 0.3, 0, -housingDepth / 2 - 0.008]} geometry={BRACKET_GEOMETRY} material={HOUSING_MATERIAL} />
+			<mesh position={[-housingWidth * 0.3, 0, -housingDepth / 2 - 0.008]} geometry={BRACKET_GEOMETRY} material={HOUSING_MATERIAL} />
 		</group>
 	)
 })
