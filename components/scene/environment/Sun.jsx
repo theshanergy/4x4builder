@@ -29,13 +29,13 @@ const Sun = ({ sunDirection }) => {
 			intensity={2.5}
 			color='#fff0dd'
 			position={[10, 10, 10]}
-			shadow-mapSize={performanceDegraded ? [512, 512] : [2048, 2048]}
+			shadow-mapSize={performanceDegraded ? [512, 512] : [1024, 1024]}
 			shadow-camera-far={100}
 			shadow-camera-left={-30}
 			shadow-camera-right={30}
 			shadow-camera-top={30}
 			shadow-camera-bottom={-30}
-			shadow-bias={-0.0001}
+			shadow-radius={2}
 		/>
 	)
 }

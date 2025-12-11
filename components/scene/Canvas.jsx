@@ -2,7 +2,6 @@ import { Suspense, useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { PerformanceMonitor } from '@react-three/drei'
-import { PCFShadowMap } from 'three'
 
 import useGameStore from '../../store/gameStore'
 import Environment from './environment/Environment'
@@ -38,7 +37,7 @@ const ThreeCanvas = () => {
 		<div id='canvas' className='absolute inset-0 overflow-hidden'>
 			<Loader />
 
-			<Canvas shadows={{ type: PCFShadowMap, enabled: !performanceDegraded }} dpr={performanceDegraded ? 1 : [1, 1.5]} camera={cameraConfig}>
+			<Canvas shadows={{ enabled: !performanceDegraded }} dpr={performanceDegraded ? 1 : [1, 1.5]} camera={cameraConfig}>
 				<PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 				<PerfMonitor />
 				<XRManager>
