@@ -9,7 +9,7 @@ import useInputStore from '../../../store/inputStore'
 import vehicleConfigs from '../../../vehicleConfigs'
 
 // Camera modes enum
-export const CameraMode = {
+const CameraMode = {
 	ORBIT: 'orbit',
 	FIRST_PERSON: 'firstPerson',
 	// Future camera modes can be added here:
@@ -22,7 +22,7 @@ export const CameraMode = {
 const CAMERA_MODES = [CameraMode.ORBIT, CameraMode.FIRST_PERSON]
 
 // Get driver position for a vehicle body, with fallback to default
-export const getDriverPosition = (bodyId) => {
+const getDriverPosition = (bodyId) => {
 	const vehicle = vehicleConfigs.vehicles[bodyId]
 	if (vehicle?.driverPosition) {
 		return new Vector3(...vehicle.driverPosition)

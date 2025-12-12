@@ -4,7 +4,7 @@ import { createXRStore, XR, XROrigin } from '@react-three/xr'
 import useGameStore from '../../../store/gameStore'
 
 // Create XR store instance
-export const xrStore = createXRStore({
+const xrStore = createXRStore({
 	hand: { teleportPointer: true },
 	controller: { teleportPointer: true },
 })
