@@ -1,4 +1,3 @@
-import { useCallback } from 'react'
 import useGameStore from '../../store/gameStore'
 import ControllerIcon from '../../assets/images/icons/Gamepad.svg'
 import SaveIcon from '../../assets/images/icons/Save.svg'
@@ -23,6 +22,7 @@ const Actions = () => {
 		showNotification({
 			title: 'Save Your Vehicle',
 			text: 'Enter a name for your vehicle:',
+			icon: SaveIcon,
 			input: true,
 			inputValue: vehicleName,
 			showCancelButton: true,
@@ -68,60 +68,54 @@ const Actions = () => {
 				}
 				setSavedVehicles(newSavedVehicles)
 
-				// Notify the user that the vehicle has been saved.
+				// Show success dialog with share and screenshot options.
 				showNotification({
 					title: 'Saved!',
-					text: 'Your vehicle has been saved.',
+					text: `Your vehicle "${name}" has been saved.`,
 					type: 'success',
+					centered: true,
+					confirmButtonText: 'Close',
+					actionButtons: [
+						{
+							label: 'Share URL',
+							icon: ShareIcon,
+							action: () => {
+								// Generate shareable URL
+								const jsonString = JSON.stringify(currentVehicle)
+								const encodedConfig = encodeURIComponent(jsonString)
+								const shareableUrl = `${window.location.origin}?config=${encodedConfig}`
+
+								// Copy to clipboard
+								navigator.clipboard
+									.writeText(shareableUrl)
+									.then(() => {
+										showNotification({
+											title: 'Link Copied!',
+											text: 'The shareable link has been copied to your clipboard.',
+											type: 'success',
+										})
+									})
+									.catch(() => {
+										showNotification({
+											title: 'Error',
+											text: 'Failed to copy link to clipboard.',
+											type: 'error',
+										})
+									})
+							},
+						},
+						{
+							label: 'Save Image',
+							icon: CameraIcon,
+							action: () => {
+								// Trigger screenshot
+								window.dispatchEvent(new Event('takeScreenshot'))
+							},
+						},
+					],
 				})
 			},
 		})
-	}
-
-	// Share current config.
-	const shareVehicle = useCallback(() => {
-		// Generate shareable URL.
-		const jsonString = JSON.stringify(currentVehicle)
-		const encodedConfig = encodeURIComponent(jsonString)
-		const shareableUrl = `${window.location.origin}?config=${encodedConfig}`
-
-		// Notify user with the link element and copy button.
-		showNotification({
-			title: 'Share Your Vehicle',
-			text: 'Copy this link to save or share your vehicle configuration:',
-			html: `<a href="${shareableUrl}">Shareable link</a>`,
-			showCancelButton: true,
-			confirmButtonText: 'Copy Link',
-			cancelButtonText: 'Cancel',
-			onConfirm: (result) => {
-				if (result.isConfirmed) {
-					// Copy the shareable URL to the clipboard.
-					navigator.clipboard
-						.writeText(shareableUrl)
-						.then(() => {
-							// Notify the user that the link has been copied.
-							showNotification({
-								title: 'Copied!',
-								text: 'The shareable link has been copied to your clipboard.',
-								type: 'success',
-							})
-						})
-						.catch((error) => {
-							// Handle error.
-							showNotification({
-								title: 'Error',
-								text: 'An error occurred while copying the link to the clipboard.',
-								type: 'error',
-							})
-						})
-				}
-			},
-		})
-	}, [currentVehicle, showNotification])
-
-	// Trigger screenshot.
-	const takeScreenshot = () => {
-		window.dispatchEvent(new Event('takeScreenshot'))
 	}
 
 	// Toggle controls visibility
@@ -136,12 +130,6 @@ const Actions = () => {
 			</button>
 			<button title='Save Vehicle' className='secondary' onClick={saveVehicle}>
 				<SaveIcon className='icon' />
-			</button>
-			<button title='Share Vehicle' className='secondary' onClick={shareVehicle}>
-				<ShareIcon className='icon' />
-			</button>
-			<button title='Take Screenshot' className='secondary' onClick={takeScreenshot}>
-				<CameraIcon className='icon' />
 			</button>
 		</div>
 	)

@@ -86,6 +86,40 @@
 	.icon {
 		@apply inline-block w-5 h-auto align-middle;
 	}
+
+	/* animations */
+	.animate-fade-scale-in {
+		animation: fade-scale-in 0.2s ease-out;
+	}
+	.animate-pop-in {
+		animation: pop-in 0.4s ease-out;
+	}
+}
+
+/* animations */
+@keyframes fade-scale-in {
+	from {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes pop-in {
+	0% {
+		transform: scale(0);
+		opacity: 0;
+	}
+	50% {
+		transform: scale(1.2);
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
 }
 
 /* loader animation */
