@@ -27,6 +27,28 @@ const vehicleConfigs = {
 			driverPosition: [0.4, 1.6, 0],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 33,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.31, 0.575],
+						rotation: [0, 0, 0],
+						curvature: 3.5,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.8, 0.95, 0.875],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		toyota_4runner_5g: {
 			name: 'Toyota 4Runner (2011-2013)',
@@ -37,6 +59,28 @@ const vehicleConfigs = {
 			driverPosition: [0.4, 1.6, 0],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 33,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.3, 0.575],
+						rotation: [0, 0, 0],
+						curvature: 2.5,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.8, 0.95, 0.875],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		toyota_4runner_4g: {
 			name: 'Toyota 4Runner (2002-2009)',
@@ -47,6 +91,28 @@ const vehicleConfigs = {
 			driverPosition: [0.4, 1.55, -0.1],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 32,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.21, 0.385],
+						rotation: [0, 0, 0],
+						curvature: 10,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.75, 0.875, 0.85],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		toyota_4runner_3g: {
 			name: 'Toyota 4Runner (1996-2002)',
@@ -105,6 +171,28 @@ const vehicleConfigs = {
 					},
 				},
 			},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 30,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.25, 0.45],
+						rotation: [0, 0, 0],
+						curvature: 2,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.75, 0.85, 0.85],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		toyota_tacoma_2g_ac: {
 			name: 'Toyota Tacoma (2005-2015)',
@@ -115,6 +203,28 @@ const vehicleConfigs = {
 			driverPosition: [0.4, 1.6, 0.2],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 32,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.34, 0.66],
+						rotation: [0, 0, 0],
+						curvature: 2.5,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.815, 0.975, 1.075],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		toyota_j250: {
 			name: 'Toyota Land Cruiser (2024+)',
@@ -125,6 +235,28 @@ const vehicleConfigs = {
 			driverPosition: [0.4, 1.5, -0.1],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 32,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.3, 0.49],
+						rotation: [0, 0, 0],
+						curvature: 2,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.785, 0.875, 0.82],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		toyota_j80: {
 			name: 'Toyota Land Cruiser (1990–2008)',
@@ -135,6 +267,19 @@ const vehicleConfigs = {
 			driverPosition: [0.45, 1.7, -0.1],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.8, 0.975, 0.65],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		jeep_jku: {
 			name: 'Jeep Wrangler (JKU)',
@@ -177,6 +322,28 @@ const vehicleConfigs = {
 			driverPosition: [0.45, 1.65, -0.5],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 36,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.34, 0.1],
+						rotation: [0, 0, 0],
+						curvature: 99,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.75, 0.9, 0.3],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		jeep_xj: {
 			name: 'Jeep Cherokee (XJ)',
@@ -187,6 +354,28 @@ const vehicleConfigs = {
 			driverPosition: [0.45, 1.45, 0],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 30,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.15, 0.35],
+						rotation: [0, 0, 0],
+						curvature: 4.5,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.75, 0.775, 0.65],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 		ford_bronco_6g: {
 			name: 'Ford Bronco',
@@ -198,6 +387,28 @@ const vehicleConfigs = {
 			spare: [0, 0.7, -2.35],
 			default_addons: {},
 			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 32,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.355, 0.5],
+						rotation: [0, 0, 0],
+						curvature: 4.5,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.8, 0.93, 0.8],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
 		},
 	},
 	wheels: {
