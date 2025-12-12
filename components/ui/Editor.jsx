@@ -256,17 +256,36 @@ function Editor() {
             {/* Lighting */}
             {lightingExists() && (
                 <EditorSection title='Lighting' icon={<LightIcon className='icon' />}>
-                    {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].lighting).map((lightKey) => (
-                        <div key={lightKey} className={`field field-light-${lightKey}`}>
-                            <input
-                                type='checkbox'
-                                id={`light-${lightKey}`}
-                                checked={currentVehicle.lighting[lightKey] === true}
-                                onChange={(e) => setVehicle({ lighting: { ...currentVehicle.lighting, [lightKey]: e.target.checked } })}
-                            />
-                            <label htmlFor={`light-${lightKey}`}>{vehicleConfigs.vehicles[currentVehicle.body].lighting[lightKey].name}</label>
-                        </div>
-                    ))}
+                    {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].lighting).map((lightType) => {
+                        const lights = vehicleConfigs.vehicles[currentVehicle.body].lighting[lightType]
+                        if (!Array.isArray(lights)) return null
+                        
+                        return lights.map((light, index) => {
+                            const lightKey = `${lightType}_${index}`
+                            const isChecked = currentVehicle.lighting[lightType]?.[index] === true
+                            
+                            return (
+                                <div key={lightKey} className={`field field-light-${lightType}`}>
+                                    <input
+                                        type='checkbox'
+                                        id={`light-${lightKey}`}
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                            const updatedLightType = [...(currentVehicle.lighting[lightType] || [])]
+                                            updatedLightType[index] = e.target.checked
+                                            setVehicle({ 
+                                                lighting: { 
+                                                    ...currentVehicle.lighting, 
+                                                    [lightType]: updatedLightType 
+                                                } 
+                                            })
+                                        }}
+                                    />
+                                    <label htmlFor={`light-${lightKey}`}>{light.name}</label>
+                                </div>
+                            )
+                        })
+                    })}
                 </EditorSection>
             )}
 
