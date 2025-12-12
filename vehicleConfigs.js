@@ -226,6 +226,38 @@ const vehicleConfigs = {
 				],
 			},
 		},
+		toyota_tundra_2g_crewmax: {
+			name: 'Toyota Tundra (2007-2021)',
+			make: 'Toyota',
+			model: 'assets/models/vehicles/toyota/tundra/2g/tundra_crewmax.glb',
+			wheel_offset: 0.85,
+			wheelbase: 3.7,
+			driverPosition: [0.55, 1.65, 0.2],
+			default_addons: {},
+			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Hood Scoop LED',
+						width: 16,
+						rows: 1,
+						color: 'white',
+						position: [0, 0.955, 2.28],
+						rotation: [0, 0, 0],
+						curvature: 5,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.875, 1.05, 1.4],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
+		},
 		toyota_j250: {
 			name: 'Toyota Land Cruiser (2024+)',
 			make: 'Toyota',
