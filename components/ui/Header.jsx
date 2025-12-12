@@ -1,6 +1,5 @@
 import useGameStore from '../../store/gameStore'
 import VehicleSwitcher from './VehicleSwitcher'
-import GitHubIcon from '../../assets/images/icons/GitHub.svg'
 import VolumeOnIcon from '../../assets/images/icons/VolumeOn.svg'
 import VolumeOffIcon from '../../assets/images/icons/VolumeOff.svg'
 
@@ -20,9 +19,6 @@ function Header() {
 				<div onClick={toggleMute} className='text-stone-900/20 cursor-pointer' title={muted ? 'Unmute' : 'Mute'}>
 					{muted ? <VolumeOffIcon className='icon' /> : <VolumeOnIcon className='icon' />}
 				</div>
-				<a target='_blank' href='https://github.com/theshanergy/4x4builder' title='GitHub'>
-					<GitHubIcon className='icon' />
-				</a>
 			</div>
 		</div>
 	)
