@@ -19,7 +19,9 @@ const EditorSection = ({ title, icon, badge, children, defaultActive, onExpand }
 		if (isActive && sectionRef.current) {
 			// Small delay to let the content render
 			requestAnimationFrame(() => {
-				sectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+				if (sectionRef.current) {
+					sectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+				}
 			})
 		}
 	}, [isActive])
