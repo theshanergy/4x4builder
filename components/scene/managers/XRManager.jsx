@@ -7,6 +7,7 @@ import useGameStore from '../../../store/gameStore'
 const xrStore = createXRStore({
 	hand: { teleportPointer: true },
 	controller: { teleportPointer: true },
+	emulate: false,
 })
 
 // Default XR origin position (for when not inside vehicle)
