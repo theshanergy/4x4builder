@@ -13,9 +13,29 @@
 }
 
 @layer base {
+	.wrapper {
+		@apply mx-auto w-6xl max-w-[90vw];
+	}
+
 	/* links */
 	a {
 		@apply underline text-blue-500;
+	}
+
+	/* headings */
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		@apply font-bold;
+	}
+	h1 {
+		@apply mb-6 text-5xl sm:text-7xl md:text-8xl lg:text-8xl font-black uppercase;
+	}
+	h2 {
+		@apply mb-6 text-4xl md:text-5xl leading-tight font-black uppercase;
 	}
 
 	/* forms */
@@ -63,11 +83,15 @@
 	/*buttons*/
 	button,
 	.button {
-		@apply flex items-center gap-2 h-11 px-5 py-0 text-white font-medium text-sm bg-red-700 hover:bg-red-600 border-none rounded shadow-md cursor-pointer;
+		@apply flex items-center gap-2 px-5 py-3 text-white font-semibold text-sm uppercase bg-red-700 hover:bg-red-600 border-none rounded shadow-md cursor-pointer;
 	}
 	button.small,
 	.button.small {
-		@apply h-9 px-3;
+		@apply px-3 py-2.5 text-xs;
+	}
+	button.large,
+	.button.large {
+		@apply px-8 py-4 text-base;
 	}
 	button.active,
 	.button.active {

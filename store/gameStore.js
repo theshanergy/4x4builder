@@ -41,17 +41,20 @@ const useGameStore = create((set, get) => {
 		controlsVisible: false,
 		muted: true, // Audio muted by default
 		lightsOn: false, // Vehicle lights state
-		
+		infoMode: false, // Info/landing page mode - when true, shows vehicle page with hero
+
 		setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
-		setPhysicsEnabled: (enabled) => set((state) => {
-			// Unmute audio the first time physics is enabled
-			const shouldUnmute = enabled && !state.physicsEnabledOnce
-			return {
-				physicsEnabled: enabled,
-				physicsEnabledOnce: state.physicsEnabledOnce || enabled,
-				...(shouldUnmute && { muted: false }),
-			}
-		}),
+		setInfoMode: (mode) => set({ infoMode: mode }),
+		setPhysicsEnabled: (enabled) =>
+			set((state) => {
+				// Unmute audio the first time physics is enabled
+				const shouldUnmute = enabled && !state.physicsEnabledOnce
+				return {
+					physicsEnabled: enabled,
+					physicsEnabledOnce: state.physicsEnabledOnce || enabled,
+					...(shouldUnmute && { muted: false }),
+				}
+			}),
 		setPerformanceDegraded: (degraded) => set({ performanceDegraded: degraded }),
 		setControlsVisible: (visible) => set({ controlsVisible: visible }),
 		toggleMute: () => set((state) => ({ muted: !state.muted })),
@@ -149,36 +152,6 @@ const useGameStore = create((set, get) => {
 					}
 				})
 			),
-
-		// Load vehicle from URL parameters
-		loadVehicleFromUrl: () => {
-			const urlParams = new URLSearchParams(window.location.search)
-			const encodedConfig = urlParams.get('config')
-
-			if (encodedConfig) {
-				console.log('Loading vehicle from shared url.')
-				const jsonString = decodeURIComponent(encodedConfig)
-				const config = preprocessVehicleConfig(JSON.parse(jsonString))
-
-				// Overwrite current vehicle from URL parameter
-				set({ currentVehicle: config })
-
-				// Clear current saved vehicle
-				set((state) => ({
-					savedVehicles: {
-						...state.savedVehicles,
-						current: null,
-					},
-				}))
-
-				// Clear URL parameters
-				window.history.replaceState({}, '', window.location.pathname)
-
-				return true
-			}
-
-			return false
-		},
 	}
 })
 

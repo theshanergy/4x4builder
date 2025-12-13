@@ -21,6 +21,7 @@
 		"noisejs": "^2.1.0",
 		"react": "^19.2.1",
 		"react-dom": "^19.2.1",
+		"react-router-dom": "^7.10.1",
 		"tailwindcss": "^4.1.17",
 		"three": "^0.182.0",
 		"three-stdlib": "^2.36.1",
