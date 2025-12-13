@@ -20,7 +20,8 @@ const vehicleConfigs = {
 	vehicles: {
 		toyota_4runner_5g_late: {
 			slug: 'toyota-4runner-5g-late',
-			name: 'Toyota 4Runner (2014-2024)',
+			name: 'Toyota 4Runner',
+			year: '2014-2024',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/4runner/5g/4runner_late.glb',
 			wheel_offset: 0.8,
@@ -53,7 +54,8 @@ const vehicleConfigs = {
 		},
 		toyota_4runner_5g: {
 			slug: 'toyota-4runner-5g',
-			name: 'Toyota 4Runner (2011-2013)',
+			name: 'Toyota 4Runner',
+			year: '2011-2013',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/4runner/5g/4runner.glb',
 			wheel_offset: 0.76,
@@ -86,7 +88,8 @@ const vehicleConfigs = {
 		},
 		toyota_4runner_4g: {
 			slug: 'toyota-4runner-4g',
-			name: 'Toyota 4Runner (2002-2009)',
+			name: 'Toyota 4Runner',
+			year: '2002-2009',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/4runner/4g/4runner.glb',
 			wheel_offset: 0.76,
@@ -119,7 +122,8 @@ const vehicleConfigs = {
 		},
 		toyota_4runner_3g: {
 			slug: 'toyota-4runner-3g',
-			name: 'Toyota 4Runner (1996-2002)',
+			name: 'Toyota 4Runner',
+			year: '1996-2002',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/4runner/3g/4runner.glb',
 			wheel_offset: 0.75,
@@ -200,7 +204,8 @@ const vehicleConfigs = {
 		},
 		toyota_tacoma_2g_ac: {
 			slug: 'toyota-tacoma-2g',
-			name: 'Toyota Tacoma (2005-2015)',
+			name: 'Toyota Tacoma',
+			year: '2005-2015',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/tacoma/2g/tacoma.glb',
 			wheel_offset: 0.81,
@@ -233,7 +238,8 @@ const vehicleConfigs = {
 		},
 		toyota_tundra_2g_crewmax: {
 			slug: 'toyota-tundra-2g',
-			name: 'Toyota Tundra (2007-2021)',
+			name: 'Toyota Tundra',
+			year: '2007-2021',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/tundra/2g/tundra_crewmax.glb',
 			wheel_offset: 0.85,
@@ -266,7 +272,8 @@ const vehicleConfigs = {
 		},
 		toyota_j250: {
 			slug: 'toyota-land-cruiser-j250',
-			name: 'Toyota Land Cruiser (2024+)',
+			name: 'Toyota Land Cruiser',
+			year: '2024+',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/land_cruiser/j250/j250.glb',
 			wheel_offset: 0.81,
@@ -299,7 +306,8 @@ const vehicleConfigs = {
 		},
 		toyota_j80: {
 			slug: 'toyota-land-cruiser-j80',
-			name: 'Toyota Land Cruiser (1990–2008)',
+			name: 'Toyota Land Cruiser',
+			year: '1990-2008',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/land_cruiser/j80/j80.glb',
 			wheel_offset: 0.78,
@@ -323,7 +331,8 @@ const vehicleConfigs = {
 		},
 		jeep_jku: {
 			slug: 'jeep-wrangler-jku',
-			name: 'Jeep Wrangler (JKU)',
+			name: 'Jeep Wrangler',
+			year: 'JKU',
 			make: 'Jeep',
 			model: '/assets/models/vehicles/jeep/jk/jku.glb',
 			wheel_offset: 0.8,
@@ -356,7 +365,8 @@ const vehicleConfigs = {
 		},
 		jeep_yj: {
 			slug: 'jeep-wrangler-yj',
-			name: 'Jeep Wrangler (YJ)',
+			name: 'Jeep Wrangler',
+			year: 'YJ',
 			make: 'Jeep',
 			model: '/assets/models/vehicles/jeep/yj/yj.glb',
 			wheel_offset: 0.7,
@@ -389,7 +399,8 @@ const vehicleConfigs = {
 		},
 		jeep_xj: {
 			slug: 'jeep-cherokee-xj',
-			name: 'Jeep Cherokee (XJ)',
+			name: 'Jeep Cherokee',
+			year: 'XJ',
 			make: 'Jeep',
 			model: '/assets/models/vehicles/jeep/xj/xj.glb',
 			wheel_offset: 0.7,
@@ -423,6 +434,7 @@ const vehicleConfigs = {
 		ford_bronco_6g: {
 			slug: 'ford-bronco-6g',
 			name: 'Ford Bronco',
+			year: '2021+',
 			make: 'Ford',
 			model: '/assets/models/vehicles/ford/bronco/6g/bronco.glb',
 			wheel_offset: 0.85,

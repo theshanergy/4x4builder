@@ -10,15 +10,11 @@ function VehicleHero({ vehicleId }) {
 		return null
 	}
 
-	// Extract year range from vehicle name (e.g., "Toyota 4Runner (2014-2024)" -> "2014-2024")
-	const yearMatch = vehicleData.name.match(/\(([^)]+)\)/)
-	const yearRange = yearMatch ? yearMatch[1] : ''
+	// Get year range from the year field
+	const yearRange = vehicleData.year || ''
 
-	// Get model name without make and year (e.g., "Toyota 4Runner (2014-2024)" -> "4Runner")
-	const modelName = vehicleData.name
-		.replace(vehicleData.make, '')
-		.replace(/\([^)]*\)/g, '')
-		.trim()
+	// Get model name without make (e.g., "Toyota 4Runner" -> "4Runner")
+	const modelName = vehicleData.name.replace(vehicleData.make, '').trim()
 
 	return (
 		<>

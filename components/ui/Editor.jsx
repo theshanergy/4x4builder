@@ -89,7 +89,7 @@ function Editor() {
                     <optgroup key={type} label={type}>
                         {groupedList[type].map((id) => (
                             <option key={id} value={id}>
-                                {itemList[id].name}
+                                {itemList[id].name}{itemList[id].year ? ` (${itemList[id].year})` : ''}
                             </option>
                         ))}
                     </optgroup>
