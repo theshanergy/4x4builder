@@ -8,6 +8,12 @@ import { useXR } from '@react-three/xr'
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import Grass from './Grass'
 import DistantTerrain from './DistantTerrain'
+import { WaterTile, waterMaterial } from './Water'
+
+// Ocean configuration
+const OCEAN_RADIUS = 1000
+const OCEAN_TRANSITION = 80 // Width of the beach transition zone
+const OCEAN_DEPTH = 5 // How far below 0 the ocean floor goes
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
@@ -27,12 +33,46 @@ const DEFAULT_TERRAIN_CONFIG = {
 	maxHeight: 4,
 }
 
+// Helper to check if a tile intersects or is beyond the ocean radius
+const tileNeedsWater = (tileX, tileZ, tileSize) => {
+	// Get the closest point on the tile to the origin
+	const halfSize = tileSize / 2
+	const tileCenterX = tileX * tileSize
+	const tileCenterZ = tileZ * tileSize
+
+	// Find the closest corner of the tile to origin
+	const corners = [
+		[tileCenterX - halfSize, tileCenterZ - halfSize],
+		[tileCenterX + halfSize, tileCenterZ - halfSize],
+		[tileCenterX - halfSize, tileCenterZ + halfSize],
+		[tileCenterX + halfSize, tileCenterZ + halfSize],
+	]
+
+	// Check if any corner is beyond ocean transition start, or tile center is
+	const oceanTransitionStart = OCEAN_RADIUS - OCEAN_TRANSITION
+
+	for (const [cx, cz] of corners) {
+		const dist = Math.sqrt(cx * cx + cz * cz)
+		if (dist >= oceanTransitionStart) {
+			return true
+		}
+	}
+
+	// Also check tile center
+	const centerDist = Math.sqrt(tileCenterX * tileCenterX + tileCenterZ * tileCenterZ)
+	return centerDist >= oceanTransitionStart
+}
+
 // Shared terrain height calculation utilities
 const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDist) => {
 	const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
 	const transitionEndDistSq = transitionEndDist * transitionEndDist
 
-	// Get raw height value at any world position (normalized 0-1)
+	// Ocean boundary calculations
+	const oceanTransitionStart = OCEAN_RADIUS - OCEAN_TRANSITION
+	const oceanTransitionStartSq = oceanTransitionStart * oceanTransitionStart
+
+	// Get raw height value at any world position (normalized 0-1, can go negative for ocean)
 	const getRawHeight = (worldX, worldZ) => {
 		const distSq = worldX * worldX + worldZ * worldZ
 		if (distSq < flatAreaRadiusSq) return 0
@@ -45,11 +85,30 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 		// Map to 0.1-1.0 range: some areas have 10% height (much flatter), others full height
 		const regionModifier = 0.1 + (regionNoise + 1) * 0.45
 
+		let baseHeight
 		if (distSq < transitionEndDistSq) {
 			const t = (Math.sqrt(distSq) - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
-			return normalizedHeight * (t * t * (3 - 2 * t)) * regionModifier
+			baseHeight = normalizedHeight * (t * t * (3 - 2 * t)) * regionModifier
+		} else {
+			baseHeight = normalizedHeight * regionModifier
 		}
-		return normalizedHeight * regionModifier
+
+		// Apply ocean tapering - smoothly transition to ocean depth beyond ocean radius
+		if (distSq > oceanTransitionStartSq) {
+			const dist = Math.sqrt(distSq)
+			if (dist >= OCEAN_RADIUS) {
+				// Beyond ocean radius - full ocean depth (normalized)
+				return -OCEAN_DEPTH / 4 // Normalize relative to typical maxHeight
+			} else {
+				// In transition zone - smooth blend using smoothstep
+				const t = (dist - oceanTransitionStart) / OCEAN_TRANSITION
+				const smoothT = t * t * (3 - 2 * t)
+				const oceanFloorHeight = -OCEAN_DEPTH / 4
+				return baseHeight * (1 - smoothT) + oceanFloorHeight * smoothT
+			}
+		}
+
+		return baseHeight
 	}
 
 	// Get terrain height at any world position (in world units)
@@ -229,8 +288,16 @@ const Terrain = () => {
 		[terrainHelpers, maxHeight, normalScratch]
 	)
 
+	// Set ocean radius uniform once
+	useEffect(() => {
+		waterMaterial.uniforms.uOceanRadius.value = OCEAN_RADIUS
+	}, [])
+
 	// Update tiles based on vehicle position
-	useFrame(() => {
+	useFrame((state) => {
+		// Update water shader time
+		waterMaterial.uniforms.uTime.value = state.clock.elapsedTime
+
 		const centerPosition = vehicleState.position
 		const currentTileX = Math.floor(centerPosition.x / tileSize)
 		const currentTileZ = Math.floor(centerPosition.z / tileSize)
@@ -265,10 +332,13 @@ const Terrain = () => {
 
 					// Only create new tile data if not already cached
 					if (!tileCache.current.has(tileKey)) {
+						const hasWater = tileNeedsWater(tileX, tileZ, tileSize)
 						tileCache.current.set(tileKey, {
 							key: tileKey,
 							position: [tileX * tileSize, 0, tileZ * tileSize], // Stable reference
+							waterPosition: hasWater ? [tileX * tileSize, 0, tileZ * tileSize] : null, // Stable reference
 							shouldFade: !isInitialLoad,
+							hasWater,
 						})
 					}
 				}
@@ -290,18 +360,20 @@ const Terrain = () => {
 	return (
 		<group name='Terrain'>
 			<DistantTerrain noise={noise} map={distantTexture} />
-			{activeTiles.map(({ key, position, shouldFade }) => (
-				<TerrainTile
-					key={key}
-					position={position}
-					shouldFade={shouldFade}
-					tileSize={tileSize}
-					resolution={resolution}
-					maxHeight={maxHeight}
-					terrainHelpers={terrainHelpers}
-					map={sandTexture}
-					normalMap={sandNormalMap}
-				/>
+			{activeTiles.map(({ key, position, waterPosition, shouldFade, hasWater }) => (
+				<group key={key}>
+					<TerrainTile
+						position={position}
+						shouldFade={shouldFade}
+						tileSize={tileSize}
+						resolution={resolution}
+						maxHeight={maxHeight}
+						terrainHelpers={terrainHelpers}
+						map={sandTexture}
+						normalMap={sandNormalMap}
+					/>
+					{hasWater && <WaterTile position={waterPosition} tileSize={tileSize} />}
+				</group>
 			))}
 			{showGrass && <Grass getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
 		</group>

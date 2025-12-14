@@ -5,6 +5,7 @@ import { Vector3, Quaternion } from 'three'
 
 import useGameStore, { vehicleState } from '../store/gameStore'
 import useVehicleInput from './useVehicleInput'
+import useBuoyancy from './useBuoyancy'
 
 // Reset position (scene center, slightly above ground)
 const RESET_POSITION = { x: 0, y: 1, z: 0 }
@@ -112,6 +113,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	const tempQuat = useMemo(() => new Quaternion(), [])
 	const wheelQuat1 = useMemo(() => new Quaternion(), [])
 	const wheelQuat2 = useMemo(() => new Quaternion(), [])
+
+	// Buoyancy hook for water physics
+	const { isInWater, applyBuoyancy } = useBuoyancy(vehicleRef)
 
 	// Engine load tracking
 	const smoothedLoad = useRef(0.5)
@@ -248,6 +252,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 			// Update speed for UI (mutate directly to avoid re-renders)
 			vehicleState.speed = forwardSpeed
+
+			// Apply buoyancy forces when in water
+			applyBuoyancy(delta)
 		}
 
 		// Get processed vehicle input
@@ -509,8 +516,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			for (let i = 0; i < wheels.length; i++) {
 				vehicleController.current.setWheelBrake(i, brakeForce)
 			}
-		} else {
-			// Airborne controls when all wheels are not in contact
+		} else if (!isInWater.current) {
+			// Airborne controls when all wheels are not in contact (disabled in water)
 			if (vehicle) {
 				// Construct torque vector in world space using reusable objects
 				tempLocalTorque.set(pitchInput, yawInput, rollInput)
