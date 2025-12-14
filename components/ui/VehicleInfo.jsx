@@ -93,17 +93,17 @@ const VehicleInfo = () => {
 			</div>
 
 			{/* Hero Section */}
-			<section className='relative flex items-end min-h-[70vh] py-16'>
+			<section className='relative flex items-center min-h-[60vh] py-16'>
 				{/* Gradient overlay for text readability */}
-				<div className='absolute inset-x-0 bottom-0 h-2/3 bg-linear-to-t from-black/90 via-black/50 to-transparent pointer-events-none' />
+				<div className='absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent' />
 				<div className='wrapper relative z-10'>
-					<div className='max-w-2xl'>
+					<div>
 						{yearRange && <p className='inline-block mb-4 px-3 py-1 text-sm font-bold uppercase tracking-widest bg-red-700 text-white rounded-full'>{yearRange}</p>}
 						<h1 className='mb-6'>
 							<span className='block text-stone-300 text-2xl sm:text-3xl md:text-4xl font-bold normal-case tracking-normal mb-2'>{vehicleData.make}</span>
 							<span className='block'>{modelName}</span>
 						</h1>
-						<p className='text-lg text-stone-400 mb-8 leading-relaxed'>
+						<p className='text-lg text-stone-400 max-w-lg mb-8 leading-relaxed'>
 							Customize every detail in our 3D configurator. Experiment with wheels, tires, suspension, and accessories.
 						</p>
 						<button onClick={enterConfigurator} className='large'>
@@ -114,9 +114,9 @@ const VehicleInfo = () => {
 			</section>
 
 			{/* Specs Bar */}
-			<section className='bg-stone-900/90 backdrop-blur-sm border-y border-stone-800'>
+			<section className='bg-black/80 backdrop-blur-sm border-t border-white/5'>
 				<div className='wrapper'>
-					<dl className='grid grid-cols-2 md:grid-cols-4 divide-x divide-stone-800'>
+					<dl className='grid grid-cols-2 md:grid-cols-4 divide-x divide-white/5'>
 						{specs.map((spec) => (
 							<SpecItem key={spec.label} {...spec} />
 						))}
@@ -199,7 +199,7 @@ const VehicleInfo = () => {
 									<ul className='space-y-2'>
 										{category.items.map((item) => (
 											<li key={item} className='flex items-start text-stone-600 text-sm'>
-												<svg className='w-5 h-5 mr-2 text-red-600 flex-shrink-0 mt-0.5' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+												<svg className='w-5 h-5 mr-2 text-red-600 shrink-0 mt-0.5' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
 													<path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 13l4 4L19 7' />
 												</svg>
 												{item}

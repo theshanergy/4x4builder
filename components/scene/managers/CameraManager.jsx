@@ -106,7 +106,7 @@ const useVehicleGroup = () => {
 }
 
 // Orbit/Chase camera controller
-const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastTerrainCacheFrame }) => {
+const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastTerrainCacheFrame, transitionFromInfo }) => {
 	const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 	const camera = useThree((state) => state.camera)
 	const orbitControlsRef = useRef()
@@ -115,6 +115,19 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastT
 	const targetWithOffset = useRef(new Vector3())
 	const targetFov = 24 // Default FOV for orbit camera
 	const lastFov = useRef(camera.fov)
+
+	// Transition state
+	const isTransitioning = useRef(false)
+	const transitionStartTime = useRef(0)
+	const startPos = useRef(new Vector3())
+
+	useEffect(() => {
+		if (transitionFromInfo) {
+			isTransitioning.current = true
+			transitionStartTime.current = 0
+			startPos.current.copy(camera.position)
+		}
+	}, [transitionFromInfo, camera])
 
 	// Use shared ground avoidance hook
 	const checkGroundAvoidance = useGroundAvoidance(cameraPosition, minGroundDistance, terrainMeshesCache, lastTerrainCacheFrame)
@@ -129,6 +142,27 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastT
 
 	useFrame((state, delta) => {
 		if (!orbitControlsRef.current) return
+
+		// Transition logic
+		if (isTransitioning.current) {
+			if (transitionStartTime.current === 0) {
+				transitionStartTime.current = state.clock.elapsedTime
+			}
+
+			// 1.5 second transition
+			const t = (state.clock.elapsedTime - transitionStartTime.current) / 1.5
+
+			if (t >= 1) {
+				isTransitioning.current = false
+			} else {
+				const isPortrait = window.innerWidth / window.innerHeight < 1
+				const defaultOffset = isPortrait ? new Vector3(-2, 1, 12) : new Vector3(-4, 1, 6.5)
+				const targetCamPos = new Vector3().copy(vehicleState.position).add(defaultOffset)
+
+				const alpha = 1 - Math.pow(1 - t, 3) // Ease out cubic
+				camera.position.lerpVectors(startPos.current, targetCamPos, alpha)
+			}
+		}
 
 		// Get the target position from vehicleState
 		const target = vehicleState.position
@@ -414,10 +448,77 @@ const ChaseCamera = ({ terrainMeshesCache, lastTerrainCacheFrame }) => {
 	return null
 }
 
+// Info camera controller - triggered by info mode
+const InfoCamera = () => {
+	const camera = useThree((state) => state.camera)
+
+	const currentPosition = useRef(camera.position.clone())
+	const currentLookAt = useRef(new Vector3(0, 0, 0).applyQuaternion(camera.quaternion).add(camera.position))
+
+	const targetFov = 30
+	const lastFov = useRef(camera.fov)
+
+	// Temp vectors
+	const tempVec = useRef(new Vector3())
+	const tempQuat = useRef(new Quaternion())
+	const idealOffset = useRef(new Vector3())
+	const idealLookAt = useRef(new Vector3())
+
+	// Use shared hooks
+	const getVehicleGroup = useVehicleGroup()
+
+	useFrame((state, delta) => {
+		const vehicleGroup = getVehicleGroup()
+		if (!vehicleGroup) return
+
+		// Get vehicle world position and rotation
+		vehicleGroup.getWorldPosition(tempVec.current)
+		vehicleGroup.getWorldQuaternion(tempQuat.current)
+
+		// Calculate ideal camera position (Front Right)
+		// Position: Right (3.5), Up (2), Forward (8.5)
+		idealOffset.current.set(3.5, 2, 8.5)
+		idealOffset.current.applyQuaternion(tempQuat.current)
+		idealOffset.current.add(tempVec.current)
+
+		// Calculate ideal look target (Left Front)
+		// Target: Left (1), Up (0), Forward (1.5)
+		idealLookAt.current.set(-1, 0, 1.5)
+		idealLookAt.current.applyQuaternion(tempQuat.current)
+		idealLookAt.current.add(tempVec.current)
+
+		// Smoothly interpolate camera position and look-at
+		const posLambda = 3
+		const lookLambda = 4
+
+		dampVector3(currentPosition.current, idealOffset.current, posLambda, delta)
+		dampVector3(currentLookAt.current, idealLookAt.current, lookLambda, delta)
+
+		// Smoothly transition FOV
+		const newFov = MathUtils.damp(camera.fov, targetFov, 3, delta)
+		if (Math.abs(newFov - lastFov.current) > 0.01) {
+			camera.fov = newFov
+			camera.updateProjectionMatrix()
+			lastFov.current = newFov
+		}
+
+		camera.position.copy(currentPosition.current)
+		camera.lookAt(currentLookAt.current)
+	})
+
+	return null
+}
+
 // Main camera manager - handles switching between camera modes
 const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 	const cameraMode = useGameStore((state) => state.cameraMode)
 	const setCameraMode = useGameStore((state) => state.setCameraMode)
+	const infoMode = useGameStore((state) => state.infoMode)
+	const prevInfoMode = useRef(infoMode)
+
+	useEffect(() => {
+		prevInfoMode.current = infoMode
+	}, [infoMode])
 
 	// Check if in XR session
 	const isInXR = useXR((state) => state.mode !== null)
@@ -448,6 +549,11 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 		keyPressedLastFrame.current = switchPressed
 	})
 
+	// Handle info mode
+	if (infoMode) {
+		return <InfoCamera />
+	}
+
 	// Render the appropriate camera controller based on current mode
 	switch (cameraMode) {
 		case CameraMode.FIRST_PERSON:
@@ -462,6 +568,7 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 					minGroundDistance={minGroundDistance}
 					terrainMeshesCache={terrainMeshesCache}
 					lastTerrainCacheFrame={lastTerrainCacheFrame}
+					transitionFromInfo={prevInfoMode.current}
 				/>
 			)
 	}
