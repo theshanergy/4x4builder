@@ -29,7 +29,7 @@ const WaterMesh = () => {
 			uniforms: {
 				uTime: { value: 0 },
 				uNormalMap: { value: waterNormals },
-				uWaterColor: { value: new Color().setHSL(0.50, 0.75, 0.48) },
+				uWaterColor: { value: new Color().setHSL(0.5, 0.75, 0.48) },
 				uDeepColor: { value: new Color().setHSL(0.52, 0.82, 0.06) },
 				uSkyColor: { value: new Color().setHSL(0.57, 0.65, 0.55) }, // Blue sky
 				uSkyHorizonColor: { value: new Color().setHSL(0.65, 0.35, 0.75) }, // Pale horizon
@@ -70,7 +70,7 @@ const WaterMesh = () => {
 		}
 	})
 
-	return <mesh ref={ref} geometry={geom} material={material} rotation-x={-Math.PI / 2} position={[0, 0, 0]} />
+	return <mesh ref={ref} geometry={geom} material={material} rotation-x={-Math.PI / 2} position={[0, -1, 0]} />
 }
 
 // Wrapper component with Suspense to handle async texture loading

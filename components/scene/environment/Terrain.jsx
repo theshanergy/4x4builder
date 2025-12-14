@@ -11,9 +11,12 @@ import Water from './Water'
 import DistantTerrain from './DistantTerrain'
 
 // Ocean configuration
-const OCEAN_RADIUS = 1000
+const OCEAN_RADIUS = 200
 const OCEAN_TRANSITION = 80 // Width of the beach transition zone
 const OCEAN_DEPTH = 5 // How far below 0 the ocean floor goes
+
+// Beach profile control point (like a Bezier curve)
+const BEACH_MIDPOINT_DEPTH = 0.2 // Intermediate depth at transition midpoint (0-1 range)
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
@@ -63,18 +66,39 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 			baseHeight = normalizedHeight * regionModifier
 		}
 
-		// Apply ocean tapering - smoothly transition to ocean depth beyond ocean radius
+		// Apply ocean tapering - realistic two-stage beach profile
 		if (distSq > oceanTransitionStartSq) {
 			const dist = Math.sqrt(distSq)
 			if (dist >= OCEAN_RADIUS) {
 				// Beyond ocean radius - full ocean depth (normalized)
 				return -OCEAN_DEPTH / 4 // Normalize relative to typical maxHeight
 			} else {
-				// In transition zone - smooth blend using smoothstep
-				const t = (dist - oceanTransitionStart) / OCEAN_TRANSITION
-				const smoothT = t * t * (3 - 2 * t)
+				// In transition zone - smooth bezier-like curve through control point
+				const t = (dist - oceanTransitionStart) / OCEAN_TRANSITION // 0 at shore, 1 at deep ocean
+				
 				const oceanFloorHeight = -OCEAN_DEPTH / 4
-				return baseHeight * (1 - smoothT) + oceanFloorHeight * smoothT
+				const midpointHeight = oceanFloorHeight * BEACH_MIDPOINT_DEPTH
+				
+				// Quadratic bezier interpolation: start at baseHeight, through midpoint, to oceanFloorHeight
+				// First half: baseHeight → midpoint (gentle slope)
+				// Second half: midpoint → oceanFloorHeight (steeper drop)
+				const bezierT = t * t * (3 - 2 * t) // Smoothstep for natural curve
+				let finalHeight
+				
+				if (t < 0.5) {
+					// Shallow beach section
+					const localT = t * 2 // Map to 0-1
+					finalHeight = baseHeight * (1 - localT) + midpointHeight * localT
+				} else {
+					// Drop-off section
+					const localT = (t - 0.5) * 2 // Map to 0-1
+					const dropCurve = localT * localT // Quadratic for steeper descent
+					finalHeight = midpointHeight * (1 - dropCurve) + oceanFloorHeight * dropCurve
+				}
+				
+				// Suppress terrain noise as we enter water
+				const noiseSuppression = (1 - bezierT) * (1 - bezierT) * (1 - bezierT)
+				return baseHeight * noiseSuppression + finalHeight * (1 - noiseSuppression)
 			}
 		}
 

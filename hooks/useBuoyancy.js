@@ -1,6 +1,9 @@
 import { useRef, useMemo } from 'react'
 import { Vector3, Quaternion } from 'three'
 
+// Water level constant
+const WATER_LEVEL = -1
+
 // Buoyancy configuration
 const BUOYANCY = {
 	// Physics parameters
@@ -43,7 +46,7 @@ export const useBuoyancy = (vehicleRef) => {
 		if (!vehicle) return false
 
 		const vehiclePos = vehicle.translation()
-		const submersionDepth = -vehiclePos.y
+		const submersionDepth = WATER_LEVEL - vehiclePos.y
 
 		if (submersionDepth > 0) {
 			isInWater.current = true
