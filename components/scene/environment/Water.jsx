@@ -1,6 +1,6 @@
 import { memo, useRef, useMemo } from 'react'
 import { Color, TextureLoader, RepeatWrapping, PlaneGeometry, ShaderMaterial, UniformsUtils, DoubleSide } from 'three'
-import { useFrame, useLoader, useThree } from '@react-three/fiber'
+import { useFrame, useLoader } from '@react-three/fiber'
 import { sunDirection } from '../../../store/gameStore'
 import waterVertexShader from '../../../shaders/water.vert.glsl'
 import waterFragmentShader from '../../../shaders/water.frag.glsl'
@@ -31,7 +31,6 @@ const WaterMaterial = {
 // WaterTile component using custom performant shader
 const WaterTile = memo(({ position, tileSize, oceanRadius, oceanTransition }) => {
 	const ref = useRef()
-	const { scene } = useThree()
 
 	// Load water normal map texture
 	const waterNormals = useLoader(TextureLoader, '/assets/images/ground/water_normal.jpg')
@@ -55,12 +54,12 @@ const WaterTile = memo(({ position, tileSize, oceanRadius, oceanTransition }) =>
 	}, [waterNormals, oceanRadius, oceanTransition])
 
 	// Animate water and update envmap from scene
-	useFrame((_, delta) => {
+	useFrame((state, delta) => {
 		if (ref.current?.material?.uniforms) {
 			ref.current.material.uniforms.uTime.value += delta
 			// Use scene environment map if available
-			if (scene.environment) {
-				ref.current.material.uniforms.uEnvMap.value = scene.environment
+			if (state.scene.environment) {
+				ref.current.material.uniforms.uEnvMap.value = state.scene.environment
 			}
 		}
 	})
