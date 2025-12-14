@@ -1,0 +1,6 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Sitemap location (update if you have a different location)
+Sitemap: https://4x4builder.com/sitemap.xml
