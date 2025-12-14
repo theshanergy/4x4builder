@@ -7,11 +7,11 @@ import { useXR } from '@react-three/xr'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import Grass from './Grass'
+import WaterTile from './Water'
 import DistantTerrain from './DistantTerrain'
-import { WaterTile, waterMaterial } from './Water'
 
 // Ocean configuration
-const OCEAN_RADIUS = 1000
+const OCEAN_RADIUS = 200
 const OCEAN_TRANSITION = 80 // Width of the beach transition zone
 const OCEAN_DEPTH = 5 // How far below 0 the ocean floor goes
 
@@ -288,16 +288,8 @@ const Terrain = () => {
 		[terrainHelpers, maxHeight, normalScratch]
 	)
 
-	// Set ocean radius uniform once
-	useEffect(() => {
-		waterMaterial.uniforms.uOceanRadius.value = OCEAN_RADIUS
-	}, [])
-
 	// Update tiles based on vehicle position
 	useFrame((state) => {
-		// Update water shader time
-		waterMaterial.uniforms.uTime.value = state.clock.elapsedTime
-
 		const centerPosition = vehicleState.position
 		const currentTileX = Math.floor(centerPosition.x / tileSize)
 		const currentTileZ = Math.floor(centerPosition.z / tileSize)
@@ -372,7 +364,7 @@ const Terrain = () => {
 						map={sandTexture}
 						normalMap={sandNormalMap}
 					/>
-					{hasWater && <WaterTile position={waterPosition} tileSize={tileSize} />}
+					{hasWater && <WaterTile position={waterPosition} tileSize={tileSize} oceanRadius={OCEAN_RADIUS} />}
 				</group>
 			))}
 			{showGrass && <Grass getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}

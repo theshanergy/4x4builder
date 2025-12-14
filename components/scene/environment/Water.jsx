@@ -1,8 +1,9 @@
-import { memo } from 'react'
+import { memo, useEffect } from 'react'
 import { ShaderMaterial, Color, FrontSide } from 'three'
+import { useFrame } from '@react-three/fiber'
 
 // Shared water shader material - single instance for all tiles
-export const waterMaterial = new ShaderMaterial({
+const waterMaterial = new ShaderMaterial({
 	uniforms: {
 		uTime: { value: 0 },
 		uOceanRadius: { value: 300 },
@@ -87,7 +88,17 @@ export const waterMaterial = new ShaderMaterial({
 
 // WaterTile component - purely visual, no physics
 // Uses shared material for better performance (no cloning, no per-tile useFrame)
-export const WaterTile = memo(({ position, tileSize }) => {
+const WaterTile = memo(({ position, tileSize, oceanRadius }) => {
+	// Initialize water material uniforms once
+	useEffect(() => {
+		waterMaterial.uniforms.uOceanRadius.value = oceanRadius
+	}, [oceanRadius])
+
+	// Update water shader time
+	useFrame((state) => {
+		waterMaterial.uniforms.uTime.value = state.clock.elapsedTime
+	})
+
 	return (
 		<mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
 			<planeGeometry args={[tileSize, tileSize]} />
@@ -95,3 +106,5 @@ export const WaterTile = memo(({ position, tileSize }) => {
 		</mesh>
 	)
 })
+
+export default WaterTile
