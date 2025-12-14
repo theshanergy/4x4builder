@@ -7,7 +7,7 @@ import { useXR } from '@react-three/xr'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import Grass from './Grass'
-import WaterTile from './Water'
+import Water from './Water'
 import DistantTerrain from './DistantTerrain'
 
 // Ocean configuration
@@ -31,36 +31,6 @@ const DEFAULT_TERRAIN_CONFIG = {
 	resolution: 16,
 	smoothness: 15,
 	maxHeight: 4,
-}
-
-// Helper to check if a tile intersects or is beyond the ocean radius
-const tileNeedsWater = (tileX, tileZ, tileSize) => {
-	// Get the closest point on the tile to the origin
-	const halfSize = tileSize / 2
-	const tileCenterX = tileX * tileSize
-	const tileCenterZ = tileZ * tileSize
-
-	// Find the closest corner of the tile to origin
-	const corners = [
-		[tileCenterX - halfSize, tileCenterZ - halfSize],
-		[tileCenterX + halfSize, tileCenterZ - halfSize],
-		[tileCenterX - halfSize, tileCenterZ + halfSize],
-		[tileCenterX + halfSize, tileCenterZ + halfSize],
-	]
-
-	// Check if any corner is beyond ocean transition start, or tile center is
-	const oceanTransitionStart = OCEAN_RADIUS - OCEAN_TRANSITION
-
-	for (const [cx, cz] of corners) {
-		const dist = Math.sqrt(cx * cx + cz * cz)
-		if (dist >= oceanTransitionStart) {
-			return true
-		}
-	}
-
-	// Also check tile center
-	const centerDist = Math.sqrt(tileCenterX * tileCenterX + tileCenterZ * tileCenterZ)
-	return centerDist >= oceanTransitionStart
 }
 
 // Shared terrain height calculation utilities
@@ -239,10 +209,15 @@ const TerrainTile = memo(({ position, tileSize, resolution, maxHeight, terrainHe
 	)
 })
 
+// Distance from ocean edge at which water starts loading (with hysteresis buffer)
+const WATER_LOAD_DISTANCE = 400 // Start loading water when this close to ocean edge
+const WATER_UNLOAD_BUFFER = 100 // Extra distance before unloading to prevent flicker
+
 // Main Terrain component
 const Terrain = () => {
 	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
 	const [activeTiles, setActiveTiles] = useState([])
+	const [showWater, setShowWater] = useState(false)
 	const lastTileCoord = useRef({ x: null, z: null })
 	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
 
@@ -324,13 +299,10 @@ const Terrain = () => {
 
 					// Only create new tile data if not already cached
 					if (!tileCache.current.has(tileKey)) {
-						const hasWater = tileNeedsWater(tileX, tileZ, tileSize)
 						tileCache.current.set(tileKey, {
 							key: tileKey,
 							position: [tileX * tileSize, 0, tileZ * tileSize], // Stable reference
-							waterPosition: hasWater ? [tileX * tileSize, 0, tileZ * tileSize] : null, // Stable reference
 							shouldFade: !isInitialLoad,
-							hasWater,
 						})
 					}
 				}
@@ -347,25 +319,39 @@ const Terrain = () => {
 		// Build active tiles array from cache (stable references)
 		const newActiveTiles = Array.from(newActiveTileKeys).map((key) => tileCache.current.get(key))
 		setActiveTiles(newActiveTiles)
+
+		// Check if player is close enough to ocean to show water
+		const distFromOrigin = Math.sqrt(centerPosition.x * centerPosition.x + centerPosition.z * centerPosition.z)
+		const distFromOcean = OCEAN_RADIUS - distFromOrigin
+
+		// Use hysteresis to prevent flicker at boundary
+		setShowWater((wasShowing) => {
+			if (wasShowing) {
+				// Already showing - only hide if we've moved far enough away
+				return distFromOcean < WATER_LOAD_DISTANCE + WATER_UNLOAD_BUFFER
+			} else {
+				// Not showing - show when we get close enough
+				return distFromOcean < WATER_LOAD_DISTANCE
+			}
+		})
 	})
 
 	return (
 		<group name='Terrain'>
 			<DistantTerrain noise={noise} map={distantTexture} />
-			{activeTiles.map(({ key, position, waterPosition, shouldFade, hasWater }) => (
-				<group key={key}>
-					<TerrainTile
-						position={position}
-						shouldFade={shouldFade}
-						tileSize={tileSize}
-						resolution={resolution}
-						maxHeight={maxHeight}
-						terrainHelpers={terrainHelpers}
-						map={sandTexture}
-						normalMap={sandNormalMap}
-					/>
-					{hasWater && <WaterTile position={waterPosition} tileSize={tileSize} oceanRadius={OCEAN_RADIUS} oceanTransition={OCEAN_TRANSITION} />}
-				</group>
+			{showWater && <Water oceanRadius={OCEAN_RADIUS} oceanTransition={OCEAN_TRANSITION} />}
+			{activeTiles.map(({ key, position, shouldFade }) => (
+				<TerrainTile
+					key={key}
+					position={position}
+					shouldFade={shouldFade}
+					tileSize={tileSize}
+					resolution={resolution}
+					maxHeight={maxHeight}
+					terrainHelpers={terrainHelpers}
+					map={sandTexture}
+					normalMap={sandNormalMap}
+				/>
 			))}
 			{showGrass && <Grass getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
 		</group>
