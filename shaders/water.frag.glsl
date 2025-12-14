@@ -8,6 +8,7 @@ uniform vec3 uSunColor;
 uniform float uDistortionScale;
 uniform float uWaveSpeed;
 uniform float uWaveScale;
+uniform float uNormalStrength;
 uniform float uOpacity;
 uniform float uShoreRadius;
 uniform float uNearFade;
@@ -16,18 +17,19 @@ uniform float uFarFade;
 varying vec2 vUv;
 varying vec3 vWorldPosition;
 varying vec3 vViewDirection;
+varying float vViewDistance;
 
 void main() {
 	// Calculate distance from shore (origin is at center, shore is at uShoreRadius)
 	float distFromOrigin = length(vWorldPosition.xz);
 	float distFromShore = distFromOrigin - uShoreRadius;
 	
-	// Calculate opacity based on distance from shore with near/far falloff
-	// Ranges from 0.3 (near shore) to 1.0 (far from shore)
-	float shoreOpacity = mix(0.6, 1.0, smoothstep(uNearFade, uFarFade, distFromShore));
+	// Calculate opacity based on distance from camera with near/far falloff
+	// Ranges from 0.6 (near camera) to 1.0 (far from camera)
+	float distanceOpacity = mix(0.6, 1.0, smoothstep(uNearFade, uFarFade, vViewDistance));
 
-	// Scale noise by distance to reduce grid effect
-	float noiseScale = mix(1.0, 0.25, smoothstep(0.0, 400.0, distFromShore));
+	// Scale noise by distance to reduce grid effect (subtle falloff to maintain wave consistency)
+	float noiseScale = mix(1.0, 0.7, smoothstep(0.0, 600.0, distFromShore));
 	
 	// Multi-layered UV animation for seamless tiling waves
 	float time = uTime * uWaveSpeed;
@@ -40,6 +42,9 @@ void main() {
 	vec3 normal2 = texture2D(uNormalMap, uv2).rgb * 2.0 - 1.0;
 	vec3 normal3 = texture2D(uNormalMap, uv3).rgb * 2.0 - 1.0;
 	vec3 normal = normalize(normal1 + normal2 * 0.5 + normal3 * 0.3);
+	
+	// Apply normal strength (controls wave contrast)
+	normal.xy *= uNormalStrength;
 	
 	// Convert to world space (water is flat, so simple transform)
 	vec3 worldNormal = normalize(vec3(normal.x * uDistortionScale, 1.0, normal.y * uDistortionScale));
@@ -63,8 +68,8 @@ void main() {
 	// Final color: blend water color with reflection based on fresnel
 	vec3 color = mix(waterBaseColor, envColor, fresnel * 0.6) + specular;
 	
-	// Apply shore-based opacity falloff
-	float finalOpacity = uOpacity * shoreOpacity;
+	// Apply distance-based opacity falloff
+	float finalOpacity = uOpacity * distanceOpacity;
 	
 	gl_FragColor = vec4(color, finalOpacity);
 }

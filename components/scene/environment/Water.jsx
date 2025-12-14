@@ -11,17 +11,18 @@ const WaterMaterial = {
 		uTime: { value: 0 },
 		uNormalMap: { value: null },
 		uEnvMap: { value: null },
-		uWaterColor: { value: new Color(0x20c4d4) }, // Bright tropical turquoise
-		uDeepColor: { value: new Color(0x0a6e7a) }, // Rich tropical teal
+		uWaterColor: { value: new Color().setHSL(0.52, 0.75, 0.48) }, // Bright tropical turquoise (H: cyan-blue, S: vibrant, L: medium-bright)
+		uDeepColor: { value: new Color().setHSL(0.52, 0.82, 0.26) }, // Rich tropical teal (H: cyan-blue, S: highly saturated, L: darker)
 		uSunDirection: { value: sunDirection },
-		uSunColor: { value: new Color(0xfffaf0) }, // Warm sunlight
+		uSunColor: { value: new Color().setHSL(0.13, 1.0, 0.97) }, // Warm sunlight (H: yellow-orange, S: pure, L: very bright)
 		uDistortionScale: { value: 3.5 },
 		uWaveSpeed: { value: 0.025 },
 		uWaveScale: { value: 0.12 },
+		uNormalStrength: { value: 0.1 },
 		uOpacity: { value: 0.85 },
 		uShoreRadius: { value: 0 }, // Where water starts (set from props)
-		uNearFade: { value: 10.0 }, // Distance from shore where water is fully transparent
-		uFarFade: { value: 50.0 }, // Distance from shore where water is fully opaque
+		uNearFade: { value: 30.0 }, // Distance from camera where water is fully transparent
+		uFarFade: { value: 60.0 }, // Distance from camera where water is fully opaque
 	},
 	vertexShader: waterVertexShader,
 	fragmentShader: waterFragmentShader,
