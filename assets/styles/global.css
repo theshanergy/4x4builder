@@ -14,7 +14,7 @@
 
 @layer base {
 	.wrapper {
-		@apply mx-auto w-6xl max-w-[90vw];
+		@apply mx-auto w-7xl max-w-[90vw];
 	}
 
 	/* links */
@@ -36,6 +36,9 @@
 	}
 	h2 {
 		@apply mb-6 text-4xl md:text-5xl leading-tight font-black uppercase;
+	}
+	h3 {
+		@apply mb-4 text-xl font-semibold;
 	}
 
 	/* forms */
