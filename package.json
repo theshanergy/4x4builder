@@ -7,8 +7,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
-		"build": "vite build",
-		"preview": "vite preview"
+		"build": "vite build && npm run sitemap",
+		"preview": "vite preview",
+		"sitemap": "node scripts/generate-sitemap.js"
 	},
 	"dependencies": {
 		"@react-three/drei": "^10.7.7",
