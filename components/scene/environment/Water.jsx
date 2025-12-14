@@ -29,10 +29,10 @@ const WaterMesh = () => {
 			uniforms: {
 				uTime: { value: 0 },
 				uNormalMap: { value: waterNormals },
-				uWaterColor: { value: new Color().setHSL(0.52, 0.75, 0.48) },
-				uDeepColor: { value: new Color().setHSL(0.52, 0.82, 0.26) },
+				uWaterColor: { value: new Color().setHSL(0.50, 0.75, 0.48) },
+				uDeepColor: { value: new Color().setHSL(0.52, 0.82, 0.06) },
 				uSkyColor: { value: new Color().setHSL(0.57, 0.65, 0.55) }, // Blue sky
-				uSkyHorizonColor: { value: new Color().setHSL(0.55, 0.35, 0.75) }, // Pale horizon
+				uSkyHorizonColor: { value: new Color().setHSL(0.65, 0.35, 0.75) }, // Pale horizon
 				uSunDirection: { value: sunDirection },
 				uSunColor: { value: new Color().setHSL(0.13, 1.0, 0.97) },
 				uDistortionScale: { value: 3.5 },

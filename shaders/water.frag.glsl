@@ -57,8 +57,13 @@ void main() {
 	float sunSpec = pow(max(dot(reflectDir, uSunDirection), 0.0), 256.0);
 	vec3 specular = uSunColor * sunSpec * 2.0;
 	
-	// Depth-based color (fake depth based on view angle)
-	float depthFactor = pow(max(dot(vViewDirection, vec3(0.0, 1.0, 0.0)), 0.0), 0.5);
+	// Distance from mesh center (water follows player, so center is at player position)
+	float distanceFromCenter = length(vWorldPos.xz) / 300.0; // Normalize by water radius
+	distanceFromCenter = clamp(distanceFromCenter, 0.0, 1.0);
+	
+	// Depth-based color: combine view angle and distance from center
+	float viewDepth = pow(max(dot(vViewDirection, vec3(0.0, 1.0, 0.0)), 0.0), 0.5);
+	float depthFactor = viewDepth * (1.0 - distanceFromCenter * 0.6); // More deep color at edges
 	vec3 waterBaseColor = mix(uDeepColor, uWaterColor, depthFactor);
 	
 	// Final color: blend water color with reflection based on fresnel
