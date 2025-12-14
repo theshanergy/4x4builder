@@ -1,61 +1,19 @@
-import { memo, useMemo, useRef, useEffect, Suspense } from 'react'
+import { useMemo, useRef, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
-import { Gltf } from '@react-three/drei'
 import { useXR } from '@react-three/xr'
 import { Vector3, Quaternion } from 'three'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import vehicleConfigs from '../../../vehicleConfigs'
-import useAnimateHeight from '../../../hooks/useAnimateHeight'
 import useVehiclePhysics from '../../../hooks/useVehiclePhysics'
-import useMaterialProperties from '../../../hooks/useMaterialProperties'
 import useTransformBroadcast from '../../../hooks/useTransformBroadcast'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
 import EngineAudio from './EngineAudio'
 import Dust from './Dust'
 import TireTracks from './TireTracks'
 import Wheels from './Wheels'
-import Lighting from './Lighting'
-
-// Body.
-const Body = memo(({ id, height, color, roughness, addons, lighting }) => {
-	const vehicle = useRef()
-
-	const { setObjectMaterials } = useMaterialProperties()
-
-	// Set body color.
-	useEffect(() => {
-		setObjectMaterials(vehicle.current, color, roughness)
-	}, [setObjectMaterials, color, roughness, addons])
-
-	// Build array of addon paths.
-	const addonPaths = useMemo(() => {
-		return Object.entries(addons)
-			.filter(([type, value]) => vehicleConfigs.vehicles[id]['addons'][type]?.['options'][value])
-			.map(([type, value]) => {
-				// Return path.
-				return vehicleConfigs.vehicles[id]['addons'][type]['options'][value]['model']
-			})
-	}, [id, addons])
-
-	// Animate height.
-	useAnimateHeight(vehicle, height, height + 0.1)
-
-	return (
-		<group ref={vehicle} name='Body' key={id}>
-			<Gltf src={vehicleConfigs.vehicles[id].model} />
-			{addonPaths.length ? (
-				<group name='Addons'>
-					{addonPaths.map((addon) => (
-						<Gltf key={addon} src={addon} />
-					))}
-				</group>
-			) : null}
-			<Lighting id={id} lighting={lighting} />
-		</group>
-	)
-})
+import VehicleBody from './VehicleBody'
 
 // Vehicle component with physics
 const Vehicle = (props) => {
@@ -134,7 +92,7 @@ const Vehicle = (props) => {
 				<group ref={chassisGroupRef} name='Vehicle'>
 					<EngineAudio />
 					<Suspense fallback={null}>
-						<Body key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />
+						<VehicleBody key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />
 					</Suspense>
 					<Wheels
 						rim={rim}

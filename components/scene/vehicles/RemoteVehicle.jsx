@@ -1,14 +1,13 @@
 import { memo, useMemo, useRef, useEffect, Suspense } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { useGLTF, Html } from '@react-three/drei'
 import { Vector3, Quaternion, MathUtils } from 'three'
+import { useFrame } from '@react-three/fiber'
 
 import vehicleConfigs from '../../../vehicleConfigs'
-import useAnimateHeight from '../../../hooks/useAnimateHeight'
-import useMaterialProperties from '../../../hooks/useMaterialProperties'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
-import cloneWithMaterials from '../../../utils/cloneWithMaterials'
+
 import Wheels from './Wheels'
+import VehicleBody from './VehicleBody'
+import PlayerLabel from './PlayerLabel'
 
 // Interpolation settings
 const INTERPOLATION_DELAY = 100 // ms - buffer time for smooth interpolation
@@ -61,22 +60,18 @@ class TransformBuffer {
 		if (!after) {
 			const latest = this.buffer[this.buffer.length - 1]
 			const timeSinceLatest = renderTime - latest.receivedAt
-			
+
 			// Don't extrapolate for too long
 			if (timeSinceLatest > MAX_EXTRAPOLATION_TIME) {
 				return latest
 			}
-			
+
 			// Simple velocity-based extrapolation
 			if (latest.velocity) {
 				const dt = timeSinceLatest / 1000 // Convert to seconds
 				return {
 					...latest,
-					position: [
-						latest.position[0] + latest.velocity[0] * dt,
-						latest.position[1] + latest.velocity[1] * dt,
-						latest.position[2] + latest.velocity[2] * dt,
-					],
+					position: [latest.position[0] + latest.velocity[0] * dt, latest.position[1] + latest.velocity[1] * dt, latest.position[2] + latest.velocity[2] * dt],
 				}
 			}
 			return latest
@@ -89,12 +84,8 @@ class TransformBuffer {
 		return {
 			position: before.position.map((v, i) => MathUtils.lerp(v, after.position[i], clampedT)),
 			rotation: this.slerpQuat(before.rotation, after.rotation, clampedT),
-			wheelRotations: before.wheelRotations?.map((v, i) => 
-				MathUtils.lerp(v, after.wheelRotations?.[i] || v, clampedT)
-			) || [0, 0, 0, 0],
-			wheelYPositions: before.wheelYPositions?.map((v, i) => 
-				MathUtils.lerp(v, after.wheelYPositions?.[i] || v, clampedT)
-			) || null,
+			wheelRotations: before.wheelRotations?.map((v, i) => MathUtils.lerp(v, after.wheelRotations?.[i] || v, clampedT)) || [0, 0, 0, 0],
+			wheelYPositions: before.wheelYPositions?.map((v, i) => MathUtils.lerp(v, after.wheelYPositions?.[i] || v, clampedT)) || null,
 			steering: MathUtils.lerp(before.steering || 0, after.steering || 0, clampedT),
 			engineRpm: MathUtils.lerp(before.engineRpm || 850, after.engineRpm || 850, clampedT),
 			velocity: after.velocity || before.velocity || [0, 0, 0],
@@ -113,96 +104,6 @@ class TransformBuffer {
 	}
 }
 
-// Single addon component - each addon loads its own model
-const RemoteAddon = memo(({ path, color, roughness }) => {
-	const { setObjectMaterials } = useMaterialProperties()
-	const gltf = useGLTF(path)
-	// Clone scene with unique materials
-	const scene = useMemo(() => cloneWithMaterials(gltf.scene), [gltf.scene])
-
-	useEffect(() => {
-		setObjectMaterials(scene, color, roughness)
-	}, [scene, setObjectMaterials, color, roughness])
-
-	return <primitive object={scene} />
-})
-
-// Body component for remote vehicle
-const RemoteBody = memo(({ id, height, color, roughness, addons }) => {
-	const { setObjectMaterials } = useMaterialProperties()
-	const vehicle = useRef()
-	
-	// Load body model
-	const bodyGltf = useGLTF(vehicleConfigs.vehicles[id]?.model || vehicleConfigs.vehicles[vehicleConfigs.defaults.body].model)
-	// Clone scene with unique materials
-	const bodyScene = useMemo(() => cloneWithMaterials(bodyGltf.scene), [bodyGltf.scene])
-
-	// Get addon paths
-	const addonPaths = useMemo(() => {
-		return Object.entries(addons || {})
-			.filter(([type, value]) => vehicleConfigs.vehicles[id]?.['addons']?.[type]?.['options']?.[value])
-			.map(([type, value]) => vehicleConfigs.vehicles[id]['addons'][type]['options'][value]['model'])
-	}, [id, addons])
-
-	useEffect(() => {
-		setObjectMaterials(bodyScene, color, roughness)
-	}, [bodyScene, setObjectMaterials, color, roughness])
-
-	useAnimateHeight(vehicle, height, height + 0.1)
-
-	// Check if vehicle config exists
-	if (!vehicleConfigs.vehicles[id]) {
-		console.warn(`Unknown vehicle body: ${id}`)
-		return null
-	}
-
-	return (
-		<group ref={vehicle} name='Body' key={id}>
-			<primitive object={bodyScene} />
-			{addonPaths.length > 0 && (
-				<group name='Addons'>
-					{addonPaths.map((path) => (
-						<Suspense key={path} fallback={null}>
-							<RemoteAddon path={path} color={color} roughness={roughness} />
-						</Suspense>
-					))}
-				</group>
-			)}
-		</group>
-	)
-})
-
-// Player name label above vehicle
-const PlayerLabel = memo(({ name }) => {
-	return (
-		<Html
-			position={[0, 2.5, 0]}
-			center
-			distanceFactor={10}
-			occlude={false}
-			style={{
-				pointerEvents: 'none',
-				userSelect: 'none',
-			}}
-		>
-			<div
-				style={{
-					background: 'rgba(0, 0, 0, 0.7)',
-					color: 'white',
-					padding: '4px 12px',
-					borderRadius: '4px',
-					fontSize: '14px',
-					fontWeight: '500',
-					whiteSpace: 'nowrap',
-					fontFamily: 'system-ui, -apple-system, sans-serif',
-				}}
-			>
-				{name}
-			</div>
-		</Html>
-	)
-})
-
 /**
  * RemoteVehicle - Visual-only vehicle component for rendering other players
  * No physics simulation - uses interpolation for smooth movement
@@ -212,17 +113,20 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 	const bufferRef = useRef(new TransformBuffer())
 	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
 	const wheelRefs = wheelRefsArray.current
-	
+
 	// Current interpolated state
 	const currentPosition = useRef(new Vector3())
 	const currentRotation = useRef(new Quaternion())
 	const currentSteering = useRef(0)
 
 	// Get vehicle config with defaults
-	const config = useMemo(() => ({
-		...vehicleConfigs.defaults,
-		...vehicleConfig,
-	}), [vehicleConfig])
+	const config = useMemo(
+		() => ({
+			...vehicleConfigs.defaults,
+			...vehicleConfig,
+		}),
+		[vehicleConfig]
+	)
 
 	const { color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, addons } = config
 
@@ -253,11 +157,11 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 				bufferRef.current.push(transform)
 			}
 			groupRef.current.userData.playerId = playerId
-			
+
 			// Notify parent that ref is ready
 			onRef?.(groupRef.current)
 		}
-		
+
 		return () => {
 			onRef?.(null)
 		}
@@ -284,21 +188,21 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 			// Update front wheel steering
 			const steering = interpolated.steering || 0
 			currentSteering.current = MathUtils.lerp(currentSteering.current, steering, INTERPOLATION_SMOOTHING)
-			
+
 			// Update wheel rotations, positions, and steering
 			wheelRefs.forEach((ref, i) => {
 				if (!ref.current) return
-				
+
 				// Update wheel Y position for suspension movement
 				if (interpolated.wheelYPositions && interpolated.wheelYPositions[i] !== undefined) {
 					ref.current.position.y = interpolated.wheelYPositions[i]
 				}
-				
+
 				// Apply wheel spin and steering using quaternion (matching physics behavior)
 				// Front wheels (0, 1) get steering, rear wheels (2, 3) don't
 				const wheelSteering = i < 2 ? currentSteering.current : 0
 				const wheelSpin = interpolated.wheelRotations?.[i] || 0
-				
+
 				// Create quaternion from steering (Y axis) and spin (X axis)
 				// This matches how the physics system applies wheel rotation
 				const steeringQuat = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), wheelSteering)
@@ -313,7 +217,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 			<PlayerLabel name={playerName || 'Player'} />
 			<group name='VehicleBody'>
 				<Suspense fallback={null}>
-					<RemoteBody key={validBody} id={validBody} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
+					<VehicleBody key={validBody} id={validBody} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
 				</Suspense>
 				<Wheels
 					rim={rim}
