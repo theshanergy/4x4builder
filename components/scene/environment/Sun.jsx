@@ -1,10 +1,10 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import useGameStore, { vehicleState } from '../../../store/gameStore'
+import useGameStore, { vehicleState, sunDirection } from '../../../store/gameStore'
 
 // Sun directional light that follows camera target
-const Sun = ({ sunDirection }) => {
+const Sun = () => {
 	const lightRef = useRef()
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 

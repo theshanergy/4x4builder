@@ -1,29 +1,23 @@
-import { memo, useMemo } from 'react'
-import { Vector3 } from 'three'
+import { memo } from 'react'
 
 import Terrain from './Terrain'
 import Sky from './Sky'
 import EnvMap from './EnvMap'
 import Sun from './Sun'
 import Hawk from './Hawk'
+import { sunDirection } from '../../../store/gameStore'
 
 // Environment component
 const SceneEnvironment = memo(() => {
-	// Sun direction - normalized vector pointing toward sun
-	const sunDirection = useMemo(() => new Vector3(0.6, 0.45, 0.5).normalize(), [])
 
-	return (
-		<>
-			{/* Sun directional light */}
-			<Sun sunDirection={sunDirection} />
-
-			{/* Ambient light for better fill - cool sky, warm ground */}
+		return (
+			<>
+				{/* Sun directional light */}
+				<Sun />			{/* Ambient light for better fill - cool sky, warm ground */}
 			<hemisphereLight args={['#b1e1ff', '#d4c4a8', 0.6]} />
 
-			{/* Atmospheric sky with procedural clouds */}
-			<Sky sunPosition={[sunDirection.x, sunDirection.y, sunDirection.z]} />
-
-			{/* Distant fog for depth - match horizon color */}
+				{/* Atmospheric sky with procedural clouds */}
+				<Sky />			{/* Distant fog for depth - match horizon color */}
 			<fog attach='fog' args={['#dbebf9', 150, 450]} />
 
 			{/* Environment map for reflections - captures sky and terrain once */}

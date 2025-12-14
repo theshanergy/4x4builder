@@ -24,6 +24,9 @@ export const vehicleState = {
 	heading: 0, // Vehicle heading/yaw in radians (updated every frame)
 }
 
+// Environment state (shared across scene components)
+export const sunDirection = new Vector3(0.6, 0.45, 0.5).normalize()
+
 // Game store
 const useGameStore = create((set, get) => {
 	// Set up resize listener for isMobile detection

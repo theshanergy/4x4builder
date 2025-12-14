@@ -1,22 +1,22 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { BackSide, Vector3 } from 'three'
+import { BackSide } from 'three'
+
+import { sunDirection } from '../../../store/gameStore'
 import skyVertexShader from '../../../shaders/sky.vert.glsl'
 import skyFragmentShader from '../../../shaders/sky.frag.glsl'
 
 // Custom Atmospheric Sky component with procedural clouds
-const AtmosphericSky = ({ sunPosition = [1, 0.5, 1] }) => {
+const AtmosphericSky = () => {
 	const meshRef = useRef()
 	const materialRef = useRef()
 
-	const sunDir = useMemo(() => new Vector3(...sunPosition).normalize(), [sunPosition])
-
 	const uniforms = useMemo(
 		() => ({
-			sunDirection: { value: sunDir },
+			sunDirection: { value: sunDirection },
 			time: { value: 0 },
 		}),
-		[sunDir]
+		[]
 	)
 
 	useFrame((state) => {
@@ -32,14 +32,7 @@ const AtmosphericSky = ({ sunPosition = [1, 0.5, 1] }) => {
 	return (
 		<mesh ref={meshRef} scale={[1, 1, 1]}>
 			<sphereGeometry args={[500, 16, 16]} />
-			<shaderMaterial
-				ref={materialRef}
-				uniforms={uniforms}
-				vertexShader={skyVertexShader}
-				fragmentShader={skyFragmentShader}
-				side={BackSide}
-				depthWrite={false}
-			/>
+			<shaderMaterial ref={materialRef} uniforms={uniforms} vertexShader={skyVertexShader} fragmentShader={skyFragmentShader} side={BackSide} depthWrite={false} />
 		</mesh>
 	)
 }
