@@ -1,9 +1,13 @@
 import { useRef, useMemo, useEffect, Suspense } from 'react'
-import { Color, TextureLoader, RepeatWrapping, CircleGeometry, ShaderMaterial, DoubleSide } from 'three'
-import { useFrame, useLoader } from '@react-three/fiber'
+import { Color, RepeatWrapping, CircleGeometry, ShaderMaterial, DoubleSide } from 'three'
+import { useFrame } from '@react-three/fiber'
+import { useTexture } from '@react-three/drei'
 import { sunDirection, vehicleState } from '../../../store/gameStore'
 import waterVertexShader from '../../../shaders/water.vert.glsl'
 import waterFragmentShader from '../../../shaders/water.frag.glsl'
+
+// Preload water texture
+useTexture.preload('/assets/images/ground/water_normal.jpg')
 
 // Water plane size - large enough to cover visible area plus buffer
 const WATER_RADIUS = 300
@@ -13,7 +17,7 @@ const WaterMesh = () => {
 	const ref = useRef()
 
 	// Load water normal map texture
-	const waterNormals = useLoader(TextureLoader, '/assets/images/ground/water_normal.jpg')
+	const waterNormals = useTexture('/assets/images/ground/water_normal.jpg')
 
 	// Apply texture settings once loaded
 	useEffect(() => {
