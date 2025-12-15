@@ -11,7 +11,7 @@ import Water from './Water'
 import DistantTerrain from './DistantTerrain'
 
 // Ocean configuration
-const OCEAN_RADIUS = 200
+const OCEAN_RADIUS = 1000
 const OCEAN_TRANSITION = 80 // Width of the beach transition zone
 const OCEAN_DEPTH = 5 // How far below 0 the ocean floor goes
 
