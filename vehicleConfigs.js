@@ -244,7 +244,7 @@ const vehicleConfigs = {
 			model: '/assets/models/vehicles/toyota/tundra/2g/tundra_crewmax.glb',
 			wheel_offset: 0.85,
 			wheelbase: 3.7,
-			driverPosition: [0.55, 1.65, 0.2],
+			driverPosition: [0.55, 1.75, 0.3],
 			default_addons: {},
 			addons: {},
 			lighting: {
