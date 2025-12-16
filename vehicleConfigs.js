@@ -121,6 +121,7 @@ const vehicleConfigs = {
 						ecotechne: {
 							name: 'EcoTechne',
 							model: '/assets/models/vehicles/toyota/4runner/5g/addons/ecotechne_rack.glb',
+							position: [0, -0.025, 0.06],
 						},
 					},
 				},
@@ -130,6 +131,7 @@ const vehicleConfigs = {
 						ecotechne: {
 							name: 'EcoTechne',
 							model: '/assets/models/vehicles/toyota/4runner/5g/addons/ecotechne_ladder.glb',
+							position: [0, 0.01, 0.06],
 						},
 					},
 				},
