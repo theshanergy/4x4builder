@@ -8,6 +8,7 @@ const COLORS = {
 	MED_GREY: new Color(0.5, 0.5, 0.5),
 	DARK_GREY: new Color(0.2, 0.2, 0.2),
 	BLACK: new Color(0.025, 0.025, 0.025),
+	BRONZE: new Color().setHSL(0.075, 0.5, 0.35),
 	HEADLIGHT_BLUE: new Color(0.8, 0.9, 1.0),
 }
 
@@ -93,6 +94,11 @@ const setMaterials = (material, color, roughness, rim_color, rim_color_secondary
 					material.metalness = 0.3
 					material.roughness = 1
 					material.color.set(COLORS.BLACK)
+					break
+				case 'bronze':
+					material.metalness = 0.8
+					material.roughness = 0.3
+					material.color.set(COLORS.BRONZE)
 					break
 				case 'body':
 					material.metalness = 0.4

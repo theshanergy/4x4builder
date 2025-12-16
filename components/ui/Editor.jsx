@@ -180,6 +180,7 @@ function Editor() {
                         <option value='gloss_black'>Gloss Black</option>
                         <option value='silver'>Silver</option>
                         <option value='chrome'>Chrome</option>
+                        <option value='bronze'>Bronze</option>
                         <option value='body'>Body match</option>
                     </select>
                 </div>
@@ -192,6 +193,7 @@ function Editor() {
                         <option value='gloss_black'>Gloss Black</option>
                         <option value='silver'>Silver</option>
                         <option value='chrome'>Chrome</option>
+                        <option value='bronze'>Bronze</option>
                         <option value='body'>Body match</option>
                     </select>
                 </div>
