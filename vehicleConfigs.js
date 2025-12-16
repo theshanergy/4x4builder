@@ -28,7 +28,18 @@ const vehicleConfigs = {
 			wheelbase: 2.789,
 			driverPosition: [0.4, 1.6, 0],
 			default_addons: {},
-			addons: {},
+			addons: {
+				bumper_f: {
+					name: 'Bumper',
+					replace: 'bumper_f',
+					options: {
+						trd_pro: {
+							name: 'C4 Fabrication',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/c4_bumper.glb',
+						},
+					},
+				},
+			},
 			lighting: {
 				lightbar: [
 					{
