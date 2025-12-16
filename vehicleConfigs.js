@@ -50,6 +50,15 @@ const vehicleConfigs = {
 						},
 					},
 				},
+				snorkel: {
+					name: 'Snorkel',
+					options: {
+						safari: {
+							name: 'Safari',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/safari_snorkel.glb',
+						},
+					},
+				},
 				running_boards: {
 					name: 'Running Boards',
 					replace: 'running_boards',
@@ -64,6 +73,10 @@ const vehicleConfigs = {
 					name: 'Roof Rack',
 					replace: 'roof_rack',
 					options: {
+						gobi: {
+							name: 'Gobi',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/gobi_rack.glb',
+						},
 						ecotechne: {
 							name: 'EcoTechne',
 							model: '/assets/models/vehicles/toyota/4runner/5g/addons/ecotechne_rack.glb',
@@ -118,10 +131,24 @@ const vehicleConfigs = {
 					name: 'Roof Rack',
 					replace: 'roof_rack',
 					options: {
+						gobi: {
+							name: 'Gobi',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/gobi_rack.glb',
+							position: [0, -0.02, 0],
+						},
 						ecotechne: {
 							name: 'EcoTechne',
 							model: '/assets/models/vehicles/toyota/4runner/5g/addons/ecotechne_rack.glb',
 							position: [0, -0.025, 0.06],
+						},
+					},
+				},
+				snorkel: {
+					name: 'Snorkel',
+					options: {
+						safari: {
+							name: 'Safari',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/safari_snorkel.glb',
 						},
 					},
 				},
