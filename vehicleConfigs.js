@@ -339,7 +339,19 @@ const vehicleConfigs = {
 			wheelbase: 2.946,
 			driverPosition: [0.45, 1.65, 0],
 			default_addons: {},
-			addons: {},
+			addons: {
+				bumper_f: {
+					name: 'Bumper',
+					replace: 'bumper_f',
+					options: {
+						motobilt_crusher: {
+							name: 'Motobilt Crusher',
+							model: '/assets/models/vehicles/jeep/jk/addons/motobilt_crusher_front_bumper.glb',
+							position: [0, 0.31, 1.95],
+						},
+					},
+				},
+			},
 			lighting: {
 				lightbar: [
 					{
