@@ -242,7 +242,7 @@ function Editor() {
                     {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons).map((addon) => (
                         <div key={addon} className={`field field-${addon}`}>
                             <label>{vehicleConfigs.vehicles[currentVehicle.body].addons[addon].name}</label>
-                            <select value={currentVehicle.addons[addon]} required onChange={(e) => setVehicle({ addons: { ...currentVehicle.addons, [addon]: e.target.value } })}>
+                            <select value={currentVehicle.addons[addon] || ''} required onChange={(e) => setVehicle({ addons: { ...currentVehicle.addons, [addon]: e.target.value } })}>
                                 {!vehicleConfigs.vehicles[currentVehicle.body].addons[addon].required && <option value=''>None</option>}
                                 {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons[addon].options).map((option) => (
                                     <option key={option} value={option}>

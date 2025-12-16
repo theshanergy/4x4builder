@@ -102,7 +102,7 @@ const VehicleBody = memo(({ id, height, color, roughness, addons, lighting }) =>
 			{addonData.length > 0 && (
 				<group name='Addons'>
 					{addonData.map((addon) => (
-						<Suspense key={addon.path} fallback={null}>
+						<Suspense key={`${id}-${addon.path}`} fallback={null}>
 							<Addon
 								path={addon.path}
 								color={color}
