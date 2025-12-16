@@ -581,6 +581,13 @@ const vehicleConfigs = {
 	},
 	wheels: {
 		rims: {
+			method_703: {
+				make: 'Method Race Wheels',
+				name: 'Method 305',
+				model: '/assets/models/wheels/rims/method_305.glb',
+				width: 0.5,
+				od: 1,
+			},
 			xd_grenade: {
 				make: 'XD Wheels',
 				name: 'XD Series Grenade',
