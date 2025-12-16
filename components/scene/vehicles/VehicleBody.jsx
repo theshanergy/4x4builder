@@ -113,7 +113,7 @@ const VehicleBody = memo(({ id, height, color, roughness, addons, lighting }) =>
 					))}
 				</group>
 			)}
-			{lighting && <Lighting id={id} lighting={lighting} />}
+			{lighting && <Lighting id={id} lighting={lighting} addons={addons} />}
 		</group>
 	)
 })

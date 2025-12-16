@@ -36,6 +36,18 @@ const vehicleConfigs = {
 						trd_pro: {
 							name: 'C4 Fabrication',
 							model: '/assets/models/vehicles/toyota/4runner/5g/addons/c4_bumper.glb',
+							lighting: {
+								lightbar: [
+									{
+										name: 'Bumper Light Bar',
+										width: 23,
+										rows: 1,
+										color: 'amber',
+										position: [0, 0.255, 2.29],
+										rotation: [0, 0, 0],
+									},
+								],
+							},
 						},
 					},
 				},

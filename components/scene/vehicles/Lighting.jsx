@@ -6,45 +6,66 @@ import LightBar from './LightBar'
 const mirrorPosition = (pos) => [-pos[0], pos[1], pos[2]]
 const mirrorRotation = (rot) => [rot[0], -rot[1], rot[2]]
 
-const Lighting = memo(({ id, lighting }) => {
+const Lighting = memo(({ id, lighting, addons }) => {
 	const lightsOn = useGameStore((state) => state.lightsOn)
-	const lightingConfig = vehicleConfigs.vehicles[id]?.lighting || {}
+	const vehicleConfig = vehicleConfigs.vehicles[id]
+	const lightingConfig = vehicleConfig?.lighting || {}
 
 	const lightsToRender = useMemo(() => {
 		const lights = []
 
+		// Helper to process lighting configs
+		const processLightingConfig = (config, lightType, keyPrefix, index) => {
+			const baseKey = `${keyPrefix}_${lightType}_${index}`
+
+			// Add right/main light
+			lights.push({
+				type: lightType,
+				key: `${baseKey}_right`,
+				...config,
+				position: config.position,
+				rotation: config.rotation,
+			})
+
+			// Add mirrored left light if paired
+			if (config.pair) {
+				lights.push({
+					type: lightType,
+					key: `${baseKey}_left`,
+					...config,
+					position: mirrorPosition(config.position),
+					rotation: mirrorRotation(config.rotation),
+				})
+			}
+		}
+
+		// Process vehicle lighting
 		for (const [lightType, configs] of Object.entries(lightingConfig)) {
 			if (!configs) continue
 
 			configs.forEach((config, index) => {
 				if (!lighting?.[lightType]?.[index]) return
+				processLightingConfig(config, lightType, 'vehicle', index)
+			})
+		}
 
-				const baseKey = `${lightType}_${index}`
+		// Process addon lighting
+		if (addons && vehicleConfig?.addons) {
+			Object.entries(addons).forEach(([addonType, addonValue]) => {
+				const addonOption = vehicleConfig.addons[addonType]?.options?.[addonValue]
+				if (!addonOption?.lighting) return
 
-				// Add right/main light
-				lights.push({
-					type: lightType,
-					key: `${baseKey}_right`,
-					...config,
-					position: config.position,
-					rotation: config.rotation,
-				})
-
-				// Add mirrored left light if paired
-				if (config.pair) {
-					lights.push({
-						type: lightType,
-						key: `${baseKey}_left`,
-						...config,
-						position: mirrorPosition(config.position),
-						rotation: mirrorRotation(config.rotation),
+				for (const [lightType, configs] of Object.entries(addonOption.lighting)) {
+					if (!configs) continue
+					configs.forEach((config, index) => {
+						processLightingConfig(config, lightType, `addon_${addonType}_${addonValue}`, index)
 					})
 				}
 			})
 		}
 
 		return lights
-	}, [lightingConfig, lighting])
+	}, [lightingConfig, lighting, addons, vehicleConfig])
 
 	if (!lightsToRender.length) return null
 

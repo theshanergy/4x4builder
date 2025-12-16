@@ -255,9 +255,9 @@ function Editor() {
                 </EditorSection>
             )}
 
-            {/* Lighting */}
+            {/* Lights */}
             {lightingExists() && (
-                <EditorSection title='Lighting' icon={<LightIcon className='icon' />}>
+                <EditorSection title='Lights' icon={<LightIcon className='icon' />}>
                     {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].lighting).map((lightType) => {
                         const lights = vehicleConfigs.vehicles[currentVehicle.body].lighting[lightType]
                         if (!Array.isArray(lights)) return null
