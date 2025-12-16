@@ -18,7 +18,7 @@ const SEO = () => {
 	const fullVehicleName = vehicleYear ? `${vehicleYear} ${vehicleName}` : vehicleName
 
 	// Build title and description
-	const titleSuffix = vehicle ? ` - ${fullVehicleName} Customizer` : ' - 3D Off-Road Vehicle Customizer'
+	const titleSuffix = vehicle ? ` - ${fullVehicleName} Configurator` : ' - 3D Off-Road Vehicle Configurator'
 	const pageTitle = `4x4 Builder${titleSuffix}`
 	const pageUrl = vehicle ? `${baseUrl}/${vehicleSlug}` : baseUrl
 	const description = vehicle
@@ -26,9 +26,9 @@ const SEO = () => {
 		: 'Build and customize your dream 4x4 off-road vehicle in 3D. Customize wheels, tires, suspension, and take it for a virtual test drive.'
 
 	// Build keywords
-	const baseKeywords = '4x4 builder, off-road vehicle customizer, virtual garage, 3D car customizer, lift kit, off-road wheels, truck builder'
+	const baseKeywords = '4x4 builder, off-road vehicle configurator, virtual garage, 3D car configurator, lift kit, off-road wheels, truck builder'
 	const keywords = vehicle
-		? `${vehicle.name}, ${fullVehicleName}, ${vehicle.name} lift kit, ${vehicle.name} wheels, ${vehicle.name} tires, ${vehicle.name} customizer, ${baseKeywords}`
+		? `${vehicle.name}, ${fullVehicleName}, ${vehicle.name} lift kit, ${vehicle.name} wheels, ${vehicle.name} tires, ${vehicle.name} configurator, ${baseKeywords}`
 		: baseKeywords
 
 	// Build structured data
