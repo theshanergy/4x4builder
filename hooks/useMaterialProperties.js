@@ -28,12 +28,13 @@ const setMaterials = (material, color, roughness, rim_color, rim_color_secondary
 			material.color.set(COLORS.WHITE)
 			break
 		case 'drl':
+		case 'foglight':
 		case 'headlight':
 			material.metalness = 1
 			material.roughness = 0
 			material.color.set(COLORS.WHITE)
 			material.emissive = COLORS.HEADLIGHT_BLUE
-			material.emissiveIntensity = lightsOn ? 1 : 0.1
+			material.emissiveIntensity = lightsOn ? 0.9 : 0.1
 			material.toneMapped = false
 			break
 		case 'glass':

@@ -31,7 +31,6 @@ const vehicleConfigs = {
 			addons: {
 				bumper_f: {
 					name: 'Bumper',
-					replace: 'bumper_f',
 					options: {
 						trd_pro: {
 							name: 'C4 Fabrication',
@@ -48,6 +47,35 @@ const vehicleConfigs = {
 									},
 								],
 							},
+						},
+					},
+				},
+				running_boards: {
+					name: 'Running Boards',
+					replace: 'running_boards',
+					options: {
+						oem: {
+							name: 'OEM',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/oem_running_boards.glb',
+						},
+					},
+				},
+				rack: {
+					name: 'Roof Rack',
+					replace: 'roof_rack',
+					options: {
+						ecotechne: {
+							name: 'EcoTechne',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/ecotechne_rack.glb',
+						},
+					},
+				},
+				ladder: {
+					name: 'Ladder',
+					options: {
+						ecotechne: {
+							name: 'EcoTechne',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/ecotechne_ladder.glb',
 						},
 					},
 				},
@@ -85,7 +113,27 @@ const vehicleConfigs = {
 			wheelbase: 2.789,
 			driverPosition: [0.4, 1.6, 0],
 			default_addons: {},
-			addons: {},
+			addons: {
+				rack: {
+					name: 'Roof Rack',
+					replace: 'roof_rack',
+					options: {
+						ecotechne: {
+							name: 'EcoTechne',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/ecotechne_rack.glb',
+						},
+					},
+				},
+				ladder: {
+					name: 'Rear Ladder',
+					options: {
+						ecotechne: {
+							name: 'EcoTechne',
+							model: '/assets/models/vehicles/toyota/4runner/5g/addons/ecotechne_ladder.glb',
+						},
+					},
+				},
+			},
 			lighting: {
 				lightbar: [
 					{
