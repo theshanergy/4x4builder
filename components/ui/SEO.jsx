@@ -18,7 +18,7 @@ const SEO = () => {
 	const fullVehicleName = vehicleYear ? `${vehicleYear} ${vehicleName}` : vehicleName
 
 	// Build title and description
-	const titleSuffix = vehicle ? ` - ${fullVehicleName} Configurator` : ' - 3D Off-Road Vehicle Configurator'
+	const titleSuffix = vehicle ? ` - ${fullVehicleName} Configurator` : ''
 	const pageTitle = `4x4 Builder${titleSuffix}`
 	const pageUrl = vehicle ? `${baseUrl}/${vehicleSlug}` : baseUrl
 	const description = vehicle
