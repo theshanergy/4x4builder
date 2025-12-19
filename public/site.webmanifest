@@ -1,0 +1,29 @@
+{
+	"name": "4x4 Builder",
+	"short_name": "4x4Builder",
+	"description": "Build and explore 4x4 vehicles in an interactive 3D environment",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#1c1919",
+	"theme_color": "#1c1919",
+	"orientation": "portrait-landscape",
+	"icons": [
+		{
+			"src": "/favicon.ico",
+			"sizes": "48x48 32x32 24x24 16x16",
+			"type": "image/x-icon"
+		},
+		{
+			"src": "/icon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any"
+		},
+		{
+			"src": "/icon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "maskable"
+		}
+	]
+}
