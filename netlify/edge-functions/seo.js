@@ -172,26 +172,47 @@ export default async function handler(request, context) {
 	const url = new URL(request.url)
 	const pathname = url.pathname
 
+	console.log('[SEO Edge] Processing request:', pathname)
+
 	// Get the response from the origin
 	const response = await context.next()
 
 	// Only process HTML responses
 	const contentType = response.headers.get('content-type')
 	if (!contentType || !contentType.includes('text/html')) {
+		console.log('[SEO Edge] Skipping non-HTML response:', contentType)
 		return response
 	}
 
 	// Determine which vehicle (if any) based on path
 	const slug = pathname.replace(/^\//, '').replace(/\/$/, '')
 	const vehicle = slug ? getVehicleBySlug(slug) : null
+	
+	if (vehicle) {
+		console.log('[SEO Edge] Vehicle matched:', vehicle.name, vehicle.year)
+	} else {
+		console.log('[SEO Edge] No vehicle matched for slug:', slug)
+	}
+	
 	const meta = vehicle ? buildVehicleMeta(vehicle, slug) : { ...defaultMeta }
 
 	// Get the HTML and inject meta tags
 	let html = await response.text()
 
+	// Remove existing meta tags that we're going to replace to prevent duplicates
+	html = html.replace(/<title>.*?<\/title>/i, '')
+	html = html.replace(/<meta\s+name="description"[^>]*>/gi, '')
+	html = html.replace(/<meta\s+name="keywords"[^>]*>/gi, '')
+	html = html.replace(/<meta\s+property="og:[^"]*"[^>]*>/gi, '')
+	html = html.replace(/<meta\s+name="twitter:[^"]*"[^>]*>/gi, '')
+	html = html.replace(/<link\s+rel="canonical"[^>]*>/gi, '')
+	html = html.replace(/<script\s+type="application\/ld\+json">.*?<\/script>/gis, '')
+
 	// Generate and inject meta tags into <head>
 	const metaTags = generateMetaTags(meta, vehicle)
 	html = html.replace('</head>', `${metaTags}\n\t</head>`)
+
+	console.log('[SEO Edge] Meta tags injected successfully')
 
 	return new Response(html, {
 		status: response.status,
@@ -203,6 +224,6 @@ export default async function handler(request, context) {
 }
 
 export const config = {
-	path: ['/', '/*'],
-	excludedPath: ['/assets/*', '/*.js', '/*.css', '/*.ico', '/*.svg', '/*.png', '/*.jpg', '/*.webp', '/*.glb', '/*.webmanifest', '/*.txt'],
+	path: '/*',
+	excludedPath: ['/', '/assets/*', '/*.js', '/*.css', '/*.ico', '/*.svg', '/*.png', '/*.jpg', '/*.webp', '/*.glb', '/*.webmanifest', '/*.txt'],
 }
