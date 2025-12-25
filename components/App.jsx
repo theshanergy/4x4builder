@@ -10,7 +10,6 @@ import Notification from './ui/Notification'
 import ControlsOverlay from './ui/ControlsOverlay'
 import Chat from './ui/Chat'
 import VehicleInfo from './ui/VehicleInfo'
-import SEO from './ui/SEO'
 
 export default function App() {
 	const infoMode = useGameStore((state) => state.infoMode)
@@ -20,8 +19,6 @@ export default function App() {
 
 	return (
 		<div className='App'>
-			<SEO />
-
 			<Canvas />
 
 			{/* UI Components */}
