@@ -2,11 +2,6 @@
   publish = "dist"
   command = "npm run build"
 
-# Edge function for SEO meta tag injection
-[[edge_functions]]
-  path = "/*"
-  function = "seo"
-
 # Headers for caching and security
 [[headers]]
   for = "/assets/*"
