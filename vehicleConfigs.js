@@ -516,7 +516,7 @@ const vehicleConfigs = {
 			make: 'Jeep',
 			model: '/assets/models/vehicles/jeep/xj/xj.glb',
 			wheel_offset: 0.7,
-			wheelbase: 2.5,
+			wheelbase: 2.576,
 			driverPosition: [0.45, 1.45, 0],
 			default_addons: {},
 			addons: {},
