@@ -373,7 +373,7 @@ const vehicleConfigs = {
 		toyota_j250: {
 			slug: 'toyota-land-cruiser-j250',
 			name: 'Toyota Land Cruiser',
-			year: '2024+',
+			year: 'J250',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/land_cruiser/j250/j250.glb',
 			wheel_offset: 0.81,
@@ -407,7 +407,7 @@ const vehicleConfigs = {
 		toyota_j80: {
 			slug: 'toyota-land-cruiser-j80',
 			name: 'Toyota Land Cruiser',
-			year: '1990-2008',
+			year: 'J80',
 			make: 'Toyota',
 			model: '/assets/models/vehicles/toyota/land_cruiser/j80/j80.glb',
 			wheel_offset: 0.78,
