@@ -14,6 +14,8 @@ export const useVehicleInput = () => {
 	const resetPressedLastFrame = useRef(false)
 	// Track lights key state to detect press (not hold)
 	const lightsKeyPressedLastFrame = useRef(false)
+	// Track brake state to detect press (not hold)
+	const brakePressedLastFrame = useRef(false)
 
 	// Smoothed keyboard steering for lerping
 	const smoothedKeyboardSteering = useRef(0)
@@ -53,6 +55,11 @@ export const useVehicleInput = () => {
 		const shouldToggleLights = lightsKeyPressed && !lightsKeyPressedLastFrame.current
 		lightsKeyPressedLastFrame.current = lightsKeyPressed
 
+		// Brake press detection - detect fresh press, not hold
+		const brakePressed = brakeInput > 0
+		const brakeJustPressed = brakePressed && !brakePressedLastFrame.current
+		brakePressedLastFrame.current = brakePressed
+
 		// Calculate keyboard steering target (-1, 0, or 1)
 		const keyboardSteerTarget = (effectiveKeys.has('ArrowRight') || effectiveKeys.has('d') ? -1 : 0) + (effectiveKeys.has('ArrowLeft') || effectiveKeys.has('a') ? 1 : 0)
 
@@ -81,6 +88,7 @@ export const useVehicleInput = () => {
 		return {
 			throttleInput,
 			brakeInput,
+			brakeJustPressed,
 			steerInput,
 			isDrifting,
 			shouldReset,

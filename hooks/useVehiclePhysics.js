@@ -126,6 +126,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Shift cooldown timer to prevent gear skipping
 	const lastShiftTime = useRef(0)
 
+	// Track if reverse can be engaged (set when brake is pressed below speed threshold)
+	const canEngageReverse = useRef(false)
+
 	// Get vehicle input processor
 	const getVehicleInput = useVehicleInput()
 
@@ -258,7 +261,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		}
 
 		// Get processed vehicle input
-		const { throttleInput, brakeInput, steerInput, isDrifting, shouldReset, shouldToggleLights, pitchInput, rollInput, yawInput } = getVehicleInput(delta, forwardSpeed)
+		const { throttleInput, brakeInput, brakeJustPressed, steerInput, isDrifting, shouldReset, shouldToggleLights, pitchInput, rollInput, yawInput } = getVehicleInput(delta, forwardSpeed)
 
 		// Handle reset
 		if (shouldReset) {
@@ -449,13 +452,26 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		// Store throttle for audio
 		vehicleState.throttle = throttleInput
 
+		// Brake/Reverse state machine
+		// Set reverse engagement flag when brake is freshly pressed below speed threshold
+		if (brakeJustPressed && Math.abs(forwardSpeed) < REVERSE_THRESHOLD) {
+			canEngageReverse.current = true
+		}
+
+		// Clear reverse flag when brake is released
+		if (brakeInput === 0) {
+			canEngageReverse.current = false
+		}
+
 		// Determine reverse state
-		// Enter reverse: braking while nearly stopped and not accelerating
+		// Enter reverse: only if brake was just pressed (not held) while nearly stopped
 		// Exit reverse: accelerating (throttle pressed)
 		if (throttleInput > 0 && vehicleState.gear === -1) {
 			vehicleState.gear = 1
-		} else if (brakeInput > 0 && Math.abs(forwardSpeed) < REVERSE_THRESHOLD) {
+			canEngageReverse.current = false
+		} else if (brakeInput > 0 && canEngageReverse.current && vehicleState.gear !== -1) {
 			vehicleState.gear = -1
+			canEngageReverse.current = false // Prevent re-triggering while holding
 		}
 
 		// Calculate actual forces based on state
