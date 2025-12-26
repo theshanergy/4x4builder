@@ -1,4 +1,4 @@
-import { MessageTypes, ErrorCodes, createMessage } from '../../shared/protocol.js'
+import { MessageTypes, ErrorCodes, createMessage } from '../../network/protocol.js'
 import Validator from './Validator.js'
 import settings from '../config/settings.js'
 

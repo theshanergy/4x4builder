@@ -1,4 +1,4 @@
-import { MessageTypes, createMessage } from '../shared/protocol.js'
+import { MessageTypes, createMessage } from './protocol.js'
 
 // Default server URL - can be overridden
 const DEFAULT_SERVER_URL = 'ws://localhost:8080'
