@@ -429,6 +429,31 @@ const vehicleConfigs = {
 				],
 			},
 		},
+		toyota_j76: {
+			slug: 'toyota-land-cruiser-j76',
+			name: 'Toyota Land Cruiser',
+			year: 'J76',
+			make: 'Toyota',
+			model: '/assets/models/vehicles/toyota/land_cruiser/j70/j76.glb',
+			wheel_offset: 0.78,
+			wheelbase: 2.73,
+			driverPosition: [-0.4, 1.55, -0.15],
+			default_addons: {},
+			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Roof Light Bar',
+						width: 33,
+						rows: 1,
+						color: 'white',
+						position: [0, 1.425, 0.255],
+						rotation: [0, 0, 0],
+						curvature: 11,
+					},
+				],
+			},
+		},
 		jeep_jku: {
 			slug: 'jeep-wrangler-jku',
 			name: 'Jeep Wrangler',
