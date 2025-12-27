@@ -238,7 +238,7 @@ function Editor() {
                         
                         return lights.map((light, index) => {
                             const lightKey = `${lightType}_${index}`
-                            const isChecked = currentVehicle.lighting[lightType]?.[index] === true
+                            const isChecked = currentVehicle.lighting?.[lightType]?.[index] === true
                             
                             return (
                                 <div key={lightKey} className={`field field-light-${lightType}`}>
@@ -247,11 +247,12 @@ function Editor() {
                                         id={`light-${lightKey}`}
                                         checked={isChecked}
                                         onChange={(e) => {
-                                            const updatedLightType = [...(currentVehicle.lighting[lightType] || [])]
+                                            const currentLighting = currentVehicle.lighting || {}
+                                            const updatedLightType = [...(currentLighting[lightType] || [])]
                                             updatedLightType[index] = e.target.checked
                                             setVehicle({ 
                                                 lighting: { 
-                                                    ...currentVehicle.lighting, 
+                                                    ...currentLighting, 
                                                     [lightType]: updatedLightType 
                                                 } 
                                             })
