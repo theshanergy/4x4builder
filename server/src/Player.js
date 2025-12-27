@@ -24,6 +24,7 @@ export default class Player {
 		this.wheelYPositions = [0, 0, 0, 0]
 		this.steering = 0
 		this.engineRpm = 850
+		this.hornActive = false
 		
 		// Connection state
 		this.lastUpdate = Date.now()
@@ -45,6 +46,7 @@ export default class Player {
 		if (data.wheelYPositions) this.wheelYPositions = data.wheelYPositions
 		if (typeof data.steering === 'number') this.steering = data.steering
 		if (typeof data.engineRpm === 'number') this.engineRpm = data.engineRpm
+		if (typeof data.hornActive === 'boolean') this.hornActive = data.hornActive
 		this.lastUpdate = Date.now()
 	}
 	
@@ -93,6 +95,7 @@ export default class Player {
 			wheelYPositions: this.wheelYPositions,
 			steering: this.steering,
 			engineRpm: this.engineRpm,
+			hornActive: this.hornActive,
 			lastUpdate: this.lastUpdate,
 		}
 	}
@@ -109,6 +112,7 @@ export default class Player {
 			wheelYPositions: this.wheelYPositions,
 			steering: this.steering,
 			engineRpm: this.engineRpm,
+			hornActive: this.hornActive,
 			timestamp: this.lastUpdate,
 		}
 	}

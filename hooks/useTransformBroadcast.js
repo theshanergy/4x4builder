@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import useMultiplayerStore from '../store/multiplayerStore'
-import useGameStore from '../store/gameStore'
+import { vehicleState } from '../store/gameStore'
 import { hornState } from '../components/scene/vehicles/VehicleAudio'
 
 // Broadcast rate: 20 updates per second
@@ -89,9 +89,8 @@ export function useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, ve
 			}
 		}
 		
-		// Get engine state
-		const engineRef = useGameStore.getState().engineRef
-		const engineRpm = engineRef?.rpm || 850
+		// Get engine RPM from mutable vehicle state
+		const engineRpm = vehicleState.rpm || 850
 		
 		// Get horn state from mutable state (avoids Zustand store read in render loop)
 		const hornActive = hornState.active
