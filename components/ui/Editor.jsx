@@ -255,7 +255,7 @@ function Editor() {
                             <input
                                 type='checkbox'
                                 id='spare-wheel'
-                                checked={currentVehicle.spare}
+                                checked={!!currentVehicle.spare}
                                 onChange={(e) => setVehicle({ spare: e.target.checked })}
                             />
                             <label htmlFor='spare-wheel'>Spare Wheel</label>
