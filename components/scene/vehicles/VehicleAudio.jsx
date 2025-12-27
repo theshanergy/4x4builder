@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { AudioListener, PositionalAudio, AudioLoader } from 'three'
+import { AudioListener, PositionalAudio } from 'three'
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
 import useMultiplayerStore from '../../../store/multiplayerStore'
@@ -123,7 +123,7 @@ class AudioEngine {
 
 	setVolume(vol) {
 		if (this.gainNode) {
-			this.gainNode.gain.setTargetAtTime(vol * 0.3, this.context.currentTime, 0.05)
+			this.gainNode.gain.setTargetAtTime(vol * 0.5, this.context.currentTime, 0.05)
 		}
 	}
 
@@ -161,32 +161,111 @@ class AudioEngine {
 	}
 }
 
-// Shared horn buffer (loaded once, used by all vehicles)
-let sharedHornBuffer = null
-let hornBufferLoading = false
-const hornBufferCallbacks = []
-
-function loadHornBuffer(callback) {
-	if (sharedHornBuffer) {
-		callback(sharedHornBuffer)
-		return
+/**
+ * Procedural Horn Engine
+ * Synthesizes a dual-tone car horn using oscillators
+ */
+class HornEngine {
+	constructor() {
+		this.context = null
+		this.masterGain = null
+		this.oscillators = []
+		this.isInitialized = false
 	}
 
-	hornBufferCallbacks.push(callback)
+	init(outputNode) {
+		if (this.isInitialized) return
 
-	if (!hornBufferLoading) {
-		hornBufferLoading = true
-		const audioLoader = new AudioLoader()
-		audioLoader.load('/assets/audio/horn.wav', (buffer) => {
-			sharedHornBuffer = buffer
-			hornBufferCallbacks.forEach((cb) => cb(buffer))
-			hornBufferCallbacks.length = 0
+		if (outputNode && outputNode.context) {
+			this.context = outputNode.context
+		} else {
+			this.context = new (window.AudioContext || window.webkitAudioContext)()
+		}
+
+		this.masterGain = this.context.createGain()
+		this.masterGain.gain.value = 0
+
+		// Connect to the PositionalAudio node
+		if (outputNode && outputNode.setNodeSource) {
+			outputNode.setNodeSource(this.masterGain)
+		} else if (outputNode) {
+			this.masterGain.connect(outputNode)
+		}
+
+		this.isInitialized = true
+	}
+
+	play() {
+		if (!this.isInitialized) return
+		if (this.oscillators.length > 0) return // Already playing
+
+		const now = this.context.currentTime
+
+		// Dual-tone horn frequencies (approx F#4 and A#4)
+		const freqs = [370, 440]
+
+		freqs.forEach((freq) => {
+			const osc = this.context.createOscillator()
+			osc.type = 'sawtooth'
+			osc.frequency.value = freq
+
+			// Detune slightly for realism
+			osc.detune.value = (Math.random() - 0.5) * 10
+
+			// Filter to soften the harsh sawtooth
+			const filter = this.context.createBiquadFilter()
+			filter.type = 'lowpass'
+			filter.frequency.value = 2000
+
+			const gain = this.context.createGain()
+			gain.gain.value = 0.5
+
+			osc.connect(filter)
+			filter.connect(gain)
+			gain.connect(this.masterGain)
+
+			osc.start(now)
+			this.oscillators.push({ osc, filter, gain })
 		})
+
+		// Attack envelope
+		this.masterGain.gain.cancelScheduledValues(now)
+		this.masterGain.gain.setValueAtTime(0, now)
+		this.masterGain.gain.linearRampToValueAtTime(0.8, now + 0.05)
+	}
+
+	stop() {
+		if (!this.isInitialized) return
+		if (this.oscillators.length === 0) return
+
+		const now = this.context.currentTime
+
+		// Release envelope
+		this.masterGain.gain.cancelScheduledValues(now)
+		this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now)
+		this.masterGain.gain.linearRampToValueAtTime(0, now + 0.1)
+
+		// Cleanup oscillators
+		this.oscillators.forEach(({ osc, filter, gain }) => {
+			osc.stop(now + 0.1)
+			setTimeout(() => {
+				osc.disconnect()
+				filter.disconnect()
+				gain.disconnect()
+			}, 150)
+		})
+		this.oscillators = []
+	}
+
+	destroy() {
+		this.stop()
+		if (this.masterGain) {
+			this.masterGain.disconnect()
+			this.masterGain = null
+		}
+		this.isInitialized = false
 	}
 }
-
-// Pre-load horn buffer at module initialization (non-blocking)
-loadHornBuffer(() => {})
 
 // Cache selectors
 const physicsEnabledSelector = (state) => state.physicsEnabled
@@ -210,7 +289,7 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 	const groupRef = useRef(null)
 	const audioEngineRef = useRef(null)
 	const hornAudioRef = useRef(null)
-	const hornReadyRef = useRef(false)
+	const hornEngineRef = useRef(null)
 	const lastHornState = useRef(false)
 	const pendingHornAction = useRef(null) // Deferred horn play/stop
 
@@ -229,24 +308,19 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 
 		// Create positional audio for engine
 		const engineAudio = new PositionalAudio(listener)
-		engineAudio.setRefDistance(isRemote ? 8 : 5)
+		engineAudio.setRefDistance(10)
 		groupRef.current.add(engineAudio)
 
 		// Create positional audio for horn
 		const hornAudio = new PositionalAudio(listener)
-		hornAudio.setRefDistance(15)
-		hornAudio.setVolume(0.8)
-		hornAudio.setLoop(true)
+		hornAudio.setRefDistance(5)
 		groupRef.current.add(hornAudio)
 		hornAudioRef.current = hornAudio
 
-		// Load shared horn buffer
-		loadHornBuffer((buffer) => {
-			if (hornAudioRef.current) {
-				hornAudioRef.current.setBuffer(buffer)
-				hornReadyRef.current = true
-			}
-		})
+		// Create horn engine
+		const hornEngine = new HornEngine()
+		hornEngineRef.current = hornEngine
+		hornEngine.init(hornAudio)
 
 		// Create audio engine instance (each vehicle gets its own)
 		const engine = new AudioEngine()
@@ -265,8 +339,10 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 		return () => {
 			if (engineAudio.isPlaying) engineAudio.stop()
 			if (engineAudio.source) engineAudio.disconnect()
-			if (hornAudio.isPlaying) hornAudio.stop()
+
+			hornEngine.destroy()
 			if (hornAudio.source) hornAudio.disconnect()
+
 			if (groupRef.current) {
 				groupRef.current.remove(engineAudio)
 				groupRef.current.remove(hornAudio)
@@ -274,7 +350,7 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 			engine.destroy()
 			audioEngineRef.current = null
 			hornAudioRef.current = null
-			hornReadyRef.current = false
+			hornEngineRef.current = null
 		}
 	}, [physicsEnabled, camera, isRemote])
 
@@ -285,8 +361,8 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 		engine.setVolume(muted ? 0 : 0.5)
 
 		// Stop horn if muted
-		if (muted && hornAudioRef.current?.isPlaying) {
-			hornAudioRef.current.stop()
+		if (muted) {
+			hornEngineRef.current?.stop()
 		}
 	}, [muted])
 
@@ -302,9 +378,7 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 			if (document.hidden) {
 				engine.setVolume(0)
 				engine.suspend()
-				if (hornAudioRef.current?.isPlaying) {
-					hornAudioRef.current.stop()
-				}
+				hornEngineRef.current?.stop()
 			} else {
 				engine.resume()
 				engine.setVolume(isMuted ? 0 : 0.5)
@@ -319,15 +393,15 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 	const processPendingHornAction = () => {
 		const action = pendingHornAction.current
 		if (!action) return
-		
+
 		pendingHornAction.current = null
-		const hornAudio = hornAudioRef.current
-		if (!hornAudio || !hornReadyRef.current) return
-		
-		if (action === 'play' && !hornAudio.isPlaying) {
-			hornAudio.play()
-		} else if (action === 'stop' && hornAudio.isPlaying) {
-			hornAudio.stop()
+		const hornEngine = hornEngineRef.current
+		if (!hornEngine) return
+
+		if (action === 'play') {
+			hornEngine.play()
+		} else if (action === 'stop') {
+			hornEngine.stop()
 		}
 	}
 
