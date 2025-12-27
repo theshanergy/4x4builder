@@ -6,6 +6,12 @@ import useInputStore from '../../../store/inputStore'
 import useMultiplayerStore from '../../../store/multiplayerStore'
 import { workletCode } from '../../../hooks/engineWorklet'
 
+// Track which AudioContexts have already registered the worklet processor
+const registeredContexts = new WeakSet()
+
+// Cached empty Set to avoid creating new objects in render loop
+const EMPTY_SET = new Set()
+
 /**
  * Audio engine class for synthesizing engine sounds
  * Uses AudioWorklet for efficient real-time audio generation
@@ -37,14 +43,18 @@ class AudioEngine {
 				this.context = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' })
 			}
 
-			// Create worklet from Blob to avoid external file loading issues
-			const blob = new Blob([workletCode], { type: 'application/javascript' })
-			const url = URL.createObjectURL(blob)
+			// Only register the worklet processor if not already registered on this context
+			if (!registeredContexts.has(this.context)) {
+				// Create worklet from Blob to avoid external file loading issues
+				const blob = new Blob([workletCode], { type: 'application/javascript' })
+				const url = URL.createObjectURL(blob)
 
-			try {
-				await this.context.audioWorklet.addModule(url)
-			} finally {
-				URL.revokeObjectURL(url)
+				try {
+					await this.context.audioWorklet.addModule(url)
+					registeredContexts.add(this.context)
+				} finally {
+					URL.revokeObjectURL(url)
+				}
 			}
 
 			this.workletNode = new AudioWorkletNode(this.context, 'aerosonic-processor', {
@@ -108,7 +118,7 @@ class AudioEngine {
 	}
 
 	updateParams(rpm, load, throttle) {
-		if (!this.workletNode) return
+		if (!this.workletNode || !this.context) return
 
 		const now = this.context.currentTime
 		this.rpmParam.setTargetAtTime(Math.max(rpm, 100), now, 0.1)
@@ -122,7 +132,7 @@ class AudioEngine {
 	}
 
 	setVolume(vol) {
-		if (this.gainNode) {
+		if (this.gainNode && this.context) {
 			this.gainNode.gain.setTargetAtTime(vol * 0.5, this.context.currentTime, 0.05)
 		}
 	}
@@ -151,11 +161,8 @@ class AudioEngine {
 		this.loadParam = null
 		this.throttleParam = null
 
-		if (this.context && this.context.state !== 'closed') {
-			try {
-				this.context.close()
-			} catch (e) {}
-		}
+		// Don't close the context - it may be shared with other audio nodes (PositionalAudio)
+		// The context will be cleaned up when the AudioListener is removed
 		this.context = null
 		this.isInitialized = false
 	}
@@ -170,6 +177,7 @@ class HornEngine {
 		this.context = null
 		this.masterGain = null
 		this.oscillators = []
+		this.pendingCleanups = [] // Track pending cleanup timeouts
 		this.isInitialized = false
 	}
 
@@ -248,21 +256,38 @@ class HornEngine {
 		// Cleanup oscillators
 		this.oscillators.forEach(({ osc, filter, gain }) => {
 			osc.stop(now + 0.1)
-			setTimeout(() => {
-				osc.disconnect()
-				filter.disconnect()
-				gain.disconnect()
+			const timeoutId = setTimeout(() => {
+				try { osc.disconnect() } catch (e) {}
+				try { filter.disconnect() } catch (e) {}
+				try { gain.disconnect() } catch (e) {}
+				// Remove from pending cleanups
+				const idx = this.pendingCleanups.indexOf(timeoutId)
+				if (idx > -1) this.pendingCleanups.splice(idx, 1)
 			}, 150)
+			this.pendingCleanups.push(timeoutId)
 		})
 		this.oscillators = []
 	}
 
 	destroy() {
-		this.stop()
+		// Cancel any pending cleanup timeouts
+		this.pendingCleanups.forEach(id => clearTimeout(id))
+		this.pendingCleanups = []
+		
+		// Stop and disconnect all oscillators immediately
+		this.oscillators.forEach(({ osc, filter, gain }) => {
+			try { osc.stop() } catch (e) {}
+			try { osc.disconnect() } catch (e) {}
+			try { filter.disconnect() } catch (e) {}
+			try { gain.disconnect() } catch (e) {}
+		})
+		this.oscillators = []
+		
 		if (this.masterGain) {
-			this.masterGain.disconnect()
+			try { this.masterGain.disconnect() } catch (e) {}
 			this.masterGain = null
 		}
+		this.context = null
 		this.isInitialized = false
 	}
 }
@@ -337,11 +362,17 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 			})
 
 		return () => {
-			if (engineAudio.isPlaying) engineAudio.stop()
-			if (engineAudio.source) engineAudio.disconnect()
+			try {
+				if (engineAudio.isPlaying) engineAudio.stop()
+			} catch (e) {}
+			try {
+				if (engineAudio.source) engineAudio.disconnect()
+			} catch (e) {}
 
 			hornEngine.destroy()
-			if (hornAudio.source) hornAudio.disconnect()
+			try {
+				if (hornAudio.source) hornAudio.disconnect()
+			} catch (e) {}
 
 			if (groupRef.current) {
 				groupRef.current.remove(engineAudio)
@@ -432,7 +463,7 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 			// Poll horn input directly (no re-renders)
 			const { keys, input } = useInputStore.getState()
 			const chatOpen = useMultiplayerStore.getState().chatOpen
-			const effectiveKeys = chatOpen ? new Set() : keys
+			const effectiveKeys = chatOpen ? EMPTY_SET : keys
 			hornActive = effectiveKeys.has('h') || input.leftBumper
 
 			// Update mutable state for network broadcast (avoids Zustand update in render loop)
