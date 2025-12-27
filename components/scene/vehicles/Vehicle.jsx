@@ -17,13 +17,45 @@ import SpareWheel from './SpareWheel'
 import VehicleBody from './VehicleBody'
 
 // Vehicle component with physics
-const Vehicle = (props) => {
-	// Get vehicle properties from props or defaults
+const Vehicle = () => {
+	// Get current vehicle config from store
+	const body = useGameStore((state) => state.currentVehicle.body)
+	const color = useGameStore((state) => state.currentVehicle.color)
+	const roughness = useGameStore((state) => state.currentVehicle.roughness)
+	const lift = useGameStore((state) => state.currentVehicle.lift)
+	const wheel_offset = useGameStore((state) => state.currentVehicle.wheel_offset)
+	const rim = useGameStore((state) => state.currentVehicle.rim)
+	const rim_diameter = useGameStore((state) => state.currentVehicle.rim_diameter)
+	const rim_width = useGameStore((state) => state.currentVehicle.rim_width)
+	const rim_color = useGameStore((state) => state.currentVehicle.rim_color)
+	const rim_color_secondary = useGameStore((state) => state.currentVehicle.rim_color_secondary)
+	const tire = useGameStore((state) => state.currentVehicle.tire)
+	const tire_diameter = useGameStore((state) => state.currentVehicle.tire_diameter)
+	const tire_muddiness = useGameStore((state) => state.currentVehicle.tire_muddiness)
+	const spare = useGameStore((state) => state.currentVehicle.spare)
+	const addons = useGameStore((state) => state.currentVehicle.addons)
+	const lighting = useGameStore((state) => state.currentVehicle.lighting)
+
+	// Merge with defaults and allow props to override
 	const config = {
 		...vehicleConfigs.defaults,
-		...props,
+		body,
+		color,
+		roughness,
+		lift,
+		wheel_offset,
+		rim,
+		rim_diameter,
+		rim_width,
+		rim_color,
+		rim_color_secondary,
+		tire,
+		tire_diameter,
+		tire_muddiness,
+		spare,
+		addons,
+		lighting,
 	}
-	const { body, color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, spare, addons, lighting } = config
 
 	// Get vehicle store
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)

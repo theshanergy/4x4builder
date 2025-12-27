@@ -9,7 +9,7 @@ import CameraManager from './managers/CameraManager'
 import InputManager from './managers/InputManager'
 import XRManager from './managers/XRManager'
 import Loader from '../ui/Loader'
-import VehicleManager from './vehicles/VehicleManager'
+import Vehicle from './vehicles/Vehicle'
 import RemoteVehicleManager from './vehicles/RemoteVehicleManager'
 import Screenshot from '../ui/Screenshot'
 import useConfigSync from '../../hooks/useConfigSync'
@@ -47,10 +47,9 @@ const ThreeCanvas = () => {
 
 					<Physics paused={!physicsEnabled}>
 						<Suspense fallback={null}>
-							<VehicleManager />
+							<Vehicle />
 						</Suspense>
 
-						{/* Remote players' vehicles */}
 						<RemoteVehicleManager />
 
 						<Environment />
