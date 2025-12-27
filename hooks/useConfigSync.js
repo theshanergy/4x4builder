@@ -14,7 +14,7 @@ export function useConfigSync() {
 	const currentVehicle = useGameStore((state) => state.currentVehicle)
 	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
 	const sendVehicleConfig = useMultiplayerStore((state) => state.sendVehicleConfig)
-	
+
 	// Keep track of the previous config to detect changes
 	const prevConfigRef = useRef(null)
 	const isFirstRender = useRef(true)
@@ -34,29 +34,26 @@ export function useConfigSync() {
 		// Skip first render to avoid sending initial config
 		if (isFirstRender.current) {
 			isFirstRender.current = false
-			prevConfigRef.current = JSON.stringify(currentVehicle)
+			prevConfigRef.current = currentVehicle
 			return
 		}
 
 		// Only sync if connected to a room
 		if (!currentRoom) {
-			prevConfigRef.current = JSON.stringify(currentVehicle)
+			prevConfigRef.current = currentVehicle
 			return
 		}
 
-		// Serialize current config for comparison
-		const configString = JSON.stringify(currentVehicle)
-		
-		// Only send if config actually changed
-		if (configString !== prevConfigRef.current) {
-			prevConfigRef.current = configString
+		// Only send if config actually changed (immer ensures new references on mutation)
+		if (currentVehicle !== prevConfigRef.current) {
+			prevConfigRef.current = currentVehicle
 			pendingConfigRef.current = currentVehicle
-			
+
 			// Clear any existing debounce timer
 			if (debounceTimerRef.current) {
 				clearTimeout(debounceTimerRef.current)
 			}
-			
+
 			// Debounce the send to prevent rate limiting during rapid changes
 			debounceTimerRef.current = setTimeout(() => {
 				if (pendingConfigRef.current) {
@@ -76,7 +73,7 @@ export function useConfigSync() {
 				sendVehicleConfig(currentVehicle)
 				console.log('[ConfigSync] Sent initial vehicle config to room')
 			}, 100)
-			
+
 			return () => clearTimeout(timeout)
 		}
 	}, [currentRoom?.id]) // Only trigger when room ID changes
