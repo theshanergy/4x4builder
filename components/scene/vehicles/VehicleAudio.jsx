@@ -333,12 +333,12 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 
 		// Create positional audio for engine
 		const engineAudio = new PositionalAudio(listener)
-		engineAudio.setRefDistance(10)
+		engineAudio.setRefDistance(5)
 		groupRef.current.add(engineAudio)
 
 		// Create positional audio for horn
 		const hornAudio = new PositionalAudio(listener)
-		hornAudio.setRefDistance(5)
+		hornAudio.setRefDistance(3)
 		groupRef.current.add(hornAudio)
 		hornAudioRef.current = hornAudio
 
