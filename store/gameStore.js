@@ -44,6 +44,7 @@ const useGameStore = create((set, get) => {
 		controlsVisible: false,
 		muted: true, // Audio muted by default
 		lightsOn: false, // Vehicle lights state
+		hornActive: false, // Vehicle horn state
 		infoMode: false, // Info/landing page mode - when true, shows vehicle page with hero
 
 		setSceneLoaded: (loaded) => set({ sceneLoaded: loaded }),
@@ -62,6 +63,7 @@ const useGameStore = create((set, get) => {
 		setControlsVisible: (visible) => set({ controlsVisible: visible }),
 		toggleMute: () => set((state) => ({ muted: !state.muted })),
 		toggleLights: () => set((state) => ({ lightsOn: !state.lightsOn })),
+		setHornActive: (active) => set({ hornActive: active }),
 
 		// Notification state
 		notification: null,

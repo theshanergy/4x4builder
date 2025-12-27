@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import useMultiplayerStore from '../store/multiplayerStore'
 import useGameStore from '../store/gameStore'
+import { hornState } from '../components/scene/vehicles/VehicleAudio'
 
 // Broadcast rate: 20 updates per second
 const BROADCAST_RATE = 1000 / 20
@@ -92,6 +93,9 @@ export function useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, ve
 		const engineRef = useGameStore.getState().engineRef
 		const engineRpm = engineRef?.rpm || 850
 		
+		// Get horn state from mutable state (avoids Zustand store read in render loop)
+		const hornActive = hornState.active
+		
 		// Send transform update to server
 		// Values are rounded to reduce message size while maintaining visual fidelity
 		sendPlayerUpdate({
@@ -104,6 +108,7 @@ export function useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, ve
 			wheelYPositions: wheelYPositions.map(round2),
 			steering: round2(steering),
 			engineRpm: Math.round(engineRpm),
+			hornActive,
 		})
 	})
 }

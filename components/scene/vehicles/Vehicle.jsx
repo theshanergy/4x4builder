@@ -10,7 +10,7 @@ import vehicleConfigs from '../../../vehicleConfigs'
 import useVehiclePhysics from '../../../hooks/useVehiclePhysics'
 import useTransformBroadcast from '../../../hooks/useTransformBroadcast'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
-import EngineAudio from './EngineAudio'
+import VehicleAudio from './VehicleAudio'
 import Dust from './Dust'
 import TireTracks from './TireTracks'
 import Wheels from './Wheels'
@@ -96,7 +96,7 @@ const Vehicle = () => {
 			<RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false} angularDamping={1}>
 				<CuboidCollider args={colliderArgs} position={colliderPosition} />
 				<group ref={chassisGroupRef} name='Vehicle'>
-					<EngineAudio />
+					<VehicleAudio />
 					<Suspense fallback={null}>
 						<VehicleBody
 							ref={bodyRef}

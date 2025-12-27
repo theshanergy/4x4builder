@@ -60,6 +60,9 @@ export const useVehicleInput = () => {
 		const brakeJustPressed = brakePressed && !brakePressedLastFrame.current
 		brakePressedLastFrame.current = brakePressed
 
+		// Horn input (H key or left bumper) - continuous while held
+		const hornActive = effectiveKeys.has('h') || input.leftBumper
+
 		// Calculate keyboard steering target (-1, 0, or 1)
 		const keyboardSteerTarget = (effectiveKeys.has('ArrowRight') || effectiveKeys.has('d') ? -1 : 0) + (effectiveKeys.has('ArrowLeft') || effectiveKeys.has('a') ? 1 : 0)
 
@@ -93,6 +96,7 @@ export const useVehicleInput = () => {
 			isDrifting,
 			shouldReset,
 			shouldToggleLights,
+			hornActive,
 			// Airborne controls
 			pitchInput,
 			rollInput,

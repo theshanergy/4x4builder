@@ -8,6 +8,7 @@ import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
 import Wheels from './Wheels'
 import SpareWheel from './SpareWheel'
 import VehicleBody from './VehicleBody'
+import VehicleAudio from './VehicleAudio'
 import PlayerLabel from './PlayerLabel'
 
 // Interpolation settings
@@ -89,6 +90,7 @@ class TransformBuffer {
 			wheelYPositions: before.wheelYPositions?.map((v, i) => MathUtils.lerp(v, after.wheelYPositions?.[i] || v, clampedT)) || null,
 			steering: MathUtils.lerp(before.steering || 0, after.steering || 0, clampedT),
 			engineRpm: MathUtils.lerp(before.engineRpm || 850, after.engineRpm || 850, clampedT),
+			hornActive: after.hornActive || false,
 			velocity: after.velocity || before.velocity || [0, 0, 0],
 		}
 	}
@@ -120,6 +122,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 	const currentPosition = useRef(new Vector3())
 	const currentRotation = useRef(new Quaternion())
 	const currentSteering = useRef(0)
+	const currentAudioState = useRef({ rpm: 850, hornActive: false })
 
 	// Get vehicle config with defaults
 	const config = useMemo(
@@ -191,6 +194,10 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 			const steering = interpolated.steering || 0
 			currentSteering.current = MathUtils.lerp(currentSteering.current, steering, INTERPOLATION_SMOOTHING)
 
+			// Update audio state for VehicleAudio
+			currentAudioState.current.rpm = interpolated.engineRpm || 850
+			currentAudioState.current.hornActive = interpolated.hornActive || false
+
 			// Update wheel rotations, positions, and steering
 			wheelRefs.forEach((ref, i) => {
 				if (!ref.current) return
@@ -214,9 +221,16 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 		}
 	})
 
+	// Callback for VehicleAudio to get current audio state
+	const getRemoteState = useMemo(
+		() => () => currentAudioState.current,
+		[]
+	)
+
 	return (
 		<group ref={groupRef} name={`RemoteVehicle-${playerId}`}>
 			<PlayerLabel name={playerName || 'Player'} />
+			<VehicleAudio isRemote getRemoteState={getRemoteState} />
 			<group name='VehicleBody'>
 				<Suspense fallback={null}>
 					<VehicleBody ref={bodyRef} key={validBody} id={validBody} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />

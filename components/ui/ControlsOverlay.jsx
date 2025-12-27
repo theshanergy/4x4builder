@@ -48,6 +48,9 @@ const ControlsOverlay = () => {
 				<Joystick onMove={(val) => setTouchInput({ leftStickX: val.x, leftStickY: val.y })} />
 			</div>
 			<div className='flex flex-col items-center gap-4 pointer-events-auto'>
+				<div onTouchStart={() => setKey('h', true)} onTouchEnd={() => setKey('h', false)}>
+					<span className='text-lg font-black'>📯</span> Horn
+				</div>
 				<div onTouchStart={() => setKey('Shift', true)} onTouchEnd={() => setKey('Shift', false)}>
 					<span className='text-lg font-black'>⇧</span> Drift
 				</div>
@@ -85,6 +88,10 @@ const ControlsOverlay = () => {
 			<Key keyName='Shift' setKey={setKey} active={isDrifting} wide>
 				<span>Drift</span>
 				<span className='text-[10px] text-white/50'>⇧ Shift</span>
+			</Key>
+			<Key keyName='h' setKey={setKey} active={keys.has('h')} wide>
+				<span>Horn</span>
+				<span className='text-[10px] text-white/50'>📯 H</span>
 			</Key>
 		</div>
 	)
