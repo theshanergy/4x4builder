@@ -66,6 +66,7 @@ const Vehicle = () => {
 
 	const chassisRef = useRef(null)
 	const chassisGroupRef = useRef(null) // Reference to the visual group that follows interpolated physics
+	const bodyRef = useRef(null) // Reference to body group for SpareWheel to follow
 	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
 	const wheelRefs = wheelRefsArray.current
 
@@ -125,7 +126,7 @@ const Vehicle = () => {
 				<group ref={chassisGroupRef} name='Vehicle'>
 					<EngineAudio />
 					<Suspense fallback={null}>
-						<VehicleBody key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />
+						<VehicleBody ref={bodyRef} key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />
 					</Suspense>
 					<Wheels
 						rim={rim}
@@ -144,7 +145,7 @@ const Vehicle = () => {
 					<SpareWheel
 						bodyId={body}
 						spare={spare}
-						height={vehicleHeight}
+						bodyRef={bodyRef}
 						rim={rim}
 						rim_diameter={rim_diameter}
 						rim_width={rim_width}

@@ -111,6 +111,7 @@ class TransformBuffer {
  */
 const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, onRef }) => {
 	const groupRef = useRef()
+	const bodyRef = useRef(null) // Reference to body group for SpareWheel to follow
 	const bufferRef = useRef(new TransformBuffer())
 	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
 	const wheelRefs = wheelRefsArray.current
@@ -218,7 +219,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 			<PlayerLabel name={playerName || 'Player'} />
 			<group name='VehicleBody'>
 				<Suspense fallback={null}>
-					<VehicleBody key={validBody} id={validBody} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />
+					<VehicleBody ref={bodyRef} key={validBody} id={validBody} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />
 				</Suspense>
 				<Wheels
 					rim={rim}
@@ -238,7 +239,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 				<SpareWheel
 					bodyId={validBody}
 					spare={spare}
-					height={vehicleHeight}
+					bodyRef={bodyRef}
 					rim={rim}
 					rim_diameter={rim_diameter}
 					rim_width={rim_width}

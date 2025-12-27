@@ -1,11 +1,11 @@
 import { memo, useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 
 import vehicleConfigs from '../../../vehicleConfigs'
-import useAnimateHeight from '../../../hooks/useAnimateHeight'
 import Wheel from './Wheel'
 
 // SpareWheel - renders a spare wheel at the position defined in vehicle config
-const SpareWheel = memo(({ bodyId, spare, height = 0, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, color, roughness }) => {
+const SpareWheel = memo(({ bodyId, spare, bodyRef, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, color, roughness }) => {
 	const groupRef = useRef()
 
 	// Get spare wheel position from vehicle config
@@ -14,27 +14,27 @@ const SpareWheel = memo(({ bodyId, spare, height = 0, rim, rim_diameter, rim_wid
 	// Calculate rim width in meters (convert from inches)
 	const rimWidthMeters = (rim_width * 2.54) / 100
 
-	// Calculate target Y position: base config position + lift height
-	const baseY = spareWheelConfig?.[1] || 0
-	const targetY = baseY + height
+	// Store the base Y offset from vehicle config (relative to body origin)
+	const baseYOffset = useMemo(() => {
+		return spareWheelConfig?.[1] || 0
+	}, [spareWheelConfig])
 
 	// Calculate final position with offsets:
 	// - Add half rim width to Z to prevent clipping into body
-	// - Y position is animated by useAnimateHeight, so we only set X and Z here
+	// - Y position will be updated in useFrame to track body + offset
 	const position = useMemo(() => {
 		if (!spareWheelConfig) return [0, 0, 0]
-		return [
-			spareWheelConfig[0],
-			spareWheelConfig[1],
-			spareWheelConfig[2] - rimWidthMeters / 2
-		]
+		return [spareWheelConfig[0], spareWheelConfig[1], spareWheelConfig[2] - rimWidthMeters / 2]
 	}, [spareWheelConfig, rimWidthMeters])
 
 	// Rotate 180 degrees around Y axis to face outward (toward rear of vehicle)
 	const rotation = useMemo(() => [0, Math.PI, 0], [])
 
-	// Animate height to match body animation (same start offset as VehicleBody)
-	useAnimateHeight(groupRef, targetY, targetY + 0.1)
+	// Sync Y position directly from body (with config offset) to avoid any desync
+	useFrame(() => {
+		if (!groupRef.current || !bodyRef?.current) return
+		groupRef.current.position.y = bodyRef.current.position.y + baseYOffset
+	})
 
 	// Don't render if spare is not enabled or no position defined
 	if (!spare || !spareWheelConfig) return null

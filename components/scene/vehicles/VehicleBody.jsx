@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef, useLayoutEffect, Suspense } from 'react'
+import { memo, useMemo, useRef, useLayoutEffect, Suspense, forwardRef } from 'react'
 import { useGLTF } from '@react-three/drei'
 
 import vehicleConfigs from '../../../vehicleConfigs'
@@ -27,7 +27,7 @@ const Addon = memo(({ path, color, roughness, position }) => {
 })
 
 // Shared vehicle body component used by both local and remote vehicles
-const VehicleBody = memo(({ id, height, color, roughness, addons, lighting }) => {
+const VehicleBody = forwardRef(({ id, height, color, roughness, addons, lighting }, ref) => {
 	const vehicle = useRef()
 	const { setObjectMaterials } = useMaterialProperties()
 
@@ -96,6 +96,15 @@ const VehicleBody = memo(({ id, height, color, roughness, addons, lighting }) =>
 	// Animate height
 	useAnimateHeight(vehicle, height, height + 0.1)
 
+	// Expose the ref to parent
+	if (ref) {
+		if (typeof ref === 'function') {
+			ref(vehicle.current)
+		} else {
+			ref.current = vehicle.current
+		}
+	}
+
 	return (
 		<group ref={vehicle} name='Body' key={id}>
 			<primitive object={bodyScene} />
@@ -103,12 +112,7 @@ const VehicleBody = memo(({ id, height, color, roughness, addons, lighting }) =>
 				<group name='Addons'>
 					{addonData.map((addon) => (
 						<Suspense key={`${id}-${addon.path}`} fallback={null}>
-							<Addon
-								path={addon.path}
-								color={color}
-								roughness={roughness}
-								position={addon.position}
-							/>
+							<Addon path={addon.path} color={color} roughness={roughness} position={addon.position} />
 						</Suspense>
 					))}
 				</group>
@@ -117,5 +121,7 @@ const VehicleBody = memo(({ id, height, color, roughness, addons, lighting }) =>
 		</group>
 	)
 })
+
+VehicleBody.displayName = 'VehicleBody'
 
 export default VehicleBody
