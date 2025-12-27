@@ -21,11 +21,9 @@ const round3 = (v) => Math.round(v * 1000) / 1000
 /**
  * Hook to broadcast local player's vehicle transform to the server
  * @param {Object} chassisRef - Reference to the Rapier RigidBody
- * @param {Object} chassisGroupRef - Reference to the visual group (for interpolated position)
- * @param {Array} wheelRefs - Array of refs to wheel groups
  * @param {Object} vehicleController - Rapier vehicle controller reference
  */
-export function useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, vehicleController) {
+const useVehicleBroadcast = (chassisRef, vehicleController) => {
 	const lastBroadcast = useRef(0)
 	const lastPosition = useRef({ x: 0, y: 0, z: 0 })
 	const lastRotation = useRef({ x: 0, y: 0, z: 0, w: 1 })
@@ -112,4 +110,4 @@ export function useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, ve
 	})
 }
 
-export default useTransformBroadcast
+export default useVehicleBroadcast

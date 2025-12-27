@@ -10,7 +10,7 @@ const DEBOUNCE_DELAY = 250
  * Watches for changes in the currentVehicle config and broadcasts them
  * Uses debouncing to prevent rate limiting during rapid changes
  */
-export function useConfigSync() {
+const useVehicleSync = () => {
 	const currentVehicle = useGameStore((state) => state.currentVehicle)
 	const currentRoom = useMultiplayerStore((state) => state.currentRoom)
 	const sendVehicleConfig = useMultiplayerStore((state) => state.sendVehicleConfig)
@@ -79,4 +79,4 @@ export function useConfigSync() {
 	}, [currentRoom?.id]) // Only trigger when room ID changes
 }
 
-export default useConfigSync
+export default useVehicleSync

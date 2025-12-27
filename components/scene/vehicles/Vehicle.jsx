@@ -8,7 +8,7 @@ import { shallow } from 'zustand/shallow'
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import vehicleConfigs from '../../../vehicleConfigs'
 import useVehiclePhysics from '../../../hooks/useVehiclePhysics'
-import useTransformBroadcast from '../../../hooks/useTransformBroadcast'
+import useVehicleBroadcast from '../../../hooks/useVehicleBroadcast'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
 import VehicleAudio from './VehicleAudio'
 import Dust from './Dust'
@@ -63,7 +63,7 @@ const Vehicle = () => {
 	const { vehicleController } = useVehiclePhysics(chassisRef, physicsWheels)
 
 	// Broadcast transform to multiplayer server
-	useTransformBroadcast(chassisRef, chassisGroupRef, wheelRefs, vehicleController)
+	useVehicleBroadcast(chassisRef, vehicleController)
 
 	// Reusable vectors/quaternions to avoid GC pressure
 	const tempWorldPos = useMemo(() => new Vector3(), [])
