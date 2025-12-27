@@ -15,7 +15,6 @@ const vehicleConfigs = {
 		tire: 'bfg_at',
 		tire_diameter: 32,
 		tire_muddiness: 0,
-		spare: true,
 	},
 	vehicles: {
 		toyota_4runner_5g_late: {
@@ -229,7 +228,7 @@ const vehicleConfigs = {
 			wheel_offset: 0.75,
 			wheelbase: 2.675,
 			driverPosition: [0.4, 1.55, 0],
-			spare: [-0.175, 0.7, -2.5],
+			spare_wheel: [-0.175, 0.7, -2.4],
 			default_addons: {
 				bumper_f: 'stock',
 				sliders: 'stock',
@@ -438,6 +437,7 @@ const vehicleConfigs = {
 			wheel_offset: 0.78,
 			wheelbase: 2.73,
 			driverPosition: [-0.4, 1.55, -0.15],
+			spare_wheel: [-0.285, 0.65, -2.5],
 			default_addons: {},
 			addons: {},
 			lighting: {
@@ -463,6 +463,7 @@ const vehicleConfigs = {
 			wheel_offset: 0.8,
 			wheelbase: 2.946,
 			driverPosition: [0.45, 1.65, 0],
+			spare_wheel: [0, 0.7, -2.2],
 			default_addons: {},
 			addons: {
 				bumper_f: {
@@ -577,7 +578,7 @@ const vehicleConfigs = {
 			wheel_offset: 0.85,
 			wheelbase: 2.95,
 			driverPosition: [0.45, 1.65, 0],
-			spare: [0, 0.7, -2.35],
+			spare_wheel: [0, 0.65, -2.2],
 			default_addons: {},
 			addons: {},
 			lighting: {

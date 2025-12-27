@@ -6,6 +6,7 @@ import vehicleConfigs from '../../../vehicleConfigs'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
 
 import Wheels from './Wheels'
+import SpareWheel from './SpareWheel'
 import VehicleBody from './VehicleBody'
 import PlayerLabel from './PlayerLabel'
 
@@ -128,7 +129,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 		[vehicleConfig]
 	)
 
-	const { color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, addons } = config
+	const { color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, spare, addons, lighting } = config
 
 	// Get vehicle dimensions and wheel positions from shared hook
 	const { validBody, vehicleHeight, wheelPositions } = useVehicleDimensions(config)
@@ -217,7 +218,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 			<PlayerLabel name={playerName || 'Player'} />
 			<group name='VehicleBody'>
 				<Suspense fallback={null}>
-					<VehicleBody key={validBody} id={validBody} height={vehicleHeight} color={color} roughness={roughness} addons={addons} />
+					<VehicleBody key={validBody} id={validBody} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />
 				</Suspense>
 				<Wheels
 					rim={rim}
@@ -233,6 +234,20 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 					wheelPositions={wheelPositions}
 					wheelRefs={wheelRefs}
 					cloneMaterials={true}
+				/>
+				<SpareWheel
+					bodyId={validBody}
+					spare={spare}
+					height={vehicleHeight}
+					rim={rim}
+					rim_diameter={rim_diameter}
+					rim_width={rim_width}
+					rim_color={rim_color}
+					rim_color_secondary={rim_color_secondary}
+					tire={tire}
+					tire_diameter={tire_diameter}
+					color={color}
+					roughness={roughness}
 				/>
 			</group>
 		</group>

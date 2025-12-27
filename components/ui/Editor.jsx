@@ -26,6 +26,7 @@ function Editor() {
     const tire = useGameStore((state) => state.currentVehicle?.tire)
     const tire_diameter = useGameStore((state) => state.currentVehicle?.tire_diameter)
     const tire_muddiness = useGameStore((state) => state.currentVehicle?.tire_muddiness) || 0
+    const spare = useGameStore((state) => state.currentVehicle?.spare)
     const addons = useGameStore((state) => state.currentVehicle?.addons) || {}
     const lighting = useGameStore((state) => state.currentVehicle?.lighting) || {}
 
@@ -50,19 +51,16 @@ function Editor() {
         tire,
         tire_diameter,
         tire_muddiness,
+        spare,
         addons,
         lighting,
     }
 
-    // Check if current vehicle has addons.
-    function addonsExist() {
-        return currentVehicle.body && Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons).length > 0 ? true : false
-    }
-
-    // Check if current vehicle has lighting options.
-    function lightingExists() {
-        return currentVehicle.body && vehicleConfigs.vehicles[currentVehicle.body]?.lighting && Object.keys(vehicleConfigs.vehicles[currentVehicle.body].lighting).length > 0
-    }
+    // Memoize vehicle config to avoid repeated lookups
+    const vehicleConfig = currentVehicle.body ? vehicleConfigs.vehicles[currentVehicle.body] : null
+    const hasAddons = vehicleConfig?.addons && Object.keys(vehicleConfig.addons).length > 0
+    const hasSpare = vehicleConfig?.spare_wheel
+    const hasLighting = vehicleConfig?.lighting && Object.keys(vehicleConfig.lighting).length > 0
 
     // Group object by key.
     const groupObjectByKey = (object, key) => {
@@ -237,29 +235,40 @@ function Editor() {
             </EditorSection>
 
             {/* Addons */}
-            {addonsExist() && (
+            {(hasAddons || hasSpare) && (
                 <EditorSection title='Addons' icon={<ToolIcon className='icon' />}>
-                    {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons).map((addon) => (
+                    {hasAddons && Object.keys(vehicleConfig.addons).map((addon) => (
                         <div key={addon} className={`field field-${addon}`}>
-                            <label>{vehicleConfigs.vehicles[currentVehicle.body].addons[addon].name}</label>
+                            <label>{vehicleConfig.addons[addon].name}</label>
                             <select value={currentVehicle.addons[addon] || ''} required onChange={(e) => setVehicle({ addons: { ...currentVehicle.addons, [addon]: e.target.value } })}>
-                                {!vehicleConfigs.vehicles[currentVehicle.body].addons[addon].required && <option value=''>None</option>}
-                                {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].addons[addon].options).map((option) => (
+                                {!vehicleConfig.addons[addon].required && <option value=''>None</option>}
+                                {Object.keys(vehicleConfig.addons[addon].options).map((option) => (
                                     <option key={option} value={option}>
-                                        {vehicleConfigs.vehicles[currentVehicle.body].addons[addon].options[option].name}
+                                        {vehicleConfig.addons[addon].options[option].name}
                                     </option>
                                 ))}
                             </select>
                         </div>
                     ))}
+                    {hasSpare && (
+                        <div className='field field-spare-wheel'>
+                            <input
+                                type='checkbox'
+                                id='spare-wheel'
+                                checked={currentVehicle.spare}
+                                onChange={(e) => setVehicle({ spare: e.target.checked })}
+                            />
+                            <label htmlFor='spare-wheel'>Spare Wheel</label>
+                        </div>
+                    )}
                 </EditorSection>
             )}
 
             {/* Lights */}
-            {lightingExists() && (
+            {hasLighting && (
                 <EditorSection title='Lights' icon={<LightIcon className='icon' />}>
-                    {Object.keys(vehicleConfigs.vehicles[currentVehicle.body].lighting).map((lightType) => {
-                        const lights = vehicleConfigs.vehicles[currentVehicle.body].lighting[lightType]
+                    {Object.keys(vehicleConfig.lighting).map((lightType) => {
+                        const lights = vehicleConfig.lighting[lightType]
                         if (!Array.isArray(lights)) return null
                         
                         return lights.map((light, index) => {

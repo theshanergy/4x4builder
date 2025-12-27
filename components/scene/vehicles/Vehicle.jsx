@@ -13,6 +13,7 @@ import EngineAudio from './EngineAudio'
 import Dust from './Dust'
 import TireTracks from './TireTracks'
 import Wheels from './Wheels'
+import SpareWheel from './SpareWheel'
 import VehicleBody from './VehicleBody'
 
 // Vehicle component with physics
@@ -22,7 +23,7 @@ const Vehicle = (props) => {
 		...vehicleConfigs.defaults,
 		...props,
 	}
-	const { body, color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, addons, lighting } = config
+	const { body, color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, spare, addons, lighting } = config
 
 	// Get vehicle store
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
@@ -107,6 +108,20 @@ const Vehicle = (props) => {
 						roughness={roughness}
 						wheelPositions={wheelPositions}
 						wheelRefs={wheelRefs}
+					/>
+					<SpareWheel
+						bodyId={body}
+						spare={spare}
+						height={vehicleHeight}
+						rim={rim}
+						rim_diameter={rim_diameter}
+						rim_width={rim_width}
+						rim_color={rim_color}
+						rim_color_secondary={rim_color_secondary}
+						tire={tire}
+						tire_diameter={tire_diameter}
+						color={color}
+						roughness={roughness}
 					/>
 				</group>
 			</RigidBody>

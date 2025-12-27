@@ -12,6 +12,9 @@ const useAnimateHeight = (elementRef, targetHeight, startHeight) => {
     const animation = useRef({ targetHeight, progress: 0, initialHeight: startHeight || 0 })
 
     useFrame((state, delta) => {
+        // Skip if element ref is not available
+        if (!elementRef.current) return
+
         // Target height has changed.
         if (animation.current.targetHeight !== targetHeight) {
             animation.current.targetHeight = targetHeight
