@@ -3,13 +3,15 @@ import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { useXR } from '@react-three/xr'
 import { Vector3, Quaternion } from 'three'
-
 import { shallow } from 'zustand/shallow'
+
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import vehicleConfigs from '../../../vehicleConfigs'
+import useVehicleSync from '../../../hooks/useVehicleSync'
 import useVehiclePhysics from '../../../hooks/useVehiclePhysics'
 import useVehicleBroadcast from '../../../hooks/useVehicleBroadcast'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
+
 import VehicleAudio from './VehicleAudio'
 import Dust from './Dust'
 import TireTracks from './TireTracks'
@@ -19,6 +21,9 @@ import VehicleBody from './VehicleBody'
 
 // Vehicle component with physics
 const Vehicle = () => {
+	// Sync vehicle config changes to multiplayer server
+	useVehicleSync()
+
 	// Get current vehicle config from store and merge with defaults
 	const currentVehicle = useGameStore((state) => state.currentVehicle, shallow)
 	const config = useMemo(

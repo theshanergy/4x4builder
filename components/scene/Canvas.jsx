@@ -12,7 +12,6 @@ import Loader from '../ui/Loader'
 import Vehicle from './vehicles/Vehicle'
 import RemoteVehicleManager from './vehicles/RemoteVehicleManager'
 import Screenshot from '../ui/Screenshot'
-import useVehicleSync from '../../hooks/useVehicleSync'
 
 // Dev-only performance monitor - completely excluded from production bundle
 const PerfMonitor = import.meta.env.DEV ? (await import('./managers/PerformanceMonitor')).default : () => null
@@ -22,9 +21,6 @@ const ThreeCanvas = () => {
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
-
-	// Sync vehicle config changes to multiplayer server
-	useVehicleSync()
 
 	// Set default camera position based on aspect ratio
 	const cameraConfig = useMemo(() => {
