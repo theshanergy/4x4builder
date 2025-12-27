@@ -1,8 +1,7 @@
-import { useRef, useEffect, useCallback, useMemo } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { Vector3, Raycaster, MathUtils, Quaternion, Matrix4 } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useXR } from '@react-three/xr'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
@@ -210,23 +209,16 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastT
 	)
 }
 
-// First-person camera controller (also handles XR origin when in VR)
-const FirstPersonCamera = ({ isInXR = false }) => {
+// First-person camera controller
+const FirstPersonCamera = () => {
 	const camera = useThree((state) => state.camera)
 	const currentVehicle = useGameStore((state) => state.currentVehicle)
-	const xrOriginRef = useGameStore((state) => state.xrOriginRef)
 
 	// Get driver position from vehicle config
 	const driverPosition = useRef(getDriverPosition(currentVehicle.body))
 
-	// Calibrated head offset from XR origin (captured when user recenters)
-	// This accounts for the user's actual seated head height
-	const calibratedHeadOffset = useRef(null)
-	const needsCalibration = useRef(true)
-	const recenterPressedLastFrame = useRef(false)
-
 	// Transition state - use elapsed time for consistency with rest of codebase
-	const isTransitioning = useRef(!isInXR)
+	const isTransitioning = useRef(true)
 	const transitionStartElapsed = useRef(0)
 	const startPos = useRef(camera.position.clone())
 	const startQuat = useRef(camera.quaternion.clone())
@@ -237,17 +229,15 @@ const FirstPersonCamera = ({ isInXR = false }) => {
 
 	useEffect(() => {
 		if (isMounted.current) {
-			if (!isInXR) {
-				isTransitioning.current = true
-				transitionStartedThisFrame.current = true // Will be set properly in useFrame
-				startPos.current.copy(camera.position)
-				startQuat.current.copy(camera.quaternion)
-				startFov.current = camera.fov
-			}
+			isTransitioning.current = true
+			transitionStartedThisFrame.current = true // Will be set properly in useFrame
+			startPos.current.copy(camera.position)
+			startQuat.current.copy(camera.quaternion)
+			startFov.current = camera.fov
 		} else {
 			isMounted.current = true
 		}
-	}, [isInXR, camera])
+	}, [camera])
 
 	// Update driver position when vehicle changes
 	useEffect(() => {
@@ -256,18 +246,13 @@ const FirstPersonCamera = ({ isInXR = false }) => {
 
 	// Set near clipping plane for first-person mode (prevents seat/interior from blocking view)
 	useEffect(() => {
-		if (!isInXR) {
-			const originalNear = camera.near
-			camera.near = 0.1 // Increased from default to cull nearby geometry like the seat
-			return () => {
-				camera.near = originalNear
-				camera.updateProjectionMatrix()
-			}
+		const originalNear = camera.near
+		camera.near = 0.1 // Increased from default to cull nearby geometry like the seat
+		return () => {
+			camera.near = originalNear
+			camera.updateProjectionMatrix()
 		}
-	}, [camera, isInXR])
-
-	// 180 degree rotation to face forward (for XR origin)
-	const seatYawOffset = useMemo(() => new Quaternion().setFromAxisAngle(UP_VECTOR, Math.PI), [])
+	}, [camera])
 
 	// Temp vectors to avoid GC
 	const tempPosition = useRef(new Vector3())
@@ -276,8 +261,6 @@ const FirstPersonCamera = ({ isInXR = false }) => {
 	const targetPosition = useRef(new Vector3())
 	const targetLookAt = useRef(new Vector3())
 	const forwardOffset = useRef(new Vector3())
-	const headWorldPos = useRef(new Vector3())
-	const originWorldPos = useRef(new Vector3())
 	const targetQuat = useRef(new Quaternion())
 	const dummyMatrix = useRef(new Matrix4())
 
@@ -303,79 +286,40 @@ const FirstPersonCamera = ({ isInXR = false }) => {
 		tempOffset.current.applyQuaternion(tempQuat.current)
 		targetPosition.current.copy(tempPosition.current).add(tempOffset.current)
 
-		if (isInXR) {
-			// In XR mode, position the XR origin so the user's head appears at driver position
-			if (xrOriginRef?.current) {
-				const { input } = useInputStore.getState()
+		// Calculate look-at point (forward from vehicle)
+		forwardOffset.current.set(0, 0, 10)
+		forwardOffset.current.applyQuaternion(tempQuat.current)
+		targetLookAt.current.copy(targetPosition.current).add(forwardOffset.current)
 
-				// Check for recenter button (X button on controller, or auto-calibrate on first frame)
-				const recenterPressed = input.buttonX
-				if ((recenterPressed && !recenterPressedLastFrame.current) || needsCalibration.current) {
-					// Capture the current head position relative to XR origin (in origin's local space)
-					// This represents where the user's head physically is when seated
-					camera.getWorldPosition(headWorldPos.current)
-					xrOriginRef.current.getWorldPosition(originWorldPos.current)
-					calibratedHeadOffset.current = headWorldPos.current.clone().sub(originWorldPos.current)
-					needsCalibration.current = false
-				}
-				recenterPressedLastFrame.current = recenterPressed
+		if (isTransitioning.current) {
+			const t = state.clock.elapsedTime - transitionStartElapsed.current // 1 sec transition
 
-				// Position XR origin so that: origin + headOffset = targetPosition (driver head pos)
-				// Therefore: origin = targetPosition - headOffset
-				if (calibratedHeadOffset.current) {
-					// Transform the calibrated offset by vehicle rotation to keep it vehicle-relative
-					tempOffset.current.copy(calibratedHeadOffset.current)
-					// The offset was captured in world space, so we need to rotate it with the vehicle
-					// to maintain the same relative position as the vehicle rotates
-					xrOriginRef.current.position.copy(targetPosition.current).sub(tempOffset.current)
-				} else {
-					// Fallback before calibration (shouldn't happen due to auto-calibrate)
-					xrOriginRef.current.position.copy(targetPosition.current)
-				}
-
-				// Apply chassis rotation plus 180° yaw to face forward
-				xrOriginRef.current.quaternion.copy(tempQuat.current).multiply(seatYawOffset)
-
-				// Force immediate matrix update to prevent XR origin from lagging behind
-				xrOriginRef.current.updateMatrixWorld(true)
-			}
-		} else {
-			// Regular first-person camera mode
-
-			// Calculate look-at point (forward from vehicle)
-			forwardOffset.current.set(0, 0, 10)
-			forwardOffset.current.applyQuaternion(tempQuat.current)
-			targetLookAt.current.copy(targetPosition.current).add(forwardOffset.current)
-			if (isTransitioning.current) {
-				const t = state.clock.elapsedTime - transitionStartElapsed.current // 1 sec transition
-
-				if (t >= 1) {
-					isTransitioning.current = false
-					camera.position.copy(targetPosition.current)
-					camera.lookAt(targetLookAt.current)
-					camera.fov = targetFov
-					camera.updateProjectionMatrix()
-				} else {
-					// Calculate target rotation quaternion
-					dummyMatrix.current.lookAt(targetPosition.current, targetLookAt.current, UP_VECTOR)
-					targetQuat.current.setFromRotationMatrix(dummyMatrix.current)
-
-					// Lerp position, rotation, and FOV
-					const alpha = 1 - Math.pow(1 - t, 3) // Ease out cubic
-					const fovAlpha = 1 - Math.pow(1 - t * 0.5, 3) // Slower FOV transition
-					camera.position.lerpVectors(startPos.current, targetPosition.current, alpha)
-					camera.quaternion.slerpQuaternions(startQuat.current, targetQuat.current, alpha)
-					camera.fov = MathUtils.lerp(startFov.current, targetFov, fovAlpha)
-					camera.updateProjectionMatrix()
-				}
-			} else {
-				// Set camera position and FOV - only update projection matrix if FOV changed
+			if (t >= 1) {
+				isTransitioning.current = false
 				camera.position.copy(targetPosition.current)
 				camera.lookAt(targetLookAt.current)
-				if (camera.fov !== targetFov) {
-					camera.fov = targetFov
-					camera.updateProjectionMatrix()
-				}
+				camera.fov = targetFov
+				camera.updateProjectionMatrix()
+			} else {
+				// Calculate target rotation quaternion
+				dummyMatrix.current.lookAt(targetPosition.current, targetLookAt.current, UP_VECTOR)
+				targetQuat.current.setFromRotationMatrix(dummyMatrix.current)
+
+				// Lerp position, rotation, and FOV
+				const alpha = 1 - Math.pow(1 - t, 3) // Ease out cubic
+				const fovAlpha = 1 - Math.pow(1 - t * 0.5, 3) // Slower FOV transition
+				camera.position.lerpVectors(startPos.current, targetPosition.current, alpha)
+				camera.quaternion.slerpQuaternions(startQuat.current, targetQuat.current, alpha)
+				camera.fov = MathUtils.lerp(startFov.current, targetFov, fovAlpha)
+				camera.updateProjectionMatrix()
+			}
+		} else {
+			// Set camera position and FOV - only update projection matrix if FOV changed
+			camera.position.copy(targetPosition.current)
+			camera.lookAt(targetLookAt.current)
+			if (camera.fov !== targetFov) {
+				camera.fov = targetFov
+				camera.updateProjectionMatrix()
 			}
 		}
 	})
@@ -520,9 +464,6 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 		prevInfoMode.current = infoMode
 	}, [infoMode])
 
-	// Check if in XR session
-	const isInXR = useXR((state) => state.mode !== null)
-
 	// Track key state to detect press (not hold)
 	const keyPressedLastFrame = useRef(false)
 
@@ -557,7 +498,7 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 	// Render the appropriate camera controller based on current mode
 	switch (cameraMode) {
 		case CameraMode.FIRST_PERSON:
-			return <FirstPersonCamera isInXR={isInXR} />
+			return <FirstPersonCamera />
 		case CameraMode.CHASE:
 			return <ChaseCamera terrainMeshesCache={terrainMeshesCache} lastTerrainCacheFrame={lastTerrainCacheFrame} />
 		case CameraMode.ORBIT:

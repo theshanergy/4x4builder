@@ -7,7 +7,7 @@ import useGameStore from '../../store/gameStore'
 import Environment from './environment/Environment'
 import CameraManager from './managers/CameraManager'
 import InputManager from './managers/InputManager'
-import XRManager from './managers/XRManager'
+import XR from './xr'
 import Loader from '../ui/Loader'
 import Vehicle from './vehicles/Vehicle'
 import RemoteVehicleManager from './vehicles/RemoteVehicleManager'
@@ -36,7 +36,7 @@ const ThreeCanvas = () => {
 			<Canvas shadows={{ enabled: !performanceDegraded }} dpr={performanceDegraded ? 1 : [1, 1.5]} camera={cameraConfig}>
 				<PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 				<PerfMonitor />
-				<XRManager>
+				<XR>
 					<InputManager />
 
 					<CameraManager />
@@ -52,7 +52,7 @@ const ThreeCanvas = () => {
 					</Physics>
 
 					<Screenshot />
-				</XRManager>
+				</XR>
 			</Canvas>
 		</div>
 	)

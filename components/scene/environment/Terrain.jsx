@@ -3,7 +3,6 @@ import { useFrame, useLoader } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
-import { useXR } from '@react-three/xr'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import Grass from './Grass'
@@ -246,7 +245,7 @@ const Terrain = () => {
 	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
 
 	// Check if grass should be disabled (XR mode, performance degraded, or mobile device)
-	const isInXR = useXR((state) => state.mode !== null)
+	const isInXR = useGameStore((state) => state.isInXR)
 	const isMobile = useGameStore((state) => state.isMobile)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const showGrass = !isInXR && !performanceDegraded && !isMobile

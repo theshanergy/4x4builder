@@ -1,7 +1,6 @@
 import { useMemo, useRef, Suspense } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
-import { useXR } from '@react-three/xr'
 import { Vector3, Quaternion } from 'three'
 import { shallow } from 'zustand/shallow'
 
@@ -37,9 +36,7 @@ const Vehicle = () => {
 	// Get vehicle store
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const isMobile = useGameStore((state) => state.isMobile)
-
-	// Check if in XR session
-	const isInXR = useXR((state) => state.mode !== null)
+	const isInXR = useGameStore((state) => state.isInXR)
 
 	const chassisRef = useRef(null)
 	const chassisGroupRef = useRef(null) // Reference to the visual group that follows interpolated physics

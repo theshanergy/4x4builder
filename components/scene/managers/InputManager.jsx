@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { useXRInputSourceState } from '@react-three/xr'
 import useInputStore from '../../../store/inputStore'
 import useMultiplayerStore from '../../../store/multiplayerStore'
 
@@ -24,18 +23,13 @@ const GAMEPAD = {
  * Component to handle all input sources:
  * - Keyboard input
  * - Standard gamepad input
- * - XR controller input (when in XR session)
+ * - Touch joystick input (via touchInput in store)
  *
- * All input sources are combined - XR users can use both XR controllers and standard gamepads.
- * Must be used inside <XR> component for XR input to work.
+ * XR controller input is handled separately in XRManager when in XR session.
  */
 const InputManager = () => {
 	const setKey = useInputStore((state) => state.setKey)
 	const setInput = useInputStore((state) => state.setInput)
-
-	// Get XR controller states using v6 API
-	const xrLeftController = useXRInputSourceState('controller', 'left')
-	const xrRightController = useXRInputSourceState('controller', 'right')
 
 	// Setup keyboard event listeners
 	useEffect(() => {
@@ -70,7 +64,7 @@ const InputManager = () => {
 
 	// Poll all input sources every frame and combine them
 	useFrame(() => {
-		// Start with touch joystick values (set directly by UI, not polled)
+		// Start with touch joystick values (set directly by UI or XR manager, not polled)
 		const touchInput = useInputStore.getState().touchInput
 		let input = {
 			leftStickX: touchInput.leftStickX,
@@ -102,45 +96,6 @@ const InputManager = () => {
 			input.buttonY = gamepad.buttons[GAMEPAD.BUTTON_Y]?.pressed ?? false
 			input.leftBumper = gamepad.buttons[GAMEPAD.BUTTON_LB]?.pressed ?? false
 			input.rightBumper = gamepad.buttons[GAMEPAD.BUTTON_RB]?.pressed ?? false
-		}
-
-		// Poll XR controllers and combine with standard gamepad
-		if (xrLeftController || xrRightController) {
-			const xrLeftThumbstick = xrLeftController?.gamepad['xr-standard-thumbstick']
-			const xrRightThumbstick = xrRightController?.gamepad['xr-standard-thumbstick']
-			const xrLeftTrigger = xrLeftController?.gamepad['xr-standard-trigger']
-			const xrRightTrigger = xrRightController?.gamepad['xr-standard-trigger']
-			const xrLeftSqueeze = xrLeftController?.gamepad['xr-standard-squeeze']
-			const xrRightSqueeze = xrRightController?.gamepad['xr-standard-squeeze']
-
-			// XR controller buttons (A/B on right, X/Y on left for Quest controllers)
-			const xrRightButtonA = xrRightController?.gamepad['a-button']
-			const xrRightButtonB = xrRightController?.gamepad['b-button']
-			const xrLeftButtonX = xrLeftController?.gamepad['x-button']
-			const xrLeftButtonY = xrLeftController?.gamepad['y-button']
-
-			// Helper to use whichever input has larger magnitude
-			const maxMagnitude = (a, b) => (Math.abs(b) > Math.abs(a) ? b : a)
-
-			// Combine axes - use whichever has larger magnitude
-			input.leftStickX = maxMagnitude(input.leftStickX, xrLeftThumbstick?.xAxis ?? 0)
-			input.leftStickY = maxMagnitude(input.leftStickY, xrLeftThumbstick?.yAxis ?? 0)
-			input.rightStickX = maxMagnitude(input.rightStickX, xrRightThumbstick?.xAxis ?? 0)
-			input.rightStickY = maxMagnitude(input.rightStickY, xrRightThumbstick?.yAxis ?? 0)
-
-			// Combine triggers - use max value
-			input.leftTrigger = Math.max(input.leftTrigger, xrLeftTrigger?.state === 'pressed' ? 1 : 0)
-			input.rightTrigger = Math.max(input.rightTrigger, xrRightTrigger?.state === 'pressed' ? 1 : 0)
-
-			// Combine bumpers/squeeze
-			input.leftBumper = input.leftBumper || xrLeftSqueeze?.state === 'pressed'
-			input.rightBumper = input.rightBumper || xrRightSqueeze?.state === 'pressed'
-
-			// Combine buttons (A/B on right controller, X/Y on left controller for Quest)
-			input.buttonA = input.buttonA || xrRightButtonA?.state === 'pressed'
-			input.buttonB = input.buttonB || xrRightButtonB?.state === 'pressed'
-			input.buttonX = input.buttonX || xrLeftButtonX?.state === 'pressed'
-			input.buttonY = input.buttonY || xrLeftButtonY?.state === 'pressed'
 		}
 
 		setInput(input)
