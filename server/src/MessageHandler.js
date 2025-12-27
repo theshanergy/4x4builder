@@ -284,6 +284,9 @@ export default class MessageHandler {
 			return // Silently ignore invalid messages
 		}
 		
+		// Log chat message on server
+		console.log(`[CHAT] [${room.id}] ${player.name}: ${text.trim()}`)
+		
 		// Broadcast to all players in the room (including sender for confirmation)
 		room.broadcastAll(createMessage(MessageTypes.CHAT_MESSAGE, {
 			playerId: player.id,
