@@ -139,61 +139,21 @@ const useMultiplayerStore = create((set, get) => ({
 			})
 			.on('onVehicleConfig', (message) => {
 				const { playerId, config } = message
-				if (playerId !== get().localPlayerId) {
-					set((state) => {
-						const existing = state.remotePlayers[playerId]
-						if (!existing) return state
-						return {
-							remotePlayers: {
-								...state.remotePlayers,
-								[playerId]: {
-									...existing,
-									vehicleConfig: config,
-								},
-							},
-						}
-					})
-				}
+				get().updateRemotePlayer(playerId, { vehicleConfig: config })
 			})
 			.on('onPlayerNameUpdate', (message) => {
 				const { playerId, name } = message
-				if (playerId !== get().localPlayerId) {
-					set((state) => {
-						const existing = state.remotePlayers[playerId]
-						if (!existing) return state
-						return {
-							remotePlayers: {
-								...state.remotePlayers,
-								[playerId]: {
-									...existing,
-									name,
-								},
-							},
-						}
-					})
-				}
+				get().updateRemotePlayer(playerId, { name })
 			})
 			.on('onVehicleReset', (message) => {
 				const { playerId, position, rotation } = message
-				if (playerId !== get().localPlayerId) {
-					set((state) => {
-						const existing = state.remotePlayers[playerId]
-						if (!existing) return state
-						return {
-							remotePlayers: {
-								...state.remotePlayers,
-								[playerId]: {
-									...existing,
-									transform: {
-										...existing.transform,
-										position,
-										rotation,
-									},
-								},
-							},
-						}
-					})
-				}
+				get().updateRemotePlayer(playerId, (existing) => ({
+					transform: {
+						...existing.transform,
+						position,
+						rotation,
+					},
+				}))
 			})
 			.on('onChatMessage', (message) => {
 				const { playerId, playerName, text, timestamp } = message
@@ -214,6 +174,29 @@ const useMultiplayerStore = create((set, get) => ({
 		
 		set({ networkManager })
 		return networkManager
+	},
+	
+	// Update a remote player's state
+	updateRemotePlayer: (playerId, updates) => {
+		if (playerId === get().localPlayerId) return
+		
+		set((state) => {
+			const existing = state.remotePlayers[playerId]
+			if (!existing) return state
+			
+			// If updates is a function, call it with existing player
+			const newData = typeof updates === 'function' ? updates(existing) : updates
+			
+			return {
+				remotePlayers: {
+					...state.remotePlayers,
+					[playerId]: {
+						...existing,
+						...newData,
+					},
+				},
+			}
+		})
 	},
 	
 	// Sync remote players from room state (excludes local player)
