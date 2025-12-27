@@ -4,6 +4,7 @@ import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { useXR } from '@react-three/xr'
 import { Vector3, Quaternion } from 'three'
 
+import { shallow } from 'zustand/shallow'
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import vehicleConfigs from '../../../vehicleConfigs'
 import useVehiclePhysics from '../../../hooks/useVehiclePhysics'
@@ -18,44 +19,15 @@ import VehicleBody from './VehicleBody'
 
 // Vehicle component with physics
 const Vehicle = () => {
-	// Get current vehicle config from store
-	const body = useGameStore((state) => state.currentVehicle.body)
-	const color = useGameStore((state) => state.currentVehicle.color)
-	const roughness = useGameStore((state) => state.currentVehicle.roughness)
-	const lift = useGameStore((state) => state.currentVehicle.lift)
-	const wheel_offset = useGameStore((state) => state.currentVehicle.wheel_offset)
-	const rim = useGameStore((state) => state.currentVehicle.rim)
-	const rim_diameter = useGameStore((state) => state.currentVehicle.rim_diameter)
-	const rim_width = useGameStore((state) => state.currentVehicle.rim_width)
-	const rim_color = useGameStore((state) => state.currentVehicle.rim_color)
-	const rim_color_secondary = useGameStore((state) => state.currentVehicle.rim_color_secondary)
-	const tire = useGameStore((state) => state.currentVehicle.tire)
-	const tire_diameter = useGameStore((state) => state.currentVehicle.tire_diameter)
-	const tire_muddiness = useGameStore((state) => state.currentVehicle.tire_muddiness)
-	const spare = useGameStore((state) => state.currentVehicle.spare)
-	const addons = useGameStore((state) => state.currentVehicle.addons)
-	const lighting = useGameStore((state) => state.currentVehicle.lighting)
-
-	// Merge with defaults and allow props to override
-	const config = {
-		...vehicleConfigs.defaults,
-		body,
-		color,
-		roughness,
-		lift,
-		wheel_offset,
-		rim,
-		rim_diameter,
-		rim_width,
-		rim_color,
-		rim_color_secondary,
-		tire,
-		tire_diameter,
-		tire_muddiness,
-		spare,
-		addons,
-		lighting,
-	}
+	// Get current vehicle config from store and merge with defaults
+	const currentVehicle = useGameStore((state) => state.currentVehicle, shallow)
+	const config = useMemo(
+		() => ({
+			...vehicleConfigs.defaults,
+			...currentVehicle,
+		}),
+		[currentVehicle]
+	)
 
 	// Get vehicle store
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
@@ -83,9 +55,9 @@ const Vehicle = () => {
 			maxSuspensionTravel: 0.3,
 			suspensionRestLength: 0.1,
 			suspensionStiffness: 28,
-			radius: (tire_diameter * 2.54) / 100 / 2,
+			radius: (config.tire_diameter * 2.54) / 100 / 2,
 		}))
-	}, [wheelPositions, tire_diameter])
+	}, [wheelPositions, config.tire_diameter])
 
 	// Use vehicle physics
 	const { vehicleController } = useVehiclePhysics(chassisRef, physicsWheels)
@@ -126,42 +98,51 @@ const Vehicle = () => {
 				<group ref={chassisGroupRef} name='Vehicle'>
 					<EngineAudio />
 					<Suspense fallback={null}>
-						<VehicleBody ref={bodyRef} key={body} id={body} height={vehicleHeight} color={color} roughness={roughness} addons={addons} lighting={lighting} />
+						<VehicleBody
+							ref={bodyRef}
+							key={config.body}
+							id={config.body}
+							height={vehicleHeight}
+							color={config.color}
+							roughness={config.roughness}
+							addons={config.addons}
+							lighting={config.lighting}
+						/>
 					</Suspense>
 					<Wheels
-						rim={rim}
-						rim_diameter={rim_diameter}
-						rim_width={rim_width}
-						rim_color={rim_color}
-						rim_color_secondary={rim_color_secondary}
-						tire={tire}
-						tire_diameter={tire_diameter}
-						tire_muddiness={tire_muddiness}
-						color={color}
-						roughness={roughness}
+						rim={config.rim}
+						rim_diameter={config.rim_diameter}
+						rim_width={config.rim_width}
+						rim_color={config.rim_color}
+						rim_color_secondary={config.rim_color_secondary}
+						tire={config.tire}
+						tire_diameter={config.tire_diameter}
+						tire_muddiness={config.tire_muddiness}
+						color={config.color}
+						roughness={config.roughness}
 						wheelPositions={wheelPositions}
 						wheelRefs={wheelRefs}
 					/>
 					<SpareWheel
-						bodyId={body}
-						spare={spare}
+						bodyId={config.body}
+						spare={config.spare}
 						bodyRef={bodyRef}
-						rim={rim}
-						rim_diameter={rim_diameter}
-						rim_width={rim_width}
-						rim_color={rim_color}
-						rim_color_secondary={rim_color_secondary}
-						tire={tire}
-						tire_diameter={tire_diameter}
-						color={color}
-						roughness={roughness}
+						rim={config.rim}
+						rim_diameter={config.rim_diameter}
+						rim_width={config.rim_width}
+						rim_color={config.rim_color}
+						rim_color_secondary={config.rim_color_secondary}
+						tire={config.tire}
+						tire_diameter={config.tire_diameter}
+						color={config.color}
+						roughness={config.roughness}
 					/>
 				</group>
 			</RigidBody>
 			{!performanceDegraded && !isInXR && !isMobile && (
 				<>
 					<Dust vehicleController={vehicleController} wheelRefs={wheelRefs} />
-					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={(rim_width * 2.54) / 100} tireRadius={axleHeight} />
+					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={(config.rim_width * 2.54) / 100} tireRadius={axleHeight} />
 				</>
 			)}
 		</>

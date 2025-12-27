@@ -15,6 +15,7 @@ const vehicleConfigs = {
 		tire: 'bfg_at',
 		tire_diameter: 32,
 		tire_muddiness: 0,
+		spare: false,
 	},
 	vehicles: {
 		toyota_4runner_5g_late: {
