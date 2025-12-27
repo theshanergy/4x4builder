@@ -12,49 +12,14 @@ import GearIcon from '../../assets/images/icons/Gear.svg'
 import LightIcon from '../../assets/images/icons/Light.svg'
 
 function Editor() {
-    // Get vehicle state from store using granular selectors
-    const body = useGameStore((state) => state.currentVehicle?.body) || null
-    const color = useGameStore((state) => state.currentVehicle?.color)
-    const roughness = useGameStore((state) => state.currentVehicle?.roughness) || 0
-    const lift = useGameStore((state) => state.currentVehicle?.lift)
-    const wheel_offset = useGameStore((state) => state.currentVehicle?.wheel_offset) || 0
-    const rim = useGameStore((state) => state.currentVehicle?.rim)
-    const rim_color = useGameStore((state) => state.currentVehicle?.rim_color)
-    const rim_color_secondary = useGameStore((state) => state.currentVehicle?.rim_color_secondary)
-    const rim_diameter = useGameStore((state) => state.currentVehicle?.rim_diameter)
-    const rim_width = useGameStore((state) => state.currentVehicle?.rim_width)
-    const tire = useGameStore((state) => state.currentVehicle?.tire)
-    const tire_diameter = useGameStore((state) => state.currentVehicle?.tire_diameter)
-    const tire_muddiness = useGameStore((state) => state.currentVehicle?.tire_muddiness) || 0
-    const spare = useGameStore((state) => state.currentVehicle?.spare)
-    const addons = useGameStore((state) => state.currentVehicle?.addons) || {}
-    const lighting = useGameStore((state) => state.currentVehicle?.lighting) || {}
+    // Get vehicle state from store
+    const currentVehicle = useGameStore((state) => state.currentVehicle) || {}
 
     const setVehicle = useGameStore((state) => state.setVehicle)
     const physicsEnabled = useGameStore((state) => state.physicsEnabled)
     const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
     const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
     const setCameraAutoRotate = useGameStore((state) => state.setCameraAutoRotate)
-
-    // Reconstruct currentVehicle for existing code
-    const currentVehicle = {
-        body,
-        color,
-        roughness,
-        lift,
-        wheel_offset,
-        rim,
-        rim_color,
-        rim_color_secondary,
-        rim_diameter,
-        rim_width,
-        tire,
-        tire_diameter,
-        tire_muddiness,
-        spare,
-        addons,
-        lighting,
-    }
 
     // Memoize vehicle config to avoid repeated lookups
     const vehicleConfig = currentVehicle.body ? vehicleConfigs.vehicles[currentVehicle.body] : null
