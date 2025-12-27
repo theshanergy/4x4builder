@@ -96,14 +96,15 @@ const VehicleBody = forwardRef(({ id, height, color, roughness, addons, lighting
 	// Animate height
 	useAnimateHeight(vehicle, height, height + 0.1)
 
-	// Expose the ref to parent
-	if (ref) {
+	// Expose the ref to parent via useLayoutEffect so it's available before paint
+	useLayoutEffect(() => {
+		if (!ref) return
 		if (typeof ref === 'function') {
 			ref(vehicle.current)
 		} else {
 			ref.current = vehicle.current
 		}
-	}
+	}, [ref])
 
 	return (
 		<group ref={vehicle} name='Body' key={id}>

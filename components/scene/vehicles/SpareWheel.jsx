@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef } from 'react'
+import { memo, useMemo, useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 
 import vehicleConfigs from '../../../vehicleConfigs'
@@ -21,16 +21,22 @@ const SpareWheel = memo(({ bodyId, spare, bodyRef, rim, rim_diameter, rim_width,
 
 	// Calculate final position with offsets:
 	// - Add half rim width to Z to prevent clipping into body
-	// - Y position will be updated in useFrame to track body + offset
+	// - Y position will be synced from body in useLayoutEffect/useFrame
 	const position = useMemo(() => {
 		if (!spareWheelConfig) return [0, 0, 0]
-		return [spareWheelConfig[0], spareWheelConfig[1], spareWheelConfig[2] - rimWidthMeters / 2]
+		return [spareWheelConfig[0], 0, spareWheelConfig[2] - rimWidthMeters / 2]
 	}, [spareWheelConfig, rimWidthMeters])
 
 	// Rotate 180 degrees around Y axis to face outward (toward rear of vehicle)
 	const rotation = useMemo(() => [0, Math.PI, 0], [])
 
-	// Sync Y position directly from body (with config offset) to avoid any desync
+	// Sync Y position when body ref or config changes
+	useLayoutEffect(() => {
+		if (!groupRef.current || !bodyRef?.current) return
+		groupRef.current.position.y = bodyRef.current.position.y + baseYOffset
+	}, [bodyRef, baseYOffset, bodyId])
+
+	// Sync Y position from body (with config offset) every frame to track animations
 	useFrame(() => {
 		if (!groupRef.current || !bodyRef?.current) return
 		groupRef.current.position.y = bodyRef.current.position.y + baseYOffset
@@ -41,7 +47,6 @@ const SpareWheel = memo(({ bodyId, spare, bodyRef, rim, rim_diameter, rim_width,
 
 	return (
 		<group ref={groupRef} name='SpareWheel' position={position} rotation={rotation}>
-			<axesHelper args={[0.5]} />
 			<Wheel
 				rim={rim}
 				rim_diameter={rim_diameter}
