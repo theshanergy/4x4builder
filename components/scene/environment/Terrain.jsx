@@ -24,34 +24,30 @@ const GRADIENT_EPSILON = 0.01
 // Regional height modulation scale (size of flat/hilly regions)
 const REGION_SCALE = 240
 
-// Mountain configuration - realistic mountain generation
+// Mountain configuration
 const MOUNTAIN_CONFIG = {
-	// Distance from origin where mountains start to appear
-	startRadius: 600,
+	// Distance from origin where mountains start to appear (further for dramatic backdrop)
+	startRadius: 1200,
 	// Distance over which mountains blend in (transition zone)
 	transitionWidth: 800,
-	// Maximum mountain height
-	maxHeight: 180,
+	// Maximum mountain height (scaled for dramatic sierra-like peaks)
+	maxHeight: 380,
 	// Base noise scale for large mountain formations (smaller = more spread out)
-	baseScale: 0.0008,
+	baseScale: 0.0006,
 	// Ridge noise creates sharp mountain ridges (smaller = wider ridges)
-	ridgeScale: 0.002,
+	ridgeScale: 0.0015,
 	// Detail noise for smaller features
 	detailScale: 0.008,
 	// Domain warping scale for more natural shapes
-	warpScale: 0.001,
-	warpStrength: 150,
+	warpScale: 0.0008,
+	warpStrength: 200,
 	// Valley carving - how much rivers/valleys cut into terrain
-	valleyScale: 0.0015,
+	valleyScale: 0.0012,
 	valleyDepth: 0.5,
 }
 
-// ============================================================================
+
 // QUADTREE TERRAIN CONFIGURATION
-// ============================================================================
-// The quadtree approach eliminates z-fighting by ensuring tiles never overlap.
-// Each node either renders itself OR subdivides into 4 children, never both.
-// This creates a hierarchical structure where LOD transitions are clean.
 
 // Base size of the entire terrain quadtree (power of 2 recommended)
 const QUADTREE_ROOT_SIZE = 4096
@@ -59,12 +55,9 @@ const QUADTREE_ROOT_SIZE = 4096
 // Minimum tile size (highest detail level) - also determines physics tile size
 const QUADTREE_MIN_SIZE = 32
 
-// Maximum depth of quadtree (calculated from root/min sizes)
-const QUADTREE_MAX_DEPTH = Math.log2(QUADTREE_ROOT_SIZE / QUADTREE_MIN_SIZE)
-
 // Resolution (vertices per side) for each tile regardless of size
 // Higher = more detail per tile, but more geometry
-const TILE_RESOLUTION = 32
+const TILE_RESOLUTION = 16
 
 // LOD split threshold multiplier - a node splits when:
 // distance < nodeSize * LOD_SPLIT_FACTOR
@@ -90,11 +83,6 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 	// Ocean boundary calculations
 	const oceanTransitionStart = OCEAN_RADIUS - OCEAN_TRANSITION
 	const oceanTransitionStartSq = oceanTransitionStart * oceanTransitionStart
-
-	// Mountain transition calculations
-	const mountainStartSq = MOUNTAIN_CONFIG.startRadius * MOUNTAIN_CONFIG.startRadius
-	const mountainFullRadius = MOUNTAIN_CONFIG.startRadius + MOUNTAIN_CONFIG.transitionWidth
-	const mountainFullRadiusSq = mountainFullRadius * mountainFullRadius
 
 	// Ridge noise function - creates sharp mountain ridges
 	// Uses absolute value of noise to create V-shaped valleys and ridges
@@ -170,14 +158,18 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 			baseHeight = normalizedHeight * regionModifier
 		}
 
-		// Add mountain height if we're far enough from center
+		// Add mountain height using parallel bands along the X axis
 		let mountainHeight = 0
-		if (distSq > mountainStartSq && dist < OCEAN_RADIUS - OCEAN_TRANSITION * 0.5) {
-			// Calculate blend factor for mountains
+		const absZ = Math.abs(worldZ) // Use absolute Z for symmetric bands on both sides
+		
+		if (absZ > MOUNTAIN_CONFIG.startRadius && dist < OCEAN_RADIUS - OCEAN_TRANSITION * 0.5) {
+			// Calculate blend factor for mountains based on Z distance
 			let mountainBlend = 1
-			if (distSq < mountainFullRadiusSq) {
+			const mountainFullZ = MOUNTAIN_CONFIG.startRadius + MOUNTAIN_CONFIG.transitionWidth
+			
+			if (absZ < mountainFullZ) {
 				// In transition zone - smooth blend in
-				const t = (dist - MOUNTAIN_CONFIG.startRadius) / MOUNTAIN_CONFIG.transitionWidth
+				const t = (absZ - MOUNTAIN_CONFIG.startRadius) / MOUNTAIN_CONFIG.transitionWidth
 				// Use smoothstep for natural transition
 				mountainBlend = t * t * (3 - 2 * t)
 			}
@@ -258,11 +250,9 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 	return { getRawHeight, getHeight, getNormal }
 }
 
-// ============================================================================
-// QUADTREE NODE LOGIC
-// ============================================================================
-
 /**
+ * QUADTREE NODE LOGIC
+ * 
  * Represents a node in the terrain quadtree.
  * Each node covers a square region and can either:
  * - Render itself as a single tile
