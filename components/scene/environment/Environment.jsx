@@ -1,6 +1,6 @@
 import { memo } from 'react'
 
-import Terrain from './Terrain'
+import Terrain from './terrain/Terrain'
 import Sky from './Sky'
 import EnvMap from './EnvMap'
 import Sun from './Sun'
