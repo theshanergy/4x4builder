@@ -26,11 +26,11 @@ const REGION_SCALE = 240
 
 // Mountain configuration
 const MOUNTAIN_CONFIG = {
-	// Distance from origin where mountains start to appear (further for dramatic backdrop)
-	startRadius: 1200,
+	// Distance from origin where mountains start to appear
+	startDistance: 1200,
 	// Distance over which mountains blend in (transition zone)
 	transitionWidth: 800,
-	// Maximum mountain height (scaled for dramatic sierra-like peaks)
+	// Maximum mountain height
 	maxHeight: 380,
 	// Base noise scale for large mountain formations (smaller = more spread out)
 	baseScale: 0.0006,
@@ -162,14 +162,14 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 		let mountainHeight = 0
 		const absZ = Math.abs(worldZ) // Use absolute Z for symmetric bands on both sides
 		
-		if (absZ > MOUNTAIN_CONFIG.startRadius && dist < OCEAN_RADIUS - OCEAN_TRANSITION * 0.5) {
+		if (absZ > MOUNTAIN_CONFIG.startDistance && dist < OCEAN_RADIUS - OCEAN_TRANSITION * 0.5) {
 			// Calculate blend factor for mountains based on Z distance
 			let mountainBlend = 1
-			const mountainFullZ = MOUNTAIN_CONFIG.startRadius + MOUNTAIN_CONFIG.transitionWidth
+			const mountainFullZ = MOUNTAIN_CONFIG.startDistance + MOUNTAIN_CONFIG.transitionWidth
 			
 			if (absZ < mountainFullZ) {
 				// In transition zone - smooth blend in
-				const t = (absZ - MOUNTAIN_CONFIG.startRadius) / MOUNTAIN_CONFIG.transitionWidth
+				const t = (absZ - MOUNTAIN_CONFIG.startDistance) / MOUNTAIN_CONFIG.transitionWidth
 				// Use smoothstep for natural transition
 				mountainBlend = t * t * (3 - 2 * t)
 			}
