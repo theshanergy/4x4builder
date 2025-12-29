@@ -18,6 +18,29 @@ const OCEAN_DEPTH = 12 // How far below 0 the ocean floor goes
 // Beach profile control point (like a Bezier curve)
 const BEACH_MIDPOINT_DEPTH = 0.2 // Intermediate depth at transition midpoint (0-1 range)
 
+// River configuration - carves a meandering channel through the valley
+// Water component at Y=-1 fills the carved riverbed
+const RIVER_CONFIG = {
+	// River path parameters - extends to ocean on both ends
+	startX: -OCEAN_RADIUS + 100,
+	endX: OCEAN_RADIUS - 100,
+	baseZ: 0, // Center line of the river (middle of valley)
+
+	// Meandering parameters
+	primaryFrequency: 0.0015,
+	primaryAmplitude: 180,
+	secondaryFrequency: 0.006,
+	secondaryAmplitude: 50,
+	tertiaryFrequency: 0.02,
+	tertiaryAmplitude: 15,
+
+	// River dimensions
+	width: 75, // Base width of river
+	widthVariation: 15, // Random width variation
+	depth: 2.5, // How deep the river carves (must go below water level at Y=-1)
+	bankSlope: 25, // Width of the sloped banks
+}
+
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
 
@@ -46,6 +69,48 @@ const MOUNTAIN_CONFIG = {
 	valleyDepth: 0.5,
 }
 
+// River helper functions
+const getRiverCenterZ = (x, noise) => {
+	const { baseZ, primaryFrequency, primaryAmplitude, secondaryFrequency, secondaryAmplitude, tertiaryAmplitude } = RIVER_CONFIG
+	const primary = Math.sin(x * primaryFrequency) * primaryAmplitude
+	const secondary = Math.sin(x * secondaryFrequency + 1.5) * secondaryAmplitude
+	const tertiary = noise ? noise.perlin2(x * 0.003, 0.5) * tertiaryAmplitude : 0
+	return baseZ + primary + secondary + tertiary
+}
+
+const getRiverWidth = (x, noise) => {
+	const { width, widthVariation } = RIVER_CONFIG
+	const variation = noise ? noise.perlin2(x * 0.005 + 100, 0.5) * widthVariation : 0
+	return width + variation
+}
+
+const getDistanceToRiver = (worldX, worldZ, noise) => {
+	const { startX, endX } = RIVER_CONFIG
+	const clampedX = Math.max(startX, Math.min(endX, worldX))
+	const riverZ = getRiverCenterZ(clampedX, noise)
+	const riverWidth = getRiverWidth(clampedX, noise)
+	const distance = Math.abs(worldZ - riverZ)
+	return { distance, riverZ, riverWidth, clampedX }
+}
+
+const getRiverDepthFactor = (worldX, worldZ, noise) => {
+	const { startX, endX, bankSlope } = RIVER_CONFIG
+	if (worldX < startX - bankSlope * 2 || worldX > endX + bankSlope * 2) return 0
+
+	const { distance, riverWidth } = getDistanceToRiver(worldX, worldZ, noise)
+	const halfWidth = riverWidth / 2
+
+	if (distance < halfWidth) {
+		// River bed: full depth in center, transitioning to 20% depth at edges
+		return 1 - (distance / halfWidth) * 0.8
+	} else if (distance < halfWidth + bankSlope) {
+		// Banks: slope from 20% depth up to surface (0)
+		const bankProgress = (distance - halfWidth) / bankSlope
+		const t = bankProgress * bankProgress * (3 - 2 * bankProgress)
+		return 0.2 * (1 - t)
+	}
+	return 0
+}
 
 // QUADTREE TERRAIN CONFIGURATION
 
@@ -103,7 +168,8 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 		const wz = z + warpZ
 
 		// Base large-scale mountain shapes
-		const base = noise.perlin2(wx * baseScale, wz * baseScale) * 0.5 +
+		const base =
+			noise.perlin2(wx * baseScale, wz * baseScale) * 0.5 +
 			noise.perlin2(wx * baseScale * 2.3, wz * baseScale * 2.3) * 0.25 +
 			noise.perlin2(wx * baseScale * 5.1, wz * baseScale * 5.1) * 0.125
 
@@ -121,8 +187,7 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 		height = height * (1 - valleyFactor * 0.5)
 
 		// Add fine detail
-		const detail = noise.perlin2(wx * detailScale, wz * detailScale) * 0.1 +
-			noise.perlin2(wx * detailScale * 2.1, wz * detailScale * 2.1) * 0.05
+		const detail = noise.perlin2(wx * detailScale, wz * detailScale) * 0.1 + noise.perlin2(wx * detailScale * 2.1, wz * detailScale * 2.1) * 0.05
 
 		height += detail
 
@@ -161,12 +226,12 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 		// Add mountain height using parallel bands along the X axis
 		let mountainHeight = 0
 		const absZ = Math.abs(worldZ) // Use absolute Z for symmetric bands on both sides
-		
+
 		if (absZ > MOUNTAIN_CONFIG.startDistance && dist < OCEAN_RADIUS - OCEAN_TRANSITION * 0.5) {
 			// Calculate blend factor for mountains based on Z distance
 			let mountainBlend = 1
 			const mountainFullZ = MOUNTAIN_CONFIG.startDistance + MOUNTAIN_CONFIG.transitionWidth
-			
+
 			if (absZ < mountainFullZ) {
 				// In transition zone - smooth blend in
 				const t = (absZ - MOUNTAIN_CONFIG.startDistance) / MOUNTAIN_CONFIG.transitionWidth
@@ -222,6 +287,18 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 			}
 		}
 
+		// Apply river carving
+		const riverDepthFactor = getRiverDepthFactor(worldX, worldZ, noise)
+		if (riverDepthFactor > 0) {
+			// Carve river bed into terrain - needs to go below water level (Y=-1)
+			// At river center (depthFactor=1): 95% terrain suppressed, 5% variance
+			// At river edges (depthFactor=0): full terrain height
+			const normalizedRiverDepth = RIVER_CONFIG.depth / 4
+			const varianceRetention = 1 - riverDepthFactor * 0.95
+			const carvedHeight = combinedHeight * varianceRetention - riverDepthFactor * normalizedRiverDepth
+			return Math.max(carvedHeight, -normalizedRiverDepth * 1.1)
+		}
+
 		return combinedHeight
 	}
 
@@ -252,7 +329,7 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 
 /**
  * QUADTREE NODE LOGIC
- * 
+ *
  * Represents a node in the terrain quadtree.
  * Each node covers a square region and can either:
  * - Render itself as a single tile
@@ -659,7 +736,7 @@ const QuadtreeTerrainTile = memo(({ node, maxHeight, terrainHelpers, map, normal
 					getHeight,
 					getNormal,
 					getUV,
-				}
+			  }
 			: { segments: 1, size: 1, maxHeight: 1, getHeight: () => 0, getNormal: null, getUV: null }
 	)
 
@@ -884,16 +961,17 @@ const Terrain = () => {
 			return hasChanges ? tilesWithStitching : prevTiles
 		})
 
-		// Check if player is close enough to ocean to show water
+		// Check if player is close enough to ocean OR in/near river to show water
 		const distFromOrigin = Math.sqrt(centerPosition.x * centerPosition.x + centerPosition.z * centerPosition.z)
 		const distFromOcean = OCEAN_RADIUS - distFromOrigin
 
+		// Check distance to river
+		const { distance: distToRiver, riverWidth } = getDistanceToRiver(centerPosition.x, centerPosition.z, noise)
+		const nearRiver = distToRiver < riverWidth / 2 + RIVER_CONFIG.bankSlope + 50 // Some buffer
+
 		setShowWater((wasShowing) => {
-			if (wasShowing) {
-				return distFromOcean < WATER_LOAD_DISTANCE + WATER_UNLOAD_BUFFER
-			} else {
-				return distFromOcean < WATER_LOAD_DISTANCE
-			}
+			const nearOcean = wasShowing ? distFromOcean < WATER_LOAD_DISTANCE + WATER_UNLOAD_BUFFER : distFromOcean < WATER_LOAD_DISTANCE
+			return nearOcean || nearRiver
 		})
 	})
 

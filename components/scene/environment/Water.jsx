@@ -10,7 +10,7 @@ import waterFragmentShader from '../../../shaders/water.frag.glsl'
 useTexture.preload('/assets/images/ground/water_normal.jpg')
 
 // Water plane size - large enough to cover visible area plus buffer
-const WATER_RADIUS = 300
+const WATER_RADIUS = 1000
 
 // Single large water plane that follows the player - inner component that uses loader
 const WaterMesh = () => {
@@ -25,7 +25,7 @@ const WaterMesh = () => {
 	}, [waterNormals])
 
 	// Create large circular geometry once - segments for smooth edges
-	const geom = useMemo(() => new CircleGeometry(WATER_RADIUS, 64), [])
+	const geom = useMemo(() => new CircleGeometry(WATER_RADIUS, 8), [])
 
 	// Create shader material with proper uniform initialization
 	const material = useMemo(() => {
