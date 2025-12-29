@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect, memo, useCallback } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
-import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader } from 'three'
+import { RepeatWrapping, BufferGeometry, BufferAttribute, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
@@ -20,9 +20,6 @@ const BEACH_MIDPOINT_DEPTH = 0.2 // Intermediate depth at transition midpoint (0
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
-
-// Fade-in duration for new tiles (in seconds)
-const TILE_FADE_DURATION = 0.5
 
 // Regional height modulation scale (size of flat/hilly regions)
 const REGION_SCALE = 240
@@ -49,17 +46,35 @@ const MOUNTAIN_CONFIG = {
 	valleyDepth: 0.5,
 }
 
-// LOD configuration - each level defines tile size, resolution, and view distance
-// Higher LOD = more detail, lower number = closer to vehicle
-// Extended for distant mountain terrain
-const LOD_LEVELS = [
-	{ level: 0, tileSize: 32, resolution: 32, viewDistance: 48 }, // Highest detail, physics enabled
-	{ level: 1, tileSize: 32, resolution: 16, viewDistance: 96 }, // Medium-high detail
-	{ level: 2, tileSize: 64, resolution: 16, viewDistance: 192 }, // Medium detail
-	{ level: 3, tileSize: 128, resolution: 16, viewDistance: 384 }, // Low detail
-	{ level: 4, tileSize: 256, resolution: 16, viewDistance: 768 }, // Distant terrain
-	{ level: 5, tileSize: 512, resolution: 16, viewDistance: 1536 }, // Very distant mountains
-]
+// ============================================================================
+// QUADTREE TERRAIN CONFIGURATION
+// ============================================================================
+// The quadtree approach eliminates z-fighting by ensuring tiles never overlap.
+// Each node either renders itself OR subdivides into 4 children, never both.
+// This creates a hierarchical structure where LOD transitions are clean.
+
+// Base size of the entire terrain quadtree (power of 2 recommended)
+const QUADTREE_ROOT_SIZE = 4096
+
+// Minimum tile size (highest detail level) - also determines physics tile size
+const QUADTREE_MIN_SIZE = 32
+
+// Maximum depth of quadtree (calculated from root/min sizes)
+const QUADTREE_MAX_DEPTH = Math.log2(QUADTREE_ROOT_SIZE / QUADTREE_MIN_SIZE)
+
+// Resolution (vertices per side) for each tile regardless of size
+// Higher = more detail per tile, but more geometry
+const TILE_RESOLUTION = 32
+
+// LOD split threshold multiplier - a node splits when:
+// distance < nodeSize * LOD_SPLIT_FACTOR
+// Lower values = more aggressive LOD (less detail at distance)
+// Higher values = more detail at distance (more tiles)
+const LOD_SPLIT_FACTOR = 1.5
+
+// Hysteresis factor to prevent tile popping at LOD boundaries
+// A node won't merge back until distance > nodeSize * LOD_SPLIT_FACTOR * LOD_HYSTERESIS
+const LOD_HYSTERESIS = 1.2
 
 // Default terrain configuration
 const DEFAULT_TERRAIN_CONFIG = {
@@ -243,57 +258,193 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 	return { getRawHeight, getHeight, getNormal }
 }
 
+// ============================================================================
+// QUADTREE NODE LOGIC
+// ============================================================================
+
 /**
- * Determine which edges of a tile need stitching to a lower LOD neighbor.
- * Returns an object with edge info: { north, south, east, west }
- * Each edge contains: { needsStitch: boolean, neighborStep: number }
- * where neighborStep is the world-space vertex spacing of the coarser grid
+ * Represents a node in the terrain quadtree.
+ * Each node covers a square region and can either:
+ * - Render itself as a single tile
+ * - Subdivide into 4 child nodes (NW, NE, SW, SE)
+ *
+ * Key properties:
+ * - centerX, centerZ: World position of node center
+ * - size: Width/height of this node's region
+ * - depth: How many levels down from root (0 = root, max = leaf)
  */
-const getEdgeStitchInfo = (tileKey, lodLevel, allTiles, tileSize) => {
-	const [tileX, tileZ] = tileKey.split(',').map(Number)
-	const currentLod = LOD_LEVELS[lodLevel]
-	const currentStep = tileSize / currentLod.resolution
+class QuadtreeNode {
+	constructor(centerX, centerZ, size, depth = 0) {
+		this.centerX = centerX
+		this.centerZ = centerZ
+		this.size = size
+		this.depth = depth
+		this.children = null // null = leaf node, array = subdivided
 
-	// Tile center in world space
-	const tileCenterX = tileX * tileSize + tileSize / 2
-	const tileCenterZ = tileZ * tileSize + tileSize / 2
-
-	const edges = {
-		north: { needsStitch: false, neighborStep: currentStep }, // +Z edge
-		south: { needsStitch: false, neighborStep: currentStep }, // -Z edge
-		east: { needsStitch: false, neighborStep: currentStep }, // +X edge
-		west: { needsStitch: false, neighborStep: currentStep }, // -X edge
+		// Unique key for React reconciliation
+		this.key = `qt_${depth}_${Math.floor(centerX)}_${Math.floor(centerZ)}`
 	}
 
-	// Check each neighboring direction for tiles of lower LOD (higher level number)
-	// We check by probing world positions just outside our tile edges
-	const probeDistance = 1 // Small distance outside tile edge
+	/**
+	 * Check if this node should subdivide based on distance to viewer.
+	 * Uses squared distance for performance.
+	 */
+	shouldSubdivide(viewerX, viewerZ, splitFactor, minSize) {
+		// Don't subdivide if we're at minimum size
+		if (this.size <= minSize) return false
 
-	const edgeProbes = [
-		{ edge: 'north', probeX: tileCenterX, probeZ: tileCenterZ + tileSize / 2 + probeDistance },
-		{ edge: 'south', probeX: tileCenterX, probeZ: tileCenterZ - tileSize / 2 - probeDistance },
-		{ edge: 'east', probeX: tileCenterX + tileSize / 2 + probeDistance, probeZ: tileCenterZ },
-		{ edge: 'west', probeX: tileCenterX - tileSize / 2 - probeDistance, probeZ: tileCenterZ },
+		// Calculate distance from viewer to node center
+		const dx = viewerX - this.centerX
+		const dz = viewerZ - this.centerZ
+		const distSq = dx * dx + dz * dz
+
+		// Split threshold based on node size
+		const splitDist = this.size * splitFactor
+		const splitDistSq = splitDist * splitDist
+
+		return distSq < splitDistSq
+	}
+
+	/**
+	 * Check if this node should merge (stop subdividing).
+	 * Uses hysteresis to prevent popping at boundaries.
+	 */
+	shouldMerge(viewerX, viewerZ, splitFactor, hysteresis) {
+		const dx = viewerX - this.centerX
+		const dz = viewerZ - this.centerZ
+		const distSq = dx * dx + dz * dz
+
+		// Merge threshold is further than split threshold
+		const mergeDist = this.size * splitFactor * hysteresis
+		const mergeDistSq = mergeDist * mergeDist
+
+		return distSq > mergeDistSq
+	}
+
+	/**
+	 * Subdivide this node into 4 children.
+	 */
+	subdivide() {
+		const halfSize = this.size / 2
+		const quarterSize = halfSize / 2
+		const childDepth = this.depth + 1
+
+		this.children = [
+			// NW (negative X, positive Z)
+			new QuadtreeNode(this.centerX - quarterSize, this.centerZ + quarterSize, halfSize, childDepth),
+			// NE (positive X, positive Z)
+			new QuadtreeNode(this.centerX + quarterSize, this.centerZ + quarterSize, halfSize, childDepth),
+			// SW (negative X, negative Z)
+			new QuadtreeNode(this.centerX - quarterSize, this.centerZ - quarterSize, halfSize, childDepth),
+			// SE (positive X, negative Z)
+			new QuadtreeNode(this.centerX + quarterSize, this.centerZ - quarterSize, halfSize, childDepth),
+		]
+	}
+
+	/**
+	 * Merge children back into this node (become a leaf).
+	 */
+	merge() {
+		this.children = null
+	}
+
+	/**
+	 * Update the quadtree based on viewer position.
+	 * Recursively subdivides or merges nodes as needed.
+	 */
+	update(viewerX, viewerZ, splitFactor, hysteresis, minSize) {
+		if (this.children) {
+			// Already subdivided - check if we should merge
+			if (this.shouldMerge(viewerX, viewerZ, splitFactor, hysteresis)) {
+				this.merge()
+			} else {
+				// Update children recursively
+				for (const child of this.children) {
+					child.update(viewerX, viewerZ, splitFactor, hysteresis, minSize)
+				}
+			}
+		} else {
+			// Leaf node - check if we should subdivide
+			if (this.shouldSubdivide(viewerX, viewerZ, splitFactor, minSize)) {
+				this.subdivide()
+				// Immediately update new children
+				for (const child of this.children) {
+					child.update(viewerX, viewerZ, splitFactor, hysteresis, minSize)
+				}
+			}
+		}
+	}
+
+	/**
+	 * Collect all leaf nodes (nodes that should render).
+	 * Also collects neighbor info for edge stitching.
+	 */
+	collectLeaves(leaves = [], allNodes = new Map()) {
+		// Register this node in the spatial map for neighbor lookup
+		allNodes.set(this.key, this)
+
+		if (this.children) {
+			// Not a leaf - collect from children
+			for (const child of this.children) {
+				child.collectLeaves(leaves, allNodes)
+			}
+		} else {
+			// This is a leaf - add to render list
+			leaves.push(this)
+		}
+
+		return { leaves, allNodes }
+	}
+}
+
+/**
+ * Get edge stitching info for a quadtree node.
+ * Checks if neighboring nodes are at a coarser LOD level.
+ *
+ * In a quadtree, a neighbor at a coarser level means we need to
+ * interpolate our edge vertices to match their grid.
+ */
+const getQuadtreeEdgeStitchInfo = (node, allNodes, minSize) => {
+	const edges = {
+		north: { needsStitch: false, neighborStep: node.size / TILE_RESOLUTION },
+		south: { needsStitch: false, neighborStep: node.size / TILE_RESOLUTION },
+		east: { needsStitch: false, neighborStep: node.size / TILE_RESOLUTION },
+		west: { needsStitch: false, neighborStep: node.size / TILE_RESOLUTION },
+	}
+
+	const halfSize = node.size / 2
+	const probeOffset = 1 // Small offset outside our boundary
+
+	// Probe points just outside each edge
+	const probes = [
+		{ edge: 'north', x: node.centerX, z: node.centerZ + halfSize + probeOffset },
+		{ edge: 'south', x: node.centerX, z: node.centerZ - halfSize - probeOffset },
+		{ edge: 'east', x: node.centerX + halfSize + probeOffset, z: node.centerZ },
+		{ edge: 'west', x: node.centerX - halfSize - probeOffset, z: node.centerZ },
 	]
 
-	for (const { edge, probeX, probeZ } of edgeProbes) {
-		// Check for neighbors at each LOD level (lower detail = higher level number)
-		for (let checkLevel = lodLevel + 1; checkLevel < LOD_LEVELS.length; checkLevel++) {
-			const checkLod = LOD_LEVELS[checkLevel]
-			const checkTileSize = checkLod.tileSize
+	// Check each edge for coarser neighbors
+	for (const { edge, x, z } of probes) {
+		// Look for nodes at coarser levels (larger sizes) that contain this point
+		let checkSize = node.size * 2
 
-			// Which tile at this LOD level contains the probe point?
-			const neighborTileX = Math.floor(probeX / checkTileSize)
-			const neighborTileZ = Math.floor(probeZ / checkTileSize)
-			const neighborKey = `${checkLevel}:${neighborTileX},${neighborTileZ}`
+		while (checkSize <= QUADTREE_ROOT_SIZE) {
+			// Calculate which node at this size would contain the probe point
+			const nodeX = Math.floor(x / checkSize) * checkSize + checkSize / 2
+			const nodeZ = Math.floor(z / checkSize) * checkSize + checkSize / 2
+			const depth = Math.log2(QUADTREE_ROOT_SIZE / checkSize)
+			const neighborKey = `qt_${depth}_${Math.floor(nodeX)}_${Math.floor(nodeZ)}`
 
-			if (allTiles.has(neighborKey)) {
-				// Found a lower LOD neighbor - need to stitch this edge
+			// Check if this coarser node exists and is a leaf
+			const neighbor = allNodes.get(neighborKey)
+			if (neighbor && !neighbor.children) {
+				// Found a coarser leaf neighbor - we need to stitch
 				edges[edge].needsStitch = true
-				// Calculate the world-space step of the neighbor's grid
-				edges[edge].neighborStep = checkTileSize / checkLod.resolution
+				edges[edge].neighborStep = checkSize / TILE_RESOLUTION
 				break
 			}
+
+			checkSize *= 2
 		}
 	}
 
@@ -301,19 +452,19 @@ const getEdgeStitchInfo = (tileKey, lodLevel, allTiles, tileSize) => {
 }
 
 /**
- * Create geometry with LOD edge stitching.
- * For edges that border lower-LOD tiles, we interpolate vertex heights to match
- * the coarser grid. This eliminates T-junctions and gaps.
- *
- * The key insight: when our edge has more vertices than the neighbor's edge,
- * we can't just snap to the neighbor's grid - we must linearly interpolate
- * between the neighbor's vertices to get smooth, gap-free transitions.
+ * Create geometry for a quadtree terrain tile.
+ * Handles edge stitching to prevent cracks between LOD levels.
  */
-const createStitchedGeometry = (tileSize, resolution, maxHeight, position, terrainHelpers, edgeStitchInfo) => {
+const createQuadtreeGeometry = (node, maxHeight, terrainHelpers, edgeStitchInfo) => {
+	const { size, centerX, centerZ } = node
+	const resolution = TILE_RESOLUTION
 	const segments = resolution
 	const sampleCount = segments + 1
 	const totalSamples = sampleCount * sampleCount
-	const step = tileSize / segments
+	const step = size / segments
+	const halfSize = size / 2
+	const originX = centerX - halfSize
+	const originZ = centerZ - halfSize
 
 	const positions = new Float32Array(totalSamples * 3)
 	const normals = new Float32Array(totalSamples * 3)
@@ -321,20 +472,9 @@ const createStitchedGeometry = (tileSize, resolution, maxHeight, position, terra
 
 	const normalVec = new Vector3()
 
-	// Helper to get world position from local grid coords
-	const getWorldPos = (i, j) => {
-		const localX = i * step
-		const localZ = j * step
-		const worldX = position[0] + localX - tileSize / 2
-		const worldZ = position[2] + localZ - tileSize / 2
-		return { localX, localZ, worldX, worldZ }
-	}
-
-	// Helper to get interpolated height along a stitched edge
-	// This samples the coarser grid and interpolates between its vertices
+	// Interpolated height for stitched edges
 	const getStitchedHeight = (worldX, worldZ, neighborStep, axis) => {
 		if (axis === 'x') {
-			// Stitching along X axis (for north/south edges)
 			const gridX = worldX / neighborStep
 			const x0 = Math.floor(gridX) * neighborStep
 			const x1 = x0 + neighborStep
@@ -344,7 +484,6 @@ const createStitchedGeometry = (tileSize, resolution, maxHeight, position, terra
 			const h1 = terrainHelpers.getRawHeight(x1, worldZ)
 			return (h0 * (1 - t) + h1 * t) * maxHeight
 		} else {
-			// Stitching along Z axis (for west/east edges)
 			const gridZ = worldZ / neighborStep
 			const z0 = Math.floor(gridZ) * neighborStep
 			const z1 = z0 + neighborStep
@@ -356,20 +495,22 @@ const createStitchedGeometry = (tileSize, resolution, maxHeight, position, terra
 		}
 	}
 
-	// Generate all vertices
+	// Generate vertices
 	for (let i = 0; i < sampleCount; i++) {
-		for (let j = 0; j < sampleCount; j++) {
-			const { localX, localZ, worldX, worldZ } = getWorldPos(i, j)
+		const localX = i * step
+		const worldX = originX + localX
+		const onWestEdge = i === 0
+		const onEastEdge = i === segments
 
-			// Check if this vertex is on an edge that needs stitching
-			const onWestEdge = i === 0
-			const onEastEdge = i === segments
+		for (let j = 0; j < sampleCount; j++) {
+			const localZ = j * step
+			const worldZ = originZ + localZ
 			const onSouthEdge = j === 0
 			const onNorthEdge = j === segments
 
 			let height
 
-			// Apply edge stitching - interpolate heights along stitched edges
+			// Apply edge stitching
 			if (onWestEdge && edgeStitchInfo.west.needsStitch) {
 				height = getStitchedHeight(worldX, worldZ, edgeStitchInfo.west.neighborStep, 'z')
 			} else if (onEastEdge && edgeStitchInfo.east.needsStitch) {
@@ -379,58 +520,67 @@ const createStitchedGeometry = (tileSize, resolution, maxHeight, position, terra
 			} else if (onNorthEdge && edgeStitchInfo.north.needsStitch) {
 				height = getStitchedHeight(worldX, worldZ, edgeStitchInfo.north.neighborStep, 'x')
 			} else {
-				// Normal sampling for non-stitched vertices
 				height = terrainHelpers.getRawHeight(worldX, worldZ) * maxHeight
 			}
 
-			// Geometry uses column-major indexing (PlaneGeometry convention)
 			const vertIndex = i + sampleCount * j
 			const posIndex = vertIndex * 3
 			const uvIndex = vertIndex * 2
 
-			// Position: centered around origin
-			positions[posIndex] = localX - tileSize / 2
+			// Position centered on node
+			positions[posIndex] = localX - halfSize
 			positions[posIndex + 1] = height
-			positions[posIndex + 2] = localZ - tileSize / 2
+			positions[posIndex + 2] = localZ - halfSize
 
-			// Normal - compute from actual height for visual quality
+			// Normal
 			terrainHelpers.getNormal(worldX, worldZ, maxHeight, normalVec)
 			normals[posIndex] = normalVec.x
 			normals[posIndex + 1] = normalVec.y
 			normals[posIndex + 2] = normalVec.z
 
-			// UVs - use actual world position for seamless texturing
+			// UVs in world space for seamless texturing
 			uvs[uvIndex] = worldX
 			uvs[uvIndex + 1] = worldZ
 		}
 	}
 
-	// Build geometry
-	const geom = new PlaneGeometry(tileSize, tileSize, resolution, resolution)
-	geom.getAttribute('position').array.set(positions)
-	geom.getAttribute('position').needsUpdate = true
-	geom.getAttribute('uv').array.set(uvs)
-	geom.getAttribute('uv').needsUpdate = true
-	geom.getAttribute('normal').array.set(normals)
-	geom.getAttribute('normal').needsUpdate = true
+	// Build indices for the grid
+	const indices = []
+	for (let i = 0; i < segments; i++) {
+		for (let j = 0; j < segments; j++) {
+			const a = i + sampleCount * j
+			const b = i + 1 + sampleCount * j
+			const c = i + sampleCount * (j + 1)
+			const d = i + 1 + sampleCount * (j + 1)
+
+			// Two triangles per quad
+			indices.push(a, c, b)
+			indices.push(b, c, d)
+		}
+	}
+
+	// Build geometry directly without PlaneGeometry overhead
+	const geom = new BufferGeometry()
+	geom.setAttribute('position', new BufferAttribute(positions, 3))
+	geom.setAttribute('normal', new BufferAttribute(normals, 3))
+	geom.setAttribute('uv', new BufferAttribute(uvs, 2))
+	geom.setIndex(indices)
 
 	return geom
 }
 
-// Custom comparison for TerrainTile to avoid unnecessary re-renders
-const areTerrainTilePropsEqual = (prevProps, nextProps) => {
-	// Position comparison - array contents
-	if (prevProps.position[0] !== nextProps.position[0] || prevProps.position[1] !== nextProps.position[1] || prevProps.position[2] !== nextProps.position[2]) {
+// Custom comparison for QuadtreeTerrainTile
+const areQuadtreeTilePropsEqual = (prevProps, nextProps) => {
+	// Node comparison - check key
+	if (prevProps.node.key !== nextProps.node.key) return false
+
+	// Check node properties that affect rendering
+	if (prevProps.node.size !== nextProps.node.size || prevProps.node.centerX !== nextProps.node.centerX || prevProps.node.centerZ !== nextProps.node.centerZ) {
 		return false
 	}
 
 	// Simple value comparisons
-	if (
-		prevProps.tileSize !== nextProps.tileSize ||
-		prevProps.resolution !== nextProps.resolution ||
-		prevProps.maxHeight !== nextProps.maxHeight ||
-		prevProps.hasCollider !== nextProps.hasCollider
-	) {
+	if (prevProps.maxHeight !== nextProps.maxHeight || prevProps.hasCollider !== nextProps.hasCollider) {
 		return false
 	}
 
@@ -461,142 +611,144 @@ const areTerrainTilePropsEqual = (prevProps, nextProps) => {
 	return true
 }
 
-// TerrainTile component with LOD support
-const TerrainTile = memo(({ position, tileSize, resolution, maxHeight, terrainHelpers, map, normalMap, shouldFade = true, hasCollider = false, edgeStitchInfo }) => {
+// QuadtreeTerrainTile component - renders a single quadtree leaf node
+const QuadtreeTerrainTile = memo(({ node, maxHeight, terrainHelpers, map, normalMap, hasCollider = false, edgeStitchInfo }) => {
 	const materialRef = useRef()
-	// Disable fade animation to debug flashing - tiles appear instantly
-	const opacityRef = useRef(1)
 
-	// Animate opacity from 0 to 1 when tile is created
-	useFrame((_, delta) => {
-		if (materialRef.current && opacityRef.current < 1) {
-			opacityRef.current = Math.min(1, opacityRef.current + delta / TILE_FADE_DURATION)
-			materialRef.current.opacity = opacityRef.current
-			materialRef.current.transparent = opacityRef.current < 1
-		}
-	})
-
-	// Apply texture settings - UVs are now in world coordinates, so repeat controls texture density
+	// Apply texture settings
 	useMemo(() => {
 		if (map) {
 			map.wrapS = map.wrapT = RepeatWrapping
-			map.repeat.set(1, 1) // 1 texture unit per world unit
+			map.repeat.set(1, 1)
 		}
 		if (normalMap) {
 			normalMap.wrapS = normalMap.wrapT = RepeatWrapping
-			normalMap.repeat.set(0.33, 0.33) // Larger scale for normal map details
+			normalMap.repeat.set(0.33, 0.33)
 		}
 	}, [map, normalMap])
 
-	// Create height/normal/UV functions that map local coords to world coords
-	// This bridges the tile system to the general-purpose terrain collider hook
+	const { size, centerX, centerZ } = node
+	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
+
+	// Create height/normal/UV functions for physics collider
 	const getHeight = useCallback(
 		(localX, localZ) => {
-			const worldX = position[0] + localX - tileSize / 2
-			const worldZ = position[2] + localZ - tileSize / 2
+			const worldX = centerX + localX - size / 2
+			const worldZ = centerZ + localZ - size / 2
 			return terrainHelpers.getRawHeight(worldX, worldZ)
 		},
-		[position, tileSize, terrainHelpers]
+		[centerX, centerZ, size, terrainHelpers]
 	)
 
 	const getNormal = useCallback(
 		(localX, localZ, target) => {
-			const worldX = position[0] + localX - tileSize / 2
-			const worldZ = position[2] + localZ - tileSize / 2
+			const worldX = centerX + localX - size / 2
+			const worldZ = centerZ + localZ - size / 2
 			return terrainHelpers.getNormal(worldX, worldZ, maxHeight, target)
 		},
-		[position, tileSize, maxHeight, terrainHelpers]
+		[centerX, centerZ, size, maxHeight, terrainHelpers]
 	)
 
 	const getUV = useCallback(
 		(localX, localZ) => {
-			// World-space UVs for seamless tiling across tiles
-			const worldX = position[0] + localX - tileSize / 2
-			const worldZ = position[2] + localZ - tileSize / 2
+			const worldX = centerX + localX - size / 2
+			const worldZ = centerZ + localZ - size / 2
 			return [worldX, worldZ]
 		},
-		[position, tileSize]
+		[centerX, centerZ, size]
 	)
 
-	// Use the terrain collider hook ONLY for tiles that need physics
-	// This generates the heightfield data in the format Rapier expects
-	const colliderData = useTerrainCollider({
-		segments: resolution,
-		size: tileSize,
-		maxHeight,
-		getHeight,
-		getNormal,
-		getUV,
-	})
+	// Only compute collider data for tiles that need physics (smallest tiles)
+	// This avoids expensive computation for the majority of tiles
+	const colliderData = useTerrainCollider(
+		hasCollider
+			? {
+					segments: TILE_RESOLUTION,
+					size,
+					maxHeight,
+					getHeight,
+					getNormal,
+					getUV,
+				}
+			: { segments: 1, size: 1, maxHeight: 1, getHeight: () => 0, getNormal: null, getUV: null }
+	)
 
-	// Create a stable key for edge stitch info to use in dependency array
+	// Create a stable key for edge stitch info
 	const edgeStitchKey = useMemo(() => {
 		if (!edgeStitchInfo) return 'none'
-		const n = edgeStitchInfo.north
-		const s = edgeStitchInfo.south
-		const e = edgeStitchInfo.east
-		const w = edgeStitchInfo.west
+		const { north: n, south: s, east: e, west: w } = edgeStitchInfo
 		return `${n.needsStitch}:${n.neighborStep},${s.needsStitch}:${s.neighborStep},${e.needsStitch}:${e.neighborStep},${w.needsStitch}:${w.neighborStep}`
 	}, [edgeStitchInfo])
 
-	// Create a stable position key since position array reference may change
-	const positionKey = `${position[0]},${position[1]},${position[2]}`
+	// Track geometry ref for proper disposal
+	const geometryRef = useRef(null)
 
-	// Create geometry with LOD stitching applied
+	// Create geometry
 	const geometry = useMemo(() => {
-		return createStitchedGeometry(tileSize, resolution, maxHeight, position, terrainHelpers, edgeStitchInfo)
+		return createQuadtreeGeometry(node, maxHeight, terrainHelpers, edgeStitchInfo)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [tileSize, resolution, maxHeight, positionKey, terrainHelpers, edgeStitchKey])
+	}, [node.key, maxHeight, terrainHelpers, edgeStitchKey])
 
-	// Dispose geometry when component unmounts or geometry changes
+	// Dispose old geometry when it changes and on unmount
 	useEffect(() => {
+		// Dispose previous geometry if it exists and is different
+		if (geometryRef.current && geometryRef.current !== geometry) {
+			geometryRef.current.dispose()
+		}
+		geometryRef.current = geometry
+
 		return () => {
-			geometry.dispose()
+			if (geometryRef.current) {
+				geometryRef.current.dispose()
+				geometryRef.current = null
+			}
 		}
 	}, [geometry])
 
-	// Render with or without physics collider based on LOD level
+	// Render with or without physics collider
 	if (hasCollider) {
 		return (
 			<RigidBody type='fixed' position={position} colliders={false}>
-				<HeightfieldCollider args={colliderData.colliderArgs} name={`Tile-${position[0]}-${position[2]}`} />
+				<HeightfieldCollider args={colliderData.colliderArgs} name={`QTTile-${node.key}`} />
 				<mesh geometry={geometry} receiveShadow>
-					<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} transparent={opacityRef.current < 1} opacity={opacityRef.current} />
+					<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} />
 				</mesh>
 			</RigidBody>
 		)
 	}
 
-	// No physics - just visual mesh
 	return (
 		<mesh geometry={geometry} position={position} receiveShadow>
-			<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} transparent={opacityRef.current < 1} opacity={opacityRef.current} />
+			<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} />
 		</mesh>
 	)
-}, areTerrainTilePropsEqual)
+}, areQuadtreeTilePropsEqual)
 
 // Distance from ocean edge at which water starts loading (with hysteresis buffer)
 const WATER_LOAD_DISTANCE = 1500 // Start loading water when this close to ocean edge
 const WATER_UNLOAD_BUFFER = 400 // Extra distance before unloading to prevent flicker
 
 // Default edge stitch info (no stitching needed)
+// neighborStep value doesn't matter when needsStitch is false, but use a sensible default
 const DEFAULT_EDGE_STITCH_INFO = {
-	north: { needsStitch: false, neighborStep: 1 },
-	south: { needsStitch: false, neighborStep: 1 },
-	east: { needsStitch: false, neighborStep: 1 },
-	west: { needsStitch: false, neighborStep: 1 },
+	north: { needsStitch: false, neighborStep: QUADTREE_MIN_SIZE / TILE_RESOLUTION },
+	south: { needsStitch: false, neighborStep: QUADTREE_MIN_SIZE / TILE_RESOLUTION },
+	east: { needsStitch: false, neighborStep: QUADTREE_MIN_SIZE / TILE_RESOLUTION },
+	west: { needsStitch: false, neighborStep: QUADTREE_MIN_SIZE / TILE_RESOLUTION },
 }
 
-// Main Terrain component with multi-LOD support
+// Main Terrain component using quadtree LOD system
 const Terrain = () => {
 	const { smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
-	const [activeTiles, setActiveTiles] = useState([])
+	const [leafTiles, setLeafTiles] = useState([])
 	const [showWater, setShowWater] = useState(false)
 	const lastUpdatePosition = useRef({ x: null, z: null })
-	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
-	const allTilesRef = useRef(new Set()) // Track all active tile keys for edge stitching
 
-	// Check if grass should be disabled (performance degraded, or mobile device)
+	// Quadtree root - covers the entire terrain area
+	// We use multiple roots arranged in a grid to cover infinite terrain
+	const quadtreeRoots = useRef(new Map())
+
+	// Check if grass should be disabled
 	const isMobile = useGameStore((state) => state.isMobile)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const showGrass = !performanceDegraded && !isMobile
@@ -606,17 +758,17 @@ const Terrain = () => {
 
 	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
 
-	// Flat area and transition parameters (use smallest tile size for flat area)
-	const flatAreaRadius = LOD_LEVELS[0].tileSize * 0.5
-	const transitionEndDist = LOD_LEVELS[0].tileSize * 2
+	// Flat area and transition parameters
+	const flatAreaRadius = QUADTREE_MIN_SIZE * 0.5
+	const transitionEndDist = QUADTREE_MIN_SIZE * 2
 
-	// Create shared terrain helpers (memoized for stable reference)
+	// Create shared terrain helpers
 	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, smoothness, flatAreaRadius, transitionEndDist), [noise, smoothness, flatAreaRadius, transitionEndDist])
 
-	// Scratch vector for normal calculations (reused to avoid allocations)
+	// Scratch vector for normal calculations
 	const normalScratch = useMemo(() => new Vector3(), [])
 
-	// Get terrain height at any world position (in world units)
+	// Get terrain height at any world position
 	const getTerrainHeight = useCallback(
 		(worldX, worldZ) => {
 			return terrainHelpers.getHeight(worldX, worldZ, maxHeight)
@@ -624,7 +776,7 @@ const Terrain = () => {
 		[terrainHelpers, maxHeight]
 	)
 
-	// Get terrain normal at any world position (optionally pass target vector to avoid allocation)
+	// Get terrain normal at any world position
 	const getTerrainNormal = useCallback(
 		(worldX, worldZ, target = normalScratch) => {
 			return terrainHelpers.getNormal(worldX, worldZ, maxHeight, target)
@@ -632,189 +784,124 @@ const Terrain = () => {
 		[terrainHelpers, maxHeight, normalScratch]
 	)
 
-	// Update tiles based on vehicle position
-	useFrame((state) => {
+	// Update quadtree based on vehicle position
+	useFrame(() => {
 		const centerPosition = vehicleState.position
 
-		// Use a smaller threshold for updates to catch all tile changes
-		const updateThreshold = LOD_LEVELS[0].tileSize / 2
+		// Use a smaller threshold for updates
+		const updateThreshold = QUADTREE_MIN_SIZE / 2
 		const dx = centerPosition.x - (lastUpdatePosition.current.x || 0)
 		const dz = centerPosition.z - (lastUpdatePosition.current.z || 0)
 		const movedDistance = Math.sqrt(dx * dx + dz * dz)
 
-		// Only update tiles if moved enough
+		// Only update if moved enough
 		if (movedDistance < updateThreshold && lastUpdatePosition.current.x !== null) {
 			return
 		}
 		lastUpdatePosition.current.x = centerPosition.x
 		lastUpdatePosition.current.z = centerPosition.z
 
-		const newActiveTileKeys = new Set()
-		const newAllTileKeys = new Set()
-		const isInitialLoad = tileCache.current.size === 0
+		// Determine which quadtree roots we need based on player position
+		// Each root covers QUADTREE_ROOT_SIZE area
+		const rootsNeeded = new Set()
+		const viewRange = QUADTREE_ROOT_SIZE * 2 // How far to look for roots
 
-		// Track which world areas are covered by each LOD level
-		// We'll use this to prevent overlapping tiles
-		const coveredAreas = new Map() // key: "worldX,worldZ" at finest grid, value: lodLevel
+		for (let rx = -viewRange; rx <= viewRange; rx += QUADTREE_ROOT_SIZE) {
+			for (let rz = -viewRange; rz <= viewRange; rz += QUADTREE_ROOT_SIZE) {
+				const rootX = Math.floor((centerPosition.x + rx) / QUADTREE_ROOT_SIZE) * QUADTREE_ROOT_SIZE + QUADTREE_ROOT_SIZE / 2
+				const rootZ = Math.floor((centerPosition.z + rz) / QUADTREE_ROOT_SIZE) * QUADTREE_ROOT_SIZE + QUADTREE_ROOT_SIZE / 2
 
-		// Process each LOD level, from highest detail (0) to lowest
-		// Higher detail LODs get priority and "claim" their areas first
-		for (let levelIndex = 0; levelIndex < LOD_LEVELS.length; levelIndex++) {
-			const { level, tileSize, resolution, viewDistance } = LOD_LEVELS[levelIndex]
+				// Check if this root is within reasonable view distance
+				const distX = centerPosition.x - rootX
+				const distZ = centerPosition.z - rootZ
+				const distSq = distX * distX + distZ * distZ
 
-			// Calculate tile range for this LOD level
-			const tilesInView = Math.ceil(viewDistance / tileSize) + 1
+				if (distSq < QUADTREE_ROOT_SIZE * QUADTREE_ROOT_SIZE * 4) {
+					const rootKey = `${rootX},${rootZ}`
+					rootsNeeded.add(rootKey)
 
-			for (let x = -tilesInView; x <= tilesInView; x++) {
-				for (let z = -tilesInView; z <= tilesInView; z++) {
-					const tileX = Math.floor(centerPosition.x / tileSize) + x
-					const tileZ = Math.floor(centerPosition.z / tileSize) + z
-
-					// Calculate tile world position (center of tile)
-					const tileCenterX = tileX * tileSize + tileSize / 2
-					const tileCenterZ = tileZ * tileSize + tileSize / 2
-					const distX = centerPosition.x - tileCenterX
-					const distZ = centerPosition.z - tileCenterZ
-					const distanceToTile = Math.sqrt(distX * distX + distZ * distZ)
-
-					// Only include tiles within this LOD's view distance
-					if (distanceToTile <= viewDistance) {
-						// Check if this tile's area is already covered by a higher-detail LOD tile
-						// We use the tile's corner as the key to check coverage
-						const tileWorldX = tileX * tileSize
-						const tileWorldZ = tileZ * tileSize
-						const coverageKey = `${Math.floor(tileWorldX / LOD_LEVELS[0].tileSize)},${Math.floor(tileWorldZ / LOD_LEVELS[0].tileSize)}`
-
-						// For LOD 0, always add (highest priority)
-						// For other LODs, only add if not already covered by a higher LOD
-						let shouldAdd = false
-
-						if (levelIndex === 0) {
-							shouldAdd = true
-							// Mark this area as covered by LOD 0
-							coveredAreas.set(coverageKey, level)
-						} else {
-							// Check if any part of this larger tile is already covered
-							// We need to check all the smaller tiles this would overlap
-							const smallTileSize = LOD_LEVELS[0].tileSize
-							const tilesPerSide = tileSize / smallTileSize
-							let fullyCovered = true
-
-							for (let sx = 0; sx < tilesPerSide; sx++) {
-								for (let sz = 0; sz < tilesPerSide; sz++) {
-									const checkX = Math.floor(tileWorldX / smallTileSize) + sx
-									const checkZ = Math.floor(tileWorldZ / smallTileSize) + sz
-									const checkKey = `${checkX},${checkZ}`
-									if (!coveredAreas.has(checkKey)) {
-										fullyCovered = false
-									}
-								}
-							}
-
-							if (!fullyCovered) {
-								shouldAdd = true
-								// Mark all sub-tiles as covered
-								for (let sx = 0; sx < tilesPerSide; sx++) {
-									for (let sz = 0; sz < tilesPerSide; sz++) {
-										const markX = Math.floor(tileWorldX / smallTileSize) + sx
-										const markZ = Math.floor(tileWorldZ / smallTileSize) + sz
-										const markKey = `${markX},${markZ}`
-										if (!coveredAreas.has(markKey)) {
-											coveredAreas.set(markKey, level)
-										}
-									}
-								}
-							}
-						}
-
-						if (shouldAdd) {
-							const tileKey = `${level}:${tileX},${tileZ}`
-							newActiveTileKeys.add(tileKey)
-							newAllTileKeys.add(tileKey)
-
-							// Only create new tile data if not already cached
-							if (!tileCache.current.has(tileKey)) {
-								tileCache.current.set(tileKey, {
-									key: tileKey,
-									lodLevel: level,
-									tileSize,
-									resolution,
-									position: [tileX * tileSize + tileSize / 2, 0, tileZ * tileSize + tileSize / 2],
-									shouldFade: !isInitialLoad,
-									hasCollider: level === 0, // Only highest LOD gets physics colliders
-								})
-							}
-						}
+					// Create root if it doesn't exist
+					if (!quadtreeRoots.current.has(rootKey)) {
+						quadtreeRoots.current.set(rootKey, new QuadtreeNode(rootX, rootZ, QUADTREE_ROOT_SIZE, 0))
 					}
 				}
 			}
 		}
 
-		// Update the all tiles reference for edge stitching calculations
-		allTilesRef.current = newAllTileKeys
-
-		// Remove tiles that are no longer in view from cache
-		for (const key of tileCache.current.keys()) {
-			if (!newActiveTileKeys.has(key)) {
-				tileCache.current.delete(key)
+		// Remove roots that are too far away
+		for (const [key] of quadtreeRoots.current) {
+			if (!rootsNeeded.has(key)) {
+				quadtreeRoots.current.delete(key)
 			}
 		}
 
-		// Update edge stitch info for tiles that need it
-		for (const key of newActiveTileKeys) {
-			const tile = tileCache.current.get(key)
-			const [, coords] = key.split(':')
-			const newEdgeStitchInfo = getEdgeStitchInfo(coords, tile.lodLevel, newAllTileKeys, tile.tileSize)
+		// Update all active quadtrees
+		for (const [, root] of quadtreeRoots.current) {
+			root.update(centerPosition.x, centerPosition.z, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, QUADTREE_MIN_SIZE)
+		}
 
-			// Always set the edge stitch info (the tile's memo will handle whether to re-render)
-			if (!tile.edgeStitchInfo) {
-				tile.edgeStitchInfo = newEdgeStitchInfo
-			} else {
-				// Only update if values changed to preserve reference stability
-				const oldInfo = tile.edgeStitchInfo
+		// Collect all leaf nodes from all roots
+		const allLeaves = []
+		const allNodes = new Map()
+
+		for (const [, root] of quadtreeRoots.current) {
+			root.collectLeaves(allLeaves, allNodes)
+		}
+
+		// Calculate edge stitching info for each leaf
+		const tilesWithStitching = allLeaves.map((node) => ({
+			node,
+			edgeStitchInfo: getQuadtreeEdgeStitchInfo(node, allNodes, QUADTREE_MIN_SIZE),
+			hasCollider: node.size === QUADTREE_MIN_SIZE, // Only smallest tiles get physics
+		}))
+
+		// Update state only if tiles actually changed
+		setLeafTiles((prevTiles) => {
+			// Quick check: if different length, definitely changed
+			if (prevTiles.length !== tilesWithStitching.length) {
+				return tilesWithStitching
+			}
+
+			// Check if any keys changed or edge stitching changed
+			let hasChanges = false
+			for (let i = 0; i < tilesWithStitching.length; i++) {
+				const newTile = tilesWithStitching[i]
+				const oldTile = prevTiles.find((t) => t.node.key === newTile.node.key)
+
+				if (!oldTile) {
+					hasChanges = true
+					break
+				}
+
+				// Check if edge stitching changed (both needsStitch and neighborStep)
+				const oldEdge = oldTile.edgeStitchInfo
+				const newEdge = newTile.edgeStitchInfo
 				if (
-					oldInfo.north.needsStitch !== newEdgeStitchInfo.north.needsStitch ||
-					oldInfo.south.needsStitch !== newEdgeStitchInfo.south.needsStitch ||
-					oldInfo.east.needsStitch !== newEdgeStitchInfo.east.needsStitch ||
-					oldInfo.west.needsStitch !== newEdgeStitchInfo.west.needsStitch ||
-					oldInfo.north.neighborStep !== newEdgeStitchInfo.north.neighborStep ||
-					oldInfo.south.neighborStep !== newEdgeStitchInfo.south.neighborStep ||
-					oldInfo.east.neighborStep !== newEdgeStitchInfo.east.neighborStep ||
-					oldInfo.west.neighborStep !== newEdgeStitchInfo.west.neighborStep
+					oldEdge.north.needsStitch !== newEdge.north.needsStitch ||
+					oldEdge.south.needsStitch !== newEdge.south.needsStitch ||
+					oldEdge.east.needsStitch !== newEdge.east.needsStitch ||
+					oldEdge.west.needsStitch !== newEdge.west.needsStitch ||
+					oldEdge.north.neighborStep !== newEdge.north.neighborStep ||
+					oldEdge.south.neighborStep !== newEdge.south.neighborStep ||
+					oldEdge.east.neighborStep !== newEdge.east.neighborStep ||
+					oldEdge.west.neighborStep !== newEdge.west.neighborStep
 				) {
-					tile.edgeStitchInfo = newEdgeStitchInfo
+					hasChanges = true
+					break
 				}
 			}
-		}
 
-		// Check if the tile set actually changed
-		const newTileArray = Array.from(newActiveTileKeys).map((key) => tileCache.current.get(key))
-
-		setActiveTiles((prevTiles) => {
-			// If same tiles (by key), return previous to avoid re-render
-			if (prevTiles.length === newTileArray.length) {
-				const prevKeys = new Set(prevTiles.map((t) => t.key))
-				const allSame = newTileArray.every((t) => prevKeys.has(t.key))
-				if (allSame) {
-					// Return new array with updated tile objects (same keys but potentially updated stitch info)
-					// This ensures tiles get the latest edgeStitchInfo without creating all new tiles
-					return newTileArray
-				}
-			}
-			return newTileArray
+			return hasChanges ? tilesWithStitching : prevTiles
 		})
 
 		// Check if player is close enough to ocean to show water
 		const distFromOrigin = Math.sqrt(centerPosition.x * centerPosition.x + centerPosition.z * centerPosition.z)
 		const distFromOcean = OCEAN_RADIUS - distFromOrigin
 
-		// Use hysteresis to prevent flicker at boundary
 		setShowWater((wasShowing) => {
 			if (wasShowing) {
-				// Already showing - only hide if we've moved far enough away
 				return distFromOcean < WATER_LOAD_DISTANCE + WATER_UNLOAD_BUFFER
 			} else {
-				// Not showing - show when we get close enough
 				return distFromOcean < WATER_LOAD_DISTANCE
 			}
 		})
@@ -823,13 +910,10 @@ const Terrain = () => {
 	return (
 		<group name='Terrain'>
 			{showWater && <Water oceanRadius={OCEAN_RADIUS} oceanTransition={OCEAN_TRANSITION} />}
-			{activeTiles.map(({ key, position, shouldFade, lodLevel, tileSize, resolution, hasCollider, edgeStitchInfo }) => (
-				<TerrainTile
-					key={key}
-					position={position}
-					shouldFade={shouldFade}
-					tileSize={tileSize}
-					resolution={resolution}
+			{leafTiles.map(({ node, hasCollider, edgeStitchInfo }) => (
+				<QuadtreeTerrainTile
+					key={node.key}
+					node={node}
 					maxHeight={maxHeight}
 					terrainHelpers={terrainHelpers}
 					map={sandTexture}
