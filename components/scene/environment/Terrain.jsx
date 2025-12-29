@@ -5,6 +5,8 @@ import { RepeatWrapping, PlaneGeometry, Vector3, TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
+import useTerrainCollider from '../../../hooks/useTerrainCollider'
+
 import Grass from './Grass'
 import Water from './Water'
 import DistantTerrain from './DistantTerrain'
@@ -74,16 +76,16 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 			} else {
 				// In transition zone - smooth bezier-like curve through control point
 				const t = (dist - oceanTransitionStart) / OCEAN_TRANSITION // 0 at shore, 1 at deep ocean
-				
+
 				const oceanFloorHeight = -OCEAN_DEPTH / 4
 				const midpointHeight = oceanFloorHeight * BEACH_MIDPOINT_DEPTH
-				
+
 				// Quadratic bezier interpolation: start at baseHeight, through midpoint, to oceanFloorHeight
 				// First half: baseHeight → midpoint (gentle slope)
 				// Second half: midpoint → oceanFloorHeight (steeper drop)
 				const bezierT = t * t * (3 - 2 * t) // Smoothstep for natural curve
 				let finalHeight
-				
+
 				if (t < 0.5) {
 					// Shallow beach section
 					const localT = t * 2 // Map to 0-1
@@ -94,7 +96,7 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 					const dropCurve = localT * localT // Quadratic for steeper descent
 					finalHeight = midpointHeight * (1 - dropCurve) + oceanFloorHeight * dropCurve
 				}
-				
+
 				// Suppress terrain noise as we enter water
 				const noiseSuppression = (1 - bezierT) * (1 - bezierT) * (1 - bezierT)
 				return baseHeight * noiseSuppression + finalHeight * (1 - noiseSuppression)
@@ -151,64 +153,61 @@ const TerrainTile = memo(({ position, tileSize, resolution, maxHeight, terrainHe
 		}
 	}, [map, normalMap])
 
-	// Generate heights, UVs, and normals together to avoid redundant calculations
-	const heights = useMemo(() => {
-		const { getRawHeight, getNormal } = terrainHelpers
-		const values = []
-		const vertexCount = (resolution + 1) * (resolution + 1)
-		const positions = new Float32Array(vertexCount * 3)
-		const uvs = new Float32Array(vertexCount * 2)
-		const normals = new Float32Array(vertexCount * 3)
-		const step = tileSize / resolution
+	// Create height/normal/UV functions that map local coords to world coords
+	// This bridges the tile system to the general-purpose terrain collider hook
+	const getHeight = useCallback(
+		(localX, localZ) => {
+			const worldX = position[0] + localX - tileSize / 2
+			const worldZ = position[2] + localZ - tileSize / 2
+			return terrainHelpers.getRawHeight(worldX, worldZ)
+		},
+		[position, tileSize, terrainHelpers]
+	)
 
-		const normal = new Vector3()
+	const getNormal = useCallback(
+		(localX, localZ, target) => {
+			const worldX = position[0] + localX - tileSize / 2
+			const worldZ = position[2] + localZ - tileSize / 2
+			return terrainHelpers.getNormal(worldX, worldZ, maxHeight, target)
+		},
+		[position, tileSize, maxHeight, terrainHelpers]
+	)
 
-		for (let i = 0; i <= resolution; i++) {
-			for (let j = 0; j <= resolution; j++) {
-				const worldX = position[0] + i * step - tileSize / 2
-				const worldZ = position[2] + j * step - tileSize / 2
+	const getUV = useCallback(
+		(localX, localZ) => {
+			// World-space UVs for seamless tiling across tiles
+			const worldX = position[0] + localX - tileSize / 2
+			const worldZ = position[2] + localZ - tileSize / 2
+			return [worldX, worldZ]
+		},
+		[position, tileSize]
+	)
 
-				const height = getRawHeight(worldX, worldZ)
-				values.push(height)
-
-				const vertIndex = i + (resolution + 1) * j
-				const posIndex = vertIndex * 3
-				positions[posIndex] = (i / resolution) * tileSize - tileSize / 2
-				positions[posIndex + 1] = height * maxHeight
-				positions[posIndex + 2] = (j / resolution) * tileSize - tileSize / 2
-
-				// Compute normal using shared helper
-				getNormal(worldX, worldZ, maxHeight, normal)
-
-				normals[posIndex] = normal.x
-				normals[posIndex + 1] = normal.y
-				normals[posIndex + 2] = normal.z
-
-				// Store UVs based on world position (computed once, reused in geometry)
-				const uvIndex = vertIndex * 2
-				uvs[uvIndex] = worldX
-				uvs[uvIndex + 1] = worldZ
-			}
-		}
-
-		return { values, positions, uvs, normals }
-	}, [position, tileSize, resolution, terrainHelpers, maxHeight])
+	// Use the terrain collider hook to generate both physics and geometry data
+	// This encapsulates all the HeightfieldCollider quirks and index mismatches
+	const { colliderArgs, positions, normals, uvs } = useTerrainCollider({
+		segments: resolution,
+		size: tileSize,
+		maxHeight,
+		getHeight,
+		getNormal,
+		getUV,
+	})
 
 	// Create geometry for terrain mesh
 	const geometry = useMemo(() => {
 		const geom = new PlaneGeometry(tileSize, tileSize, resolution, resolution)
-		geom.getAttribute('position').array.set(heights.positions)
+		geom.getAttribute('position').array.set(positions)
+		geom.getAttribute('position').needsUpdate = true
 
-		// Apply pre-computed UVs (world-space coordinates for seamless tiling)
-		geom.getAttribute('uv').array.set(heights.uvs)
+		geom.getAttribute('uv').array.set(uvs)
 		geom.getAttribute('uv').needsUpdate = true
 
-		// Apply pre-computed normals (calculated analytically from noise gradient)
-		geom.getAttribute('normal').array.set(heights.normals)
+		geom.getAttribute('normal').array.set(normals)
 		geom.getAttribute('normal').needsUpdate = true
 
 		return geom
-	}, [heights, tileSize, resolution])
+	}, [positions, uvs, normals, tileSize, resolution])
 
 	// Dispose geometry when component unmounts or geometry changes
 	useEffect(() => {
@@ -216,11 +215,6 @@ const TerrainTile = memo(({ position, tileSize, resolution, maxHeight, terrainHe
 			geometry.dispose()
 		}
 	}, [geometry])
-
-	// Set collider arguments
-	const colliderArgs = useMemo(() => {
-		return [resolution, resolution, heights.values, { x: tileSize, y: maxHeight, z: tileSize }]
-	}, [resolution, heights, tileSize, maxHeight])
 
 	return (
 		<RigidBody type='fixed' position={position} colliders={false}>
