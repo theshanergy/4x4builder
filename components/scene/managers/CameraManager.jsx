@@ -199,7 +199,7 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastT
 			enableDamping
 			dampingFactor={0.025}
 			minDistance={2}
-			maxDistance={24}
+			maxDistance={24000}
 			minPolarAngle={Math.PI / 6}
 			maxPolarAngle={Math.PI / 2}
 			autoRotate={cameraAutoRotate}

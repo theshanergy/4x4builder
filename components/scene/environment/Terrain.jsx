@@ -9,12 +9,11 @@ import useTerrainCollider from '../../../hooks/useTerrainCollider'
 
 import Grass from './Grass'
 import Water from './Water'
-import DistantTerrain from './DistantTerrain'
 
 // Ocean configuration
-const OCEAN_RADIUS = 1000
-const OCEAN_TRANSITION = 80 // Width of the beach transition zone
-const OCEAN_DEPTH = 5 // How far below 0 the ocean floor goes
+const OCEAN_RADIUS = 5000
+const OCEAN_TRANSITION = 300 // Width of the beach transition zone
+const OCEAN_DEPTH = 12 // How far below 0 the ocean floor goes
 
 // Beach profile control point (like a Bezier curve)
 const BEACH_MIDPOINT_DEPTH = 0.2 // Intermediate depth at transition midpoint (0-1 range)
@@ -28,13 +27,38 @@ const TILE_FADE_DURATION = 0.5
 // Regional height modulation scale (size of flat/hilly regions)
 const REGION_SCALE = 240
 
+// Mountain configuration - realistic mountain generation
+const MOUNTAIN_CONFIG = {
+	// Distance from origin where mountains start to appear
+	startRadius: 600,
+	// Distance over which mountains blend in (transition zone)
+	transitionWidth: 800,
+	// Maximum mountain height
+	maxHeight: 180,
+	// Base noise scale for large mountain formations (smaller = more spread out)
+	baseScale: 0.0008,
+	// Ridge noise creates sharp mountain ridges (smaller = wider ridges)
+	ridgeScale: 0.002,
+	// Detail noise for smaller features
+	detailScale: 0.008,
+	// Domain warping scale for more natural shapes
+	warpScale: 0.001,
+	warpStrength: 150,
+	// Valley carving - how much rivers/valleys cut into terrain
+	valleyScale: 0.0015,
+	valleyDepth: 0.5,
+}
+
 // LOD configuration - each level defines tile size, resolution, and view distance
 // Higher LOD = more detail, lower number = closer to vehicle
+// Extended for distant mountain terrain
 const LOD_LEVELS = [
 	{ level: 0, tileSize: 32, resolution: 32, viewDistance: 48 }, // Highest detail, physics enabled
 	{ level: 1, tileSize: 32, resolution: 16, viewDistance: 96 }, // Medium-high detail
 	{ level: 2, tileSize: 64, resolution: 16, viewDistance: 192 }, // Medium detail
-	{ level: 3, tileSize: 128, resolution: 16, viewDistance: 384 }, // Low detail, far view
+	{ level: 3, tileSize: 128, resolution: 16, viewDistance: 384 }, // Low detail
+	{ level: 4, tileSize: 256, resolution: 16, viewDistance: 768 }, // Distant terrain
+	{ level: 5, tileSize: 512, resolution: 16, viewDistance: 1536 }, // Very distant mountains
 ]
 
 // Default terrain configuration
@@ -52,11 +76,69 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 	const oceanTransitionStart = OCEAN_RADIUS - OCEAN_TRANSITION
 	const oceanTransitionStartSq = oceanTransitionStart * oceanTransitionStart
 
+	// Mountain transition calculations
+	const mountainStartSq = MOUNTAIN_CONFIG.startRadius * MOUNTAIN_CONFIG.startRadius
+	const mountainFullRadius = MOUNTAIN_CONFIG.startRadius + MOUNTAIN_CONFIG.transitionWidth
+	const mountainFullRadiusSq = mountainFullRadius * mountainFullRadius
+
+	// Ridge noise function - creates sharp mountain ridges
+	// Uses absolute value of noise to create V-shaped valleys and ridges
+	const getRidgeNoise = (x, z, scale) => {
+		const n = noise.perlin2(x * scale, z * scale)
+		// Invert absolute value to get ridges instead of valleys
+		return 1 - Math.abs(n)
+	}
+
+	// Fractal Brownian Motion with ridged noise for mountains
+	const getMountainNoise = (x, z) => {
+		const { baseScale, ridgeScale, detailScale, warpScale, warpStrength, valleyScale, valleyDepth } = MOUNTAIN_CONFIG
+
+		// Domain warping - displaces sample position for more organic shapes
+		const warpX = noise.perlin2(x * warpScale + 50, z * warpScale + 50) * warpStrength
+		const warpZ = noise.perlin2(x * warpScale + 150, z * warpScale + 150) * warpStrength
+		const wx = x + warpX
+		const wz = z + warpZ
+
+		// Base large-scale mountain shapes
+		const base = noise.perlin2(wx * baseScale, wz * baseScale) * 0.5 +
+			noise.perlin2(wx * baseScale * 2.3, wz * baseScale * 2.3) * 0.25 +
+			noise.perlin2(wx * baseScale * 5.1, wz * baseScale * 5.1) * 0.125
+
+		// Ridge noise for sharp peaks
+		const ridge1 = getRidgeNoise(wx, wz, ridgeScale)
+		const ridge2 = getRidgeNoise(wx + 100, wz + 100, ridgeScale * 1.7)
+		const ridges = ridge1 * ridge1 * 0.6 + ridge2 * ridge2 * 0.4
+
+		// Combine base and ridges
+		let height = (base + 0.5) * 0.4 + ridges * 0.6
+
+		// Apply valley carving - creates river-like valleys
+		const valleyNoise = noise.perlin2(x * valleyScale + 200, z * valleyScale + 200)
+		const valleyFactor = Math.max(0, valleyNoise) * valleyDepth
+		height = height * (1 - valleyFactor * 0.5)
+
+		// Add fine detail
+		const detail = noise.perlin2(wx * detailScale, wz * detailScale) * 0.1 +
+			noise.perlin2(wx * detailScale * 2.1, wz * detailScale * 2.1) * 0.05
+
+		height += detail
+
+		// Ensure positive and apply power curve for more dramatic peaks
+		height = Math.max(0, height)
+		height = Math.pow(height, 1.3)
+
+		return height
+	}
+
 	// Get raw height value at any world position (normalized 0-1, can go negative for ocean)
 	const getRawHeight = (worldX, worldZ) => {
 		const distSq = worldX * worldX + worldZ * worldZ
+		const dist = Math.sqrt(distSq)
+
+		// Start with flat area check
 		if (distSq < flatAreaRadiusSq) return 0
 
+		// Calculate base terrain noise (existing gentle terrain)
 		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
 		const normalizedHeight = (noiseValue + 1) / 2
 
@@ -67,15 +149,41 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 
 		let baseHeight
 		if (distSq < transitionEndDistSq) {
-			const t = (Math.sqrt(distSq) - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
+			const t = (dist - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
 			baseHeight = normalizedHeight * (t * t * (3 - 2 * t)) * regionModifier
 		} else {
 			baseHeight = normalizedHeight * regionModifier
 		}
 
+		// Add mountain height if we're far enough from center
+		let mountainHeight = 0
+		if (distSq > mountainStartSq && dist < OCEAN_RADIUS - OCEAN_TRANSITION * 0.5) {
+			// Calculate blend factor for mountains
+			let mountainBlend = 1
+			if (distSq < mountainFullRadiusSq) {
+				// In transition zone - smooth blend in
+				const t = (dist - MOUNTAIN_CONFIG.startRadius) / MOUNTAIN_CONFIG.transitionWidth
+				// Use smoothstep for natural transition
+				mountainBlend = t * t * (3 - 2 * t)
+			}
+
+			// Reduce mountains near ocean to create beaches
+			const oceanProximity = (OCEAN_RADIUS - OCEAN_TRANSITION * 2 - dist) / (OCEAN_TRANSITION * 3)
+			const oceanFade = Math.min(1, Math.max(0, oceanProximity))
+
+			// Get mountain noise and apply blend
+			const rawMountainHeight = getMountainNoise(worldX, worldZ)
+			// Scale to normalized units (will be multiplied by maxHeight later)
+			mountainHeight = rawMountainHeight * (MOUNTAIN_CONFIG.maxHeight / 4) * mountainBlend * oceanFade
+		}
+
+		// Combine base terrain with mountains
+		// Base terrain is scaled down in mountain areas to let mountains dominate
+		const mountainInfluence = mountainHeight > 0 ? Math.min(1, mountainHeight * 0.5) : 0
+		const combinedHeight = baseHeight * (1 - mountainInfluence * 0.7) + mountainHeight
+
 		// Apply ocean tapering - realistic two-stage beach profile
 		if (distSq > oceanTransitionStartSq) {
-			const dist = Math.sqrt(distSq)
 			if (dist >= OCEAN_RADIUS) {
 				// Beyond ocean radius - full ocean depth (normalized)
 				return -OCEAN_DEPTH / 4 // Normalize relative to typical maxHeight
@@ -86,16 +194,14 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 				const oceanFloorHeight = -OCEAN_DEPTH / 4
 				const midpointHeight = oceanFloorHeight * BEACH_MIDPOINT_DEPTH
 
-				// Quadratic bezier interpolation: start at baseHeight, through midpoint, to oceanFloorHeight
-				// First half: baseHeight → midpoint (gentle slope)
-				// Second half: midpoint → oceanFloorHeight (steeper drop)
+				// Quadratic bezier interpolation: start at combinedHeight, through midpoint, to oceanFloorHeight
 				const bezierT = t * t * (3 - 2 * t) // Smoothstep for natural curve
 				let finalHeight
 
 				if (t < 0.5) {
 					// Shallow beach section
 					const localT = t * 2 // Map to 0-1
-					finalHeight = baseHeight * (1 - localT) + midpointHeight * localT
+					finalHeight = combinedHeight * (1 - localT) + midpointHeight * localT
 				} else {
 					// Drop-off section
 					const localT = (t - 0.5) * 2 // Map to 0-1
@@ -105,11 +211,11 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 
 				// Suppress terrain noise as we enter water
 				const noiseSuppression = (1 - bezierT) * (1 - bezierT) * (1 - bezierT)
-				return baseHeight * noiseSuppression + finalHeight * (1 - noiseSuppression)
+				return combinedHeight * noiseSuppression + finalHeight * (1 - noiseSuppression)
 			}
 		}
 
-		return baseHeight
+		return combinedHeight
 	}
 
 	// Get terrain height at any world position (in world units)
@@ -119,13 +225,17 @@ const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDi
 
 	// Get terrain normal at any world position
 	const getNormal = (worldX, worldZ, maxHeight, target) => {
-		const hL = getRawHeight(worldX - GRADIENT_EPSILON, worldZ) * maxHeight
-		const hR = getRawHeight(worldX + GRADIENT_EPSILON, worldZ) * maxHeight
-		const hD = getRawHeight(worldX, worldZ - GRADIENT_EPSILON) * maxHeight
-		const hU = getRawHeight(worldX, worldZ + GRADIENT_EPSILON) * maxHeight
+		// Use larger epsilon for distant terrain to avoid noise artifacts
+		const dist = Math.sqrt(worldX * worldX + worldZ * worldZ)
+		const epsilon = dist > 500 ? GRADIENT_EPSILON * 4 : GRADIENT_EPSILON
 
-		const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
-		const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
+		const hL = getRawHeight(worldX - epsilon, worldZ) * maxHeight
+		const hR = getRawHeight(worldX + epsilon, worldZ) * maxHeight
+		const hD = getRawHeight(worldX, worldZ - epsilon) * maxHeight
+		const hU = getRawHeight(worldX, worldZ + epsilon) * maxHeight
+
+		const dhdx = (hR - hL) / (2 * epsilon)
+		const dhdz = (hU - hD) / (2 * epsilon)
 
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}
@@ -466,8 +576,8 @@ const TerrainTile = memo(({ position, tileSize, resolution, maxHeight, terrainHe
 }, areTerrainTilePropsEqual)
 
 // Distance from ocean edge at which water starts loading (with hysteresis buffer)
-const WATER_LOAD_DISTANCE = 400 // Start loading water when this close to ocean edge
-const WATER_UNLOAD_BUFFER = 100 // Extra distance before unloading to prevent flicker
+const WATER_LOAD_DISTANCE = 1500 // Start loading water when this close to ocean edge
+const WATER_UNLOAD_BUFFER = 400 // Extra distance before unloading to prevent flicker
 
 // Default edge stitch info (no stitching needed)
 const DEFAULT_EDGE_STITCH_INFO = {
@@ -495,8 +605,6 @@ const Terrain = () => {
 	const noise = useMemo(() => new Noise(1234), [])
 
 	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
-
-	const distantTexture = useMemo(() => sandTexture.clone(), [sandTexture])
 
 	// Flat area and transition parameters (use smallest tile size for flat area)
 	const flatAreaRadius = LOD_LEVELS[0].tileSize * 0.5
@@ -714,7 +822,6 @@ const Terrain = () => {
 
 	return (
 		<group name='Terrain'>
-			<DistantTerrain noise={noise} map={distantTexture} />
 			{showWater && <Water oceanRadius={OCEAN_RADIUS} oceanTransition={OCEAN_TRANSITION} />}
 			{activeTiles.map(({ key, position, shouldFade, lodLevel, tileSize, resolution, hasCollider, edgeStitchInfo }) => (
 				<TerrainTile

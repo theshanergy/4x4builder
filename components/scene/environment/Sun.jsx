@@ -16,7 +16,7 @@ const Sun = () => {
 		// Position light based on sun direction relative to vehicle position
 		const lightDistance = 50
 		const targetPos = vehicleState.position
-		light.position.set(targetPos.x + sunDirection.x * lightDistance, sunDirection.y * lightDistance, targetPos.z + sunDirection.z * lightDistance)
+		light.position.set(targetPos.x + sunDirection.x * lightDistance, targetPos.y + sunDirection.y * lightDistance, targetPos.z + sunDirection.z * lightDistance)
 		light.target.position.set(targetPos.x, targetPos.y, targetPos.z)
 		light.target.updateMatrixWorld()
 	})

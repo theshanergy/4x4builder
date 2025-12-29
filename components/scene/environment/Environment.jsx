@@ -20,7 +20,7 @@ const SceneEnvironment = memo(() => {
 			<Sky />
 
 			{/* Distant fog for depth - match horizon color */}
-			<fog attach='fog' args={['#dbebf9', 150, 450]} />
+			{/* <fog attach='fog' args={['#dbebf9', 150, 3000]} /> */}
 
 			{/* Environment map for reflections - captures sky and terrain once */}
 			<EnvMap />

@@ -26,7 +26,7 @@ const ThreeCanvas = () => {
 	const cameraConfig = useMemo(() => {
 		const isPortrait = window.innerWidth / window.innerHeight < 1
 		const defaultCameraPosition = isPortrait ? [-2, 1, 12] : [-4, 1, 6.5]
-		return { position: defaultCameraPosition, fov: 24 }
+		return { position: defaultCameraPosition, fov: 24, near: 0.1, far: 10000 }
 	}, [])
 
 	return (
