@@ -22,6 +22,8 @@ const WaterMesh = () => {
 	// Apply texture settings once loaded
 	useEffect(() => {
 		waterNormals.wrapS = waterNormals.wrapT = RepeatWrapping
+		waterNormals.generateMipmaps = true
+		waterNormals.needsUpdate = true
 	}, [waterNormals])
 
 	// Create large circular geometry once - segments for smooth edges
@@ -33,16 +35,16 @@ const WaterMesh = () => {
 			uniforms: {
 				uTime: { value: 0 },
 				uNormalMap: { value: waterNormals },
-				uWaterColor: { value: new Color().setHSL(0.5, 0.75, 0.48) },
-				uDeepColor: { value: new Color().setHSL(0.52, 0.82, 0.06) },
-				uSkyColor: { value: new Color().setHSL(0.57, 0.65, 0.55) }, // Blue sky
-				uSkyHorizonColor: { value: new Color().setHSL(0.65, 0.35, 0.75) }, // Pale horizon
+				uWaterColor: { value: new Color().setHSL(0.54, 0.58, 0.28) },
+				uDeepColor: { value: new Color().setHSL(0.58, 0.68, 0.06) },
+				uSkyColor: { value: new Color().setHSL(0.57, 0.60, 0.60) }, // Blue sky
+				uSkyHorizonColor: { value: new Color().setHSL(0.58, 0.30, 0.78) }, // Pale horizon
 				uSunDirection: { value: sunDirection },
-				uSunColor: { value: new Color().setHSL(0.13, 1.0, 0.97) },
-				uDistortionScale: { value: 3.5 },
-				uWaveSpeed: { value: 0.025 },
-				uWaveScale: { value: 0.12 },
-				uNormalStrength: { value: 0.1 },
+				uSunColor: { value: new Color().setHSL(0.12, 0.95, 0.95) },
+				uDistortionScale: { value: 1.2 },
+				uWaveSpeed: { value: 0.02 },
+				uWaveScale: { value: 0.1 },
+				uNormalStrength: { value: 0.08 },
 				uOpacity: { value: 1 },
 				uNearFade: { value: 30.0 },
 				uFarFade: { value: 60.0 },
