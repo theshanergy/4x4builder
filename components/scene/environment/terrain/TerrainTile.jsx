@@ -7,7 +7,7 @@ import { useRef, useMemo, useEffect, useCallback, memo } from 'react'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 import { RepeatWrapping } from 'three'
 
-import { TILE_RESOLUTION } from './config'
+import { TILE_RESOLUTION } from '../../../../config/terrain'
 import { createTileGeometry } from './geometry'
 import useTerrainCollider from '../../../../hooks/useTerrainCollider'
 

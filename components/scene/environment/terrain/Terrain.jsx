@@ -7,16 +7,16 @@ import useGameStore, { vehicleState } from '../../../../store/gameStore'
 
 // Import terrain modules
 import {
-	OCEAN_RADIUS,
+	OCEAN_CONFIG,
 	QUADTREE_ROOT_SIZE,
 	QUADTREE_MIN_SIZE,
 	LOD_SPLIT_FACTOR,
 	LOD_HYSTERESIS,
-	DEFAULT_TERRAIN_CONFIG,
+	TERRAIN_CONFIG,
 	WATER_LOAD_DISTANCE,
 	WATER_UNLOAD_BUFFER,
 	RIVER_CONFIG,
-} from './config'
+} from '../../../../config/terrain'
 import { QuadtreeNode, getEdgeStitchInfo, DEFAULT_EDGE_STITCH_INFO } from './quadtree'
 import { getDistanceToRiver } from './riverUtils'
 import { createTerrainHelpers } from './heightSampler'
@@ -37,7 +37,7 @@ import Water from '../Water'
  * - Grass rendering (disabled on mobile/low performance)
  */
 const Terrain = () => {
-	const { smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
+	const { smoothness, maxHeight } = TERRAIN_CONFIG
 	const [leafTiles, setLeafTiles] = useState([])
 	const [showWater, setShowWater] = useState(false)
 	const lastUpdatePosition = useRef({ x: null, z: null })
@@ -190,7 +190,7 @@ const Terrain = () => {
 
 		// Check if player is close enough to ocean OR in/near river to show water
 		const distFromOrigin = Math.sqrt(centerPosition.x * centerPosition.x + centerPosition.z * centerPosition.z)
-		const distFromOcean = OCEAN_RADIUS - distFromOrigin
+		const distFromOcean = OCEAN_CONFIG.radius - distFromOrigin
 
 		// Check distance to river
 		const { distance: distToRiver, riverWidth } = getDistanceToRiver(centerPosition.x, centerPosition.z, noise)

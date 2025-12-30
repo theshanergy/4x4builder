@@ -4,7 +4,7 @@
 // between different LOD levels.
 
 import { BufferGeometry, BufferAttribute, Vector3 } from 'three'
-import { TILE_RESOLUTION } from './config'
+import { TILE_RESOLUTION } from '../../../../config/terrain'
 
 /**
  * Create geometry for a quadtree terrain tile.

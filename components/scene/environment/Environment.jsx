@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { Color } from 'three'
 
 import Terrain from './terrain/Terrain'
 import Sky from './Sky'
@@ -7,20 +8,18 @@ import Sun from './Sun'
 import Hawk from './Hawk'
 
 // Environment component
+// Uses shared atmosphere config for consistent lighting
 const SceneEnvironment = memo(() => {
 	return (
 		<>
 			{/* Sun directional light */}
 			<Sun />
 
-			{/* Ambient light for better fill - cool sky, warm ground */}
-			<hemisphereLight args={['#b1e1ff', '#d4c4a8', 0.6]} />
+			{/* Ambient light for better fill */}
+			<hemisphereLight args={[new Color().setHSL(0.56, 1.0, 0.85), new Color().setHSL(0.09, 0.34, 0.75), 0.6]} />
 
 			{/* Atmospheric sky with procedural clouds */}
 			<Sky />
-
-			{/* Distant fog for depth - match horizon color */}
-			{/* <fog attach='fog' args={['#dbebf9', 150, 3000]} /> */}
 
 			{/* Environment map for reflections - captures sky and terrain once */}
 			<EnvMap />

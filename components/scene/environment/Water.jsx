@@ -1,53 +1,49 @@
-import { useRef, useMemo, useEffect, Suspense } from 'react'
-import { Color, RepeatWrapping, CircleGeometry, ShaderMaterial, DoubleSide } from 'three'
+import { useRef, useMemo, useEffect } from 'react'
+import { CircleGeometry, ShaderMaterial, DoubleSide } from 'three'
 import { useFrame } from '@react-three/fiber'
-import { useTexture } from '@react-three/drei'
-import { sunDirection, vehicleState } from '../../../store/gameStore'
+import { vehicleState } from '../../../store/gameStore'
+import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
+import { generateFlowMap, FLOW_MAP_CONFIG } from './terrain/flowMapGenerator'
 import waterVertexShader from '../../../shaders/water.vert.glsl'
 import waterFragmentShader from '../../../shaders/water.frag.glsl'
 
-// Preload water texture
-useTexture.preload('/assets/images/ground/water_normal.jpg')
-
 // Water plane size - large enough to cover visible area plus buffer
-const WATER_RADIUS = 1000
+const WATER_RADIUS = 3000
 
-// Single large water plane that follows the player - inner component that uses loader
-const WaterMesh = () => {
+// Procedural Water component
+const Water = () => {
 	const ref = useRef()
 
-	// Load water normal map texture
-	const waterNormals = useTexture('/assets/images/ground/water_normal.jpg')
-
-	// Apply texture settings once loaded
-	useEffect(() => {
-		waterNormals.wrapS = waterNormals.wrapT = RepeatWrapping
-		waterNormals.generateMipmaps = true
-		waterNormals.needsUpdate = true
-	}, [waterNormals])
+	// Generate flow map texture once on mount
+	const flowMap = useMemo(() => {
+		return generateFlowMap(FLOW_MAP_CONFIG.resolution, FLOW_MAP_CONFIG.worldSize)
+	}, [])
 
 	// Create large circular geometry once - segments for smooth edges
 	const geom = useMemo(() => new CircleGeometry(WATER_RADIUS, 8), [])
 
-	// Create shader material with proper uniform initialization
+	// Create shader material with shared atmosphere uniforms
 	const material = useMemo(() => {
 		const mat = new ShaderMaterial({
 			uniforms: {
 				uTime: { value: 0 },
-				uNormalMap: { value: waterNormals },
-				uWaterColor: { value: new Color().setHSL(0.54, 0.58, 0.28) },
-				uDeepColor: { value: new Color().setHSL(0.58, 0.68, 0.06) },
-				uSkyColor: { value: new Color().setHSL(0.57, 0.60, 0.60) }, // Blue sky
-				uSkyHorizonColor: { value: new Color().setHSL(0.58, 0.30, 0.78) }, // Pale horizon
-				uSunDirection: { value: sunDirection },
-				uSunColor: { value: new Color().setHSL(0.12, 0.95, 0.95) },
-				uDistortionScale: { value: 1.2 },
-				uWaveSpeed: { value: 0.02 },
-				uWaveScale: { value: 0.1 },
-				uNormalStrength: { value: 0.08 },
+				// Shared atmosphere uniforms
+				uSunDirection: { value: sunDirection.clone() },
+				uSunColor: { value: sunColor.clone() },
+				uSkyColor: { value: skyColorZenith.clone() },
+				uSkyHorizonColor: { value: skyColorHorizon.clone() },
+				// Flow map for water movement
+				uFlowMap: { value: flowMap },
+				uFlowMapSize: { value: FLOW_MAP_CONFIG.worldSize },
+				// Water-specific parameters
+				uDistortionScale: { value: 1.5 },
+				uFlowSpeed: { value: 0.6 },
+				uWaveSpeed: { value: 0.03 },
+				uWaveScale: { value: 0.08 },
+				uNormalStrength: { value: 0.12 },
 				uOpacity: { value: 1 },
-				uNearFade: { value: 30.0 },
-				uFarFade: { value: 60.0 },
+				uNearFade: { value: 20.0 },
+				uFarFade: { value: 80.0 },
 			},
 			vertexShader: waterVertexShader,
 			fragmentShader: waterFragmentShader,
@@ -55,15 +51,16 @@ const WaterMesh = () => {
 			side: DoubleSide,
 		})
 		return mat
-	}, [waterNormals])
+	}, [flowMap])
 
-	// Dispose geometry and material when component unmounts
+	// Dispose geometry, material, and flow map when component unmounts
 	useEffect(() => {
 		return () => {
 			geom.dispose()
 			material.dispose()
+			flowMap.dispose()
 		}
-	}, [geom, material])
+	}, [geom, material, flowMap])
 
 	// Animate water and follow player
 	useFrame((_, delta) => {
@@ -77,15 +74,6 @@ const WaterMesh = () => {
 	})
 
 	return <mesh ref={ref} geometry={geom} material={material} rotation-x={-Math.PI / 2} position={[0, -1, 0]} />
-}
-
-// Wrapper component with Suspense to handle async texture loading
-const Water = () => {
-	return (
-		<Suspense fallback={null}>
-			<WaterMesh />
-		</Suspense>
-	)
 }
 
 export default Water

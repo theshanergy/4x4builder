@@ -2,7 +2,7 @@
 
 // Functions for calculating river path, width, and terrain carving depth.
 
-import { RIVER_CONFIG } from './config'
+import { RIVER_CONFIG } from '../../../../config/terrain'
 
 /**
  * Calculate the Z position of the river center at a given X coordinate.
@@ -45,10 +45,7 @@ export const getDistanceToRiver = (worldX, worldZ, noise) => {
  * Uses smooth transitions for banks.
  */
 export const getRiverDepthFactor = (worldX, worldZ, noise) => {
-	const { startX, endX, bankSlope } = RIVER_CONFIG
-
-	// Early exit if outside river bounds
-	if (worldX < startX - bankSlope * 2 || worldX > endX + bankSlope * 2) return 0
+	const { bankSlope } = RIVER_CONFIG
 
 	const { distance, riverWidth } = getDistanceToRiver(worldX, worldZ, noise)
 	const halfWidth = riverWidth / 2

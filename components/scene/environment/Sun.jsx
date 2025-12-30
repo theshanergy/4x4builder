@@ -1,7 +1,8 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import useGameStore, { vehicleState, sunDirection } from '../../../store/gameStore'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
+import { sunDirection, sunColor } from '../../../config/environment'
 
 // Sun directional light that follows camera target
 const Sun = () => {
@@ -21,13 +22,13 @@ const Sun = () => {
 		light.target.updateMatrixWorld()
 	})
 
-	// Warm sunlight color
+	// Use sun color from shared atmosphere config
 	return (
 		<directionalLight
 			ref={lightRef}
 			castShadow={!performanceDegraded}
 			intensity={2.5}
-			color='#fff0dd'
+			color={sunColor}
 			position={[10, 10, 10]}
 			shadow-mapSize={performanceDegraded ? [512, 512] : [1024, 1024]}
 			shadow-camera-far={100}

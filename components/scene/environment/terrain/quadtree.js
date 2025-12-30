@@ -3,7 +3,7 @@
 // Quadtree data structure for terrain level-of-detail management.
 // Handles spatial subdivision, view-dependent refinement, and neighbor queries.
 
-import { QUADTREE_ROOT_SIZE, TILE_RESOLUTION } from './config'
+import { QUADTREE_ROOT_SIZE, TILE_RESOLUTION } from '../../../../config/terrain'
 
 /**
  * Represents a node in the terrain quadtree.

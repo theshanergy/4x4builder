@@ -1,20 +1,9 @@
 import { useRef, useMemo, memo, useEffect, useReducer } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { 
-	Vector3, 
-	Quaternion, 
-	CatmullRomCurve3, 
-	DoubleSide, 
-	Color, 
-	BufferGeometry, 
-	BufferAttribute, 
-	Object3D, 
-	InstancedMesh, 
-	ShaderMaterial,
-	Matrix4 
-} from 'three'
+import { Vector3, Quaternion, CatmullRomCurve3, DoubleSide, Color, BufferGeometry, BufferAttribute, Object3D, InstancedMesh, ShaderMaterial } from 'three'
 
-import useGameStore, { vehicleState } from '../../../store/gameStore'
+import { vehicleState } from '../../../store/gameStore'
+import { sunDirection, sunColor } from '../../../config/environment'
 import grassVertexShader from '../../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../../shaders/grass.frag.glsl'
 
@@ -39,7 +28,6 @@ const hashCoords = (x, z, salt = 0) => {
 const _scratchDummy = new Object3D()
 const _scratchUp = new Vector3(0, 1, 0)
 const _scratchQuaternion = new Quaternion()
-const _scratchMatrix = new Matrix4()
 
 // Blade configuration (tuned for realistic scale)
 const BLADE_CONFIG = {
@@ -198,7 +186,7 @@ const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerr
 	const dummy = _scratchDummy
 	const up = _scratchUp
 	const quaternion = _scratchQuaternion
-	
+
 	let bladeCount = 0
 	const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
 
@@ -252,7 +240,7 @@ const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerr
 
 			// Sample terrain height at blade's world position
 			const bladeTerrainY = getTerrainHeight(bladeWorldX, bladeWorldZ)
-			
+
 			// OPTIMIZATION: Use patch normal instead of sampling per-blade normal
 			// This saves ~4 noise calls per blade (huge performance win)
 			// Since patches are small (radius < 0.6), the normal variance is minimal
@@ -283,7 +271,7 @@ const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerr
 				_matrixBuffer[offset + i] = elements[i]
 			}
 			bladeCount++
-			
+
 			// Safety check to prevent buffer overflow
 			if (bladeCount >= MAX_BLADES_PER_CHUNK) break
 		}
@@ -293,7 +281,7 @@ const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerr
 	// Return a copy of only the used portion of the buffer
 	return {
 		array: new Float32Array(_matrixBuffer.buffer, 0, bladeCount * 16),
-		count: bladeCount
+		count: bladeCount,
 	}
 }
 
@@ -311,14 +299,14 @@ const GrassChunk = memo(({ chunkKey, chunkPosition, chunkSize, lodFactor, getTer
 		if (bladeData.count === 0) return null
 
 		const mesh = new InstancedMesh(sharedGeometry, sharedMaterial, bladeData.count)
-		
+
 		// Copy matrix data directly from Float32Array
 		mesh.instanceMatrix.array.set(bladeData.array)
 		mesh.instanceMatrix.needsUpdate = true
 		mesh.frustumCulled = true
 		mesh.castShadow = false
 		mesh.receiveShadow = false
-		
+
 		return mesh
 	}, [bladeData, sharedGeometry, sharedMaterial])
 
@@ -349,6 +337,7 @@ const Grass = memo(({ getTerrainHeight, getTerrainNormal }) => {
 	}, [])
 
 	// Create shared material once
+	// Uses shared atmosphere config for consistent lighting with sky/water
 	const sharedMaterial = useMemo(() => {
 		return new ShaderMaterial({
 			vertexShader: grassVertexShader,
@@ -364,6 +353,9 @@ const Grass = memo(({ getTerrainHeight, getTerrainNormal }) => {
 				uColorTip: { value: new Color(BLADE_CONFIG.colorTip) },
 				uAmbientStrength: { value: BLADE_CONFIG.ambientStrength },
 				uTranslucency: { value: BLADE_CONFIG.translucency },
+				// Shared atmosphere uniforms for consistent lighting
+				uSunDirection: { value: sunDirection.clone() },
+				uSunColor: { value: sunColor.clone() },
 			},
 			side: DoubleSide,
 		})
@@ -386,7 +378,7 @@ const Grass = memo(({ getTerrainHeight, getTerrainNormal }) => {
 		const newActiveChunkKeys = new Set()
 		const viewDistSq = GRASS_VIEW_DISTANCE * GRASS_VIEW_DISTANCE
 		const lodDistSq = GRASS_LOD_DISTANCE * GRASS_LOD_DISTANCE
-		
+
 		let hasChanges = false
 
 		for (let x = -chunksInView; x <= chunksInView; x++) {
@@ -449,20 +441,21 @@ const Grass = memo(({ getTerrainHeight, getTerrainNormal }) => {
 	}, [sharedGeometry, sharedMaterial])
 
 	return (
-		<group name="Grass">
-			{activeChunks && activeChunks.map(({ key, position, lodFactor }) => (
-				<GrassChunk
-					key={key}
-					chunkKey={key}
-					chunkPosition={position}
-					chunkSize={GRASS_CHUNK_SIZE}
-					lodFactor={lodFactor}
-					getTerrainHeight={getTerrainHeight}
-					getTerrainNormal={getTerrainNormal}
-					sharedGeometry={sharedGeometry}
-					sharedMaterial={sharedMaterial}
-				/>
-			))}
+		<group name='Grass'>
+			{activeChunks &&
+				activeChunks.map(({ key, position, lodFactor }) => (
+					<GrassChunk
+						key={key}
+						chunkKey={key}
+						chunkPosition={position}
+						chunkSize={GRASS_CHUNK_SIZE}
+						lodFactor={lodFactor}
+						getTerrainHeight={getTerrainHeight}
+						getTerrainNormal={getTerrainNormal}
+						sharedGeometry={sharedGeometry}
+						sharedMaterial={sharedMaterial}
+					/>
+				))}
 		</group>
 	)
 })

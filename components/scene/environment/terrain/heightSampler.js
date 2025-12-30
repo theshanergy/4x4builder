@@ -3,9 +3,10 @@
 // Core height sampling logic including noise generation, mountains, ocean,
 // river carving, and normal calculation.
 
-import { OCEAN_RADIUS, OCEAN_TRANSITION, OCEAN_DEPTH, BEACH_MIDPOINT_DEPTH, MOUNTAIN_CONFIG, REGION_SCALE, GRADIENT_EPSILON, RIVER_CONFIG, STAGING_AREA } from './config'
+import { OCEAN_CONFIG, MOUNTAIN_CONFIG, TERRAIN_CONFIG, RIVER_CONFIG, STAGING_AREA } from '../../../../config/terrain'
 import { getRiverDepthFactor } from './riverUtils'
-
+// Epsilon for numerical gradient approximation when calculating normals
+const GRADIENT_EPSILON = 0.01
 /**
  * Ridge noise function - creates sharp mountain ridges.
  * Uses absolute value of noise to create V-shaped valleys and ridges.
@@ -74,7 +75,7 @@ export const createTerrainHelpers = (noise, smoothness) => {
 	const transitionEndDistSq = STAGING_AREA.transitionEnd * STAGING_AREA.transitionEnd
 
 	// Ocean boundary calculations
-	const oceanTransitionStart = OCEAN_RADIUS - OCEAN_TRANSITION
+	const oceanTransitionStart = OCEAN_CONFIG.radius - OCEAN_CONFIG.transition
 	const oceanTransitionStartSq = oceanTransitionStart * oceanTransitionStart
 
 	/**
@@ -89,7 +90,7 @@ export const createTerrainHelpers = (noise, smoothness) => {
 		const normalizedHeight = (noiseValue + 1) / 2
 
 		// Regional height modulation - creates dispersed flatter areas
-		const regionNoise = noise.perlin2(worldX / REGION_SCALE + 100, worldZ / REGION_SCALE + 100)
+		const regionNoise = noise.perlin2(worldX / TERRAIN_CONFIG.regionScale + 100, worldZ / TERRAIN_CONFIG.regionScale + 100)
 		// Map to 0.1-1.0 range: some areas have 10% height (much flatter), others full height
 		const regionModifier = 0.1 + (regionNoise + 1) * 0.45
 
@@ -113,7 +114,7 @@ export const createTerrainHelpers = (noise, smoothness) => {
 		let mountainHeight = 0
 		const absZ = Math.abs(worldZ) // Use absolute Z for symmetric bands on both sides
 
-		if (absZ > MOUNTAIN_CONFIG.startDistance && dist < OCEAN_RADIUS - OCEAN_TRANSITION * 0.5) {
+		if (absZ > MOUNTAIN_CONFIG.startDistance && dist < OCEAN_CONFIG.radius - OCEAN_CONFIG.transition * 0.5) {
 			// Calculate blend factor for mountains based on Z distance
 			let mountainBlend = 1
 			const mountainFullZ = MOUNTAIN_CONFIG.startDistance + MOUNTAIN_CONFIG.transitionWidth
@@ -126,7 +127,7 @@ export const createTerrainHelpers = (noise, smoothness) => {
 			}
 
 			// Reduce mountains near ocean to create beaches
-			const oceanProximity = (OCEAN_RADIUS - OCEAN_TRANSITION * 2 - dist) / (OCEAN_TRANSITION * 3)
+			const oceanProximity = (OCEAN_CONFIG.radius - OCEAN_CONFIG.transition * 2 - dist) / (OCEAN_CONFIG.transition * 3)
 			const oceanFade = Math.min(1, Math.max(0, oceanProximity))
 
 			// Get mountain noise and apply blend
@@ -138,19 +139,31 @@ export const createTerrainHelpers = (noise, smoothness) => {
 		// Combine base terrain with mountains
 		// Base terrain is scaled down in mountain areas to let mountains dominate
 		const mountainInfluence = mountainHeight > 0 ? Math.min(1, mountainHeight * 0.5) : 0
-		const combinedHeight = baseHeight * (1 - mountainInfluence * 0.7) + mountainHeight
+		let combinedHeight = baseHeight * (1 - mountainInfluence * 0.7) + mountainHeight
+
+		// Apply river carving BEFORE ocean transition so river cuts through beach
+		const riverDepthFactor = getRiverDepthFactor(worldX, worldZ, noise)
+		if (riverDepthFactor > 0) {
+			// Carve river bed into terrain - needs to go below water level (Y=-1)
+			// At river center (depthFactor=1): 95% terrain suppressed, 5% variance
+			// At river edges (depthFactor=0): full terrain height
+			const normalizedRiverDepth = RIVER_CONFIG.depth / 4
+			const varianceRetention = 1 - riverDepthFactor * 0.95
+			const carvedHeight = combinedHeight * varianceRetention - riverDepthFactor * normalizedRiverDepth
+			combinedHeight = Math.max(carvedHeight, -normalizedRiverDepth * 1.1)
+		}
 
 		// Apply ocean tapering - realistic two-stage beach profile
 		if (distSq > oceanTransitionStartSq) {
-			if (dist >= OCEAN_RADIUS) {
+			if (dist >= OCEAN_CONFIG.radius) {
 				// Beyond ocean radius - full ocean depth (normalized)
-				return -OCEAN_DEPTH / 4 // Normalize relative to typical maxHeight
+				return -OCEAN_CONFIG.depth / 4 // Normalize relative to typical maxHeight
 			} else {
 				// In transition zone - smooth bezier-like curve through control point
-				const t = (dist - oceanTransitionStart) / OCEAN_TRANSITION // 0 at shore, 1 at deep ocean
+				const t = (dist - oceanTransitionStart) / OCEAN_CONFIG.transition // 0 at shore, 1 at deep ocean
 
-				const oceanFloorHeight = -OCEAN_DEPTH / 4
-				const midpointHeight = oceanFloorHeight * BEACH_MIDPOINT_DEPTH
+				const oceanFloorHeight = -OCEAN_CONFIG.depth / 4
+				const midpointHeight = oceanFloorHeight * OCEAN_CONFIG.beachMidpointDepth
 
 				// Quadratic bezier interpolation: start at combinedHeight, through midpoint, to oceanFloorHeight
 				const bezierT = t * t * (3 - 2 * t) // Smoothstep for natural curve
@@ -171,18 +184,6 @@ export const createTerrainHelpers = (noise, smoothness) => {
 				const noiseSuppression = (1 - bezierT) * (1 - bezierT) * (1 - bezierT)
 				return combinedHeight * noiseSuppression + finalHeight * (1 - noiseSuppression)
 			}
-		}
-
-		// Apply river carving
-		const riverDepthFactor = getRiverDepthFactor(worldX, worldZ, noise)
-		if (riverDepthFactor > 0) {
-			// Carve river bed into terrain - needs to go below water level (Y=-1)
-			// At river center (depthFactor=1): 95% terrain suppressed, 5% variance
-			// At river edges (depthFactor=0): full terrain height
-			const normalizedRiverDepth = RIVER_CONFIG.depth / 4
-			const varianceRetention = 1 - riverDepthFactor * 0.95
-			const carvedHeight = combinedHeight * varianceRetention - riverDepthFactor * normalizedRiverDepth
-			return Math.max(carvedHeight, -normalizedRiverDepth * 1.1)
 		}
 
 		return combinedHeight

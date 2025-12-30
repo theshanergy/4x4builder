@@ -2,26 +2,30 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BackSide } from 'three'
 
-import { sunDirection } from '../../../store/gameStore'
+import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
 import skyVertexShader from '../../../shaders/sky.vert.glsl'
 import skyFragmentShader from '../../../shaders/sky.frag.glsl'
 
 // Custom Atmospheric Sky component with procedural clouds
+// Uses shared atmosphere config for consistency with water shader
 const AtmosphericSky = () => {
 	const meshRef = useRef()
 	const materialRef = useRef()
 
 	const uniforms = useMemo(
 		() => ({
-			sunDirection: { value: sunDirection },
-			time: { value: 0 },
+			uTime: { value: 0 },
+			uSunDirection: { value: sunDirection.clone() },
+			uSunColor: { value: sunColor.clone() },
+			uSkyColor: { value: skyColorZenith.clone() },
+			uSkyHorizonColor: { value: skyColorHorizon.clone() },
 		}),
 		[]
 	)
 
 	useFrame((state) => {
 		if (materialRef.current) {
-			materialRef.current.uniforms.time.value = state.clock.elapsedTime
+			materialRef.current.uniforms.uTime.value = state.clock.elapsedTime
 		}
 		// Make sky follow camera so it appears infinite
 		if (meshRef.current) {
