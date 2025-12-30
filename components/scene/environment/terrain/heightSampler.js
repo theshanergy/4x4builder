@@ -3,7 +3,7 @@
 // Core height sampling logic including noise generation, mountains, ocean,
 // river carving, and normal calculation.
 
-import { OCEAN_RADIUS, OCEAN_TRANSITION, OCEAN_DEPTH, BEACH_MIDPOINT_DEPTH, MOUNTAIN_CONFIG, REGION_SCALE, GRADIENT_EPSILON, RIVER_CONFIG } from './config'
+import { OCEAN_RADIUS, OCEAN_TRANSITION, OCEAN_DEPTH, BEACH_MIDPOINT_DEPTH, MOUNTAIN_CONFIG, REGION_SCALE, GRADIENT_EPSILON, RIVER_CONFIG, STAGING_AREA } from './config'
 import { getRiverDepthFactor } from './riverUtils'
 
 /**
@@ -67,13 +67,11 @@ const getMountainNoise = (noise, x, z) => {
  *
  * @param {Object} noise - Noise instance from noisejs
  * @param {number} smoothness - Base terrain noise scale
- * @param {number} flatAreaRadius - Radius of flat area around origin
- * @param {number} transitionEndDist - Distance where transition from flat area ends
  * @returns {Object} Object with getRawHeight, getHeight, and getNormal functions
  */
-export const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDist) => {
-	const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
-	const transitionEndDistSq = transitionEndDist * transitionEndDist
+export const createTerrainHelpers = (noise, smoothness) => {
+	const flatAreaRadiusSq = STAGING_AREA.flatRadius * STAGING_AREA.flatRadius
+	const transitionEndDistSq = STAGING_AREA.transitionEnd * STAGING_AREA.transitionEnd
 
 	// Ocean boundary calculations
 	const oceanTransitionStart = OCEAN_RADIUS - OCEAN_TRANSITION
@@ -86,9 +84,6 @@ export const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transiti
 		const distSq = worldX * worldX + worldZ * worldZ
 		const dist = Math.sqrt(distSq)
 
-		// Start with flat area check
-		if (distSq < flatAreaRadiusSq) return 0
-
 		// Calculate base terrain noise (existing gentle terrain)
 		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
 		const normalizedHeight = (noiseValue + 1) / 2
@@ -98,13 +93,21 @@ export const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transiti
 		// Map to 0.1-1.0 range: some areas have 10% height (much flatter), others full height
 		const regionModifier = 0.1 + (regionNoise + 1) * 0.45
 
-		let baseHeight
+		// Staging area blending - smooth transition from flat to terrain
+		let stagingBlend = 1
 		if (distSq < transitionEndDistSq) {
-			const t = (dist - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
-			baseHeight = normalizedHeight * (t * t * (3 - 2 * t)) * regionModifier
-		} else {
-			baseHeight = normalizedHeight * regionModifier
+			if (distSq < flatAreaRadiusSq) {
+				// Inside flat radius - completely flat
+				stagingBlend = 0
+			} else {
+				// In transition zone - smooth blend using smoothstep
+				const t = (dist - STAGING_AREA.flatRadius) / (STAGING_AREA.transitionEnd - STAGING_AREA.flatRadius)
+				// Cubic smoothstep for extra smooth transition
+				stagingBlend = t * t * t * (t * (t * 6 - 15) + 10)
+			}
 		}
+
+		const baseHeight = normalizedHeight * stagingBlend * regionModifier
 
 		// Add mountain height using parallel bands along the X axis
 		let mountainHeight = 0

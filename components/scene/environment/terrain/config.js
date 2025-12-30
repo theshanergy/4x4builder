@@ -83,6 +83,14 @@ export const LOD_SPLIT_FACTOR = 1.5
 // A node won't merge back until distance > nodeSize * LOD_SPLIT_FACTOR * LOD_HYSTERESIS
 export const LOD_HYSTERESIS = 1.2
 
+// Staging Area Configuration (flat spawn area)
+export const STAGING_AREA = {
+	// Radius of completely flat area around origin
+	flatRadius: 16,
+	// Distance where terrain reaches full height (smooth blend zone)
+	transitionEnd: 64,
+}
+
 // Default Terrain Parameters
 export const DEFAULT_TERRAIN_CONFIG = {
 	smoothness: 15,

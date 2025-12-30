@@ -57,12 +57,8 @@ const Terrain = () => {
 	// Load textures
 	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
 
-	// Flat area and transition parameters
-	const flatAreaRadius = QUADTREE_MIN_SIZE * 0.5
-	const transitionEndDist = QUADTREE_MIN_SIZE * 2
-
 	// Create shared terrain helpers (height/normal sampling)
-	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, smoothness, flatAreaRadius, transitionEndDist), [noise, smoothness, flatAreaRadius, transitionEndDist])
+	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, smoothness), [noise, smoothness])
 
 	// Scratch vector for normal calculations
 	const normalScratch = useMemo(() => new Vector3(), [])
