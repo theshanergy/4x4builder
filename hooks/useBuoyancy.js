@@ -1,5 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { Vector3, Quaternion } from 'three'
+import { generateFlowMap, FLOW_MAP_CONFIG } from '../components/scene/environment/terrain/flowMapGenerator'
 
 // Water level constant
 const WATER_LEVEL = -1
@@ -18,6 +19,46 @@ const BUOYANCY = {
 	// Sinking parameters
 	sinkingRate: 0.05, // How fast it fills with water (0-1 per second)
 	minBuoyancy: 0.1, // Buoyancy factor when fully sunk (still has some displacement)
+
+	// Flow parameters
+	flowForce: 8.0, // Multiplier for flow force strength
+}
+
+/**
+ * Sample flow data from the flow map at a given world position
+ * @param {Object} flowMapData - The flow map data object
+ * @param {number} worldX - World X position
+ * @param {number} worldZ - World Z position
+ * @returns {Object} - Flow data { dirX, dirZ, speed, inRiver }
+ */
+const sampleFlowMap = (flowMapData, worldX, worldZ) => {
+	if (!flowMapData) {
+		return { dirX: 0, dirZ: 0, speed: 0, inRiver: 0 }
+	}
+
+	const { data, resolution, worldSize } = flowMapData
+	const halfSize = worldSize / 2
+
+	// Convert world coords to texture coords
+	const u = (worldX + halfSize) / worldSize
+	const v = (worldZ + halfSize) / worldSize
+
+	// Clamp to texture bounds
+	const ux = Math.max(0, Math.min(0.999, u))
+	const vx = Math.max(0, Math.min(0.999, v))
+
+	// Get pixel coordinates
+	const px = Math.floor(ux * resolution)
+	const py = Math.floor(vx * resolution)
+	const idx = (py * resolution + px) * 4
+
+	// Decode flow data from texture
+	const flowX = (data[idx + 0] / 255) * 2 - 1 // Convert 0-255 to -1 to 1
+	const flowZ = (data[idx + 1] / 255) * 2 - 1
+	const speed = data[idx + 2] / 255 // 0-1
+	const inRiver = data[idx + 3] / 255 // 0-1
+
+	return { dirX: flowX, dirZ: flowZ, speed, inRiver }
 }
 
 /**
@@ -30,6 +71,16 @@ export const useBuoyancy = (vehicleRef) => {
 	const isInWater = useRef(false)
 	// Track water intake (0 = dry, 1 = full/sunk)
 	const waterIntake = useRef(0)
+
+	// Generate and cache flow map data
+	const flowMapData = useMemo(() => {
+		const flowMap = generateFlowMap(FLOW_MAP_CONFIG.resolution, FLOW_MAP_CONFIG.worldSize)
+		return {
+			data: flowMap.image.data,
+			resolution: FLOW_MAP_CONFIG.resolution,
+			worldSize: FLOW_MAP_CONFIG.worldSize,
+		}
+	}, [])
 
 	// Reusable vectors
 	const vec = useMemo(() => new Vector3(), [])
@@ -110,6 +161,39 @@ export const useBuoyancy = (vehicleRef) => {
 
 			vec.set(-angvel.x * angDragFactor, -angvel.y * angDragFactor, -angvel.z * angDragFactor)
 			vehicle.applyTorqueImpulse(vec, true)
+
+			// 5. Apply Water Flow Forces
+			// Sample flow map at vehicle position
+			const flow = sampleFlowMap(flowMapData, vehiclePos.x, vehiclePos.z)
+
+			if (flow.speed > 0.01 && flow.inRiver > 0.01) {
+				// Calculate flow force magnitude
+				// Force scales with: mass (heavier = more force), submersion, flow speed, and river presence
+				const flowForceMagnitude = mass * BUOYANCY.flowForce * submersionRatio * flow.speed * flow.inRiver * delta
+
+				// Apply force in flow direction
+				vec.set(flow.dirX * flowForceMagnitude, 0, flow.dirZ * flowForceMagnitude)
+				vehicle.applyImpulse(vec, true)
+
+				// Optional: Apply slight torque to align with flow (makes vehicle want to point downstream)
+				const rotation = vehicle.rotation()
+				quat.copy(rotation)
+
+				// Get vehicle's forward direction
+				vec2.set(0, 0, 1).applyQuaternion(quat)
+
+				// Calculate cross product between forward direction and flow direction
+				// This creates a torque that rotates the vehicle toward the flow direction
+				const flowDir = new Vector3(flow.dirX, 0, flow.dirZ).normalize()
+				const alignTorque = vec2.clone().cross(flowDir)
+
+				// Scale torque by flow strength and apply it
+				const torqueMagnitude = mass * flow.speed * flow.inRiver * 0.5 * delta
+				alignTorque.multiplyScalar(torqueMagnitude)
+
+				vec.set(alignTorque.x, alignTorque.y, alignTorque.z)
+				vehicle.applyTorqueImpulse(vec, true)
+			}
 
 			return true
 		} else {

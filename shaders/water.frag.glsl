@@ -220,7 +220,8 @@ void main() {
 	vec4 flowData = texture2D(uFlowMap, vFlowMapUV);
 
 	// Decode flow direction (0.5 = no flow, 0 = -1, 1 = +1)
-	vec2 flowDir = (flowData.rg - 0.5) * 2.0;
+	// Negate for visual flow - UV offset convention is opposite of physical flow
+	vec2 flowDir = -((flowData.rg - 0.5) * 2.0);
 	float flowStrength = flowData.b;
 	float riverMask = flowData.a;
 
