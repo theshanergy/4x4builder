@@ -12,10 +12,6 @@ uniform float uNormalStrength;
 uniform float uOpacity;
 uniform float uNearFade;
 uniform float uFarFade;
-// Shared atmosphere uniforms (from terrain/config.js)
-uniform vec3 uFogExtinction;
-uniform vec3 uFogInscatter;
-
 varying vec3 vWorldPos;
 varying vec3 vViewDirection;
 varying float vViewDistance;

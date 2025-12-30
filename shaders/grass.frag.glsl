@@ -2,7 +2,6 @@ uniform vec3 uColorBase;
 uniform vec3 uColorTip;
 uniform float uAmbientStrength;
 uniform float uTranslucency;
-// Shared atmosphere uniforms (from terrain/config.js)
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 
@@ -14,7 +13,7 @@ void main() {
     // Gradient from base to tip
     vec3 color = mix(uColorBase, uColorTip, vHeightFactor);
 
-    // Use sun direction from shared atmosphere config
+    // Use sun direction from shared environment config
     vec3 lightDir = normalize(uSunDirection);
     float diffuse = max(dot(vNormal, lightDir), 0.0);
     

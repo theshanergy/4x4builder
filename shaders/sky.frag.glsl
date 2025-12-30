@@ -1,11 +1,10 @@
 varying vec3 vDirection;
 
-// Shared atmosphere uniforms (from terrain/config.js)
+uniform float uTime;
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 uniform vec3 uSkyColor;
 uniform vec3 uSkyHorizonColor;
-uniform float uTime;
 
 const float PI = 3.14159265359;
 
