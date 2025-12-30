@@ -6,17 +6,8 @@ import { Noise } from 'noisejs'
 import useGameStore, { vehicleState } from '../../../../store/gameStore'
 
 // Import terrain modules
-import {
-	OCEAN_CONFIG,
-	QUADTREE_ROOT_SIZE,
-	QUADTREE_MIN_SIZE,
-	LOD_SPLIT_FACTOR,
-	LOD_HYSTERESIS,
-	TERRAIN_CONFIG,
-	WATER_LOAD_DISTANCE,
-	WATER_UNLOAD_BUFFER,
-	RIVER_CONFIG,
-} from '../../../../config/terrain'
+import { OCEAN_CONFIG, QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, TERRAIN_CONFIG, RIVER_CONFIG } from '../../../../config/terrain'
+import { WATER_LOAD_DISTANCE, WATER_UNLOAD_BUFFER } from '../../../../config/water'
 import { QuadtreeNode, getEdgeStitchInfo, DEFAULT_EDGE_STITCH_INFO } from './quadtree'
 import { getDistanceToRiver } from './riverUtils'
 import { createTerrainHelpers } from './heightSampler'

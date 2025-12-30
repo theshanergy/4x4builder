@@ -3,6 +3,7 @@ import { CircleGeometry, ShaderMaterial, DoubleSide } from 'three'
 import { useFrame } from '@react-three/fiber'
 import { vehicleState } from '../../../store/gameStore'
 import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
+import { WATER_LEVEL } from '../../../config/water'
 import { generateFlowMap, FLOW_MAP_CONFIG } from './terrain/flowMapGenerator'
 import waterVertexShader from '../../../shaders/water.vert.glsl'
 import waterFragmentShader from '../../../shaders/water.frag.glsl'
@@ -73,7 +74,7 @@ const Water = () => {
 		}
 	})
 
-	return <mesh ref={ref} geometry={geom} material={material} rotation-x={-Math.PI / 2} position={[0, -1, 0]} />
+	return <mesh ref={ref} geometry={geom} material={material} rotation-x={-Math.PI / 2} position={[0, WATER_LEVEL, 0]} />
 }
 
 export default Water

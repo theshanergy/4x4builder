@@ -4,9 +4,12 @@
 // river carving, and normal calculation.
 
 import { OCEAN_CONFIG, MOUNTAIN_CONFIG, TERRAIN_CONFIG, RIVER_CONFIG, STAGING_AREA } from '../../../../config/terrain'
+import { WATER_LEVEL } from '../../../../config/water'
 import { getRiverDepthFactor } from './riverUtils'
+
 // Epsilon for numerical gradient approximation when calculating normals
 const GRADIENT_EPSILON = 0.01
+
 /**
  * Ridge noise function - creates sharp mountain ridges.
  * Uses absolute value of noise to create V-shaped valleys and ridges.
@@ -144,25 +147,30 @@ export const createTerrainHelpers = (noise, smoothness) => {
 		// Apply river carving BEFORE ocean transition so river cuts through beach
 		const riverDepthFactor = getRiverDepthFactor(worldX, worldZ, noise)
 		if (riverDepthFactor > 0) {
-			// Carve river bed into terrain - needs to go below water level (Y=-1)
+			// Carve river bed into terrain - depth is relative to water level
 			// At river center (depthFactor=1): 95% terrain suppressed, 5% variance
 			// At river edges (depthFactor=0): full terrain height
-			const normalizedRiverDepth = RIVER_CONFIG.depth / 4
+			const normalizedRiverDepth = RIVER_CONFIG.depth / TERRAIN_CONFIG.maxHeight
 			const varianceRetention = 1 - riverDepthFactor * 0.95
 			const carvedHeight = combinedHeight * varianceRetention - riverDepthFactor * normalizedRiverDepth
-			combinedHeight = Math.max(carvedHeight, -normalizedRiverDepth * 1.1)
+			const riverBedFloor = WATER_LEVEL / TERRAIN_CONFIG.maxHeight - normalizedRiverDepth * 1.1
+			combinedHeight = Math.max(carvedHeight, riverBedFloor)
 		}
 
 		// Apply ocean tapering - realistic two-stage beach profile
 		if (distSq > oceanTransitionStartSq) {
 			if (dist >= OCEAN_CONFIG.radius) {
-				// Beyond ocean radius - full ocean depth (normalized)
-				return -OCEAN_CONFIG.depth / 4 // Normalize relative to typical maxHeight
+				// Beyond ocean radius - full ocean depth (relative to water level)
+				const normalizedWaterLevel = WATER_LEVEL / TERRAIN_CONFIG.maxHeight
+				const normalizedOceanDepth = OCEAN_CONFIG.depth / TERRAIN_CONFIG.maxHeight
+				return normalizedWaterLevel - normalizedOceanDepth
 			} else {
 				// In transition zone - smooth bezier-like curve through control point
 				const t = (dist - oceanTransitionStart) / OCEAN_CONFIG.transition // 0 at shore, 1 at deep ocean
 
-				const oceanFloorHeight = -OCEAN_CONFIG.depth / 4
+				const normalizedWaterLevel = WATER_LEVEL / TERRAIN_CONFIG.maxHeight
+				const normalizedOceanDepth = OCEAN_CONFIG.depth / TERRAIN_CONFIG.maxHeight
+				const oceanFloorHeight = normalizedWaterLevel - normalizedOceanDepth
 				const midpointHeight = oceanFloorHeight * OCEAN_CONFIG.beachMidpointDepth
 
 				// Quadratic bezier interpolation: start at combinedHeight, through midpoint, to oceanFloorHeight

@@ -42,7 +42,7 @@ export const MOUNTAIN_CONFIG = {
 export const OCEAN_CONFIG = {
 	radius: 5000,
 	transition: 300, // Width of the beach transition zone
-	depth: 12, // How far below 0 the ocean floor goes
+	depth: 12, // Depth below WATER_LEVEL
 	// Beach profile control point (like a Bezier curve)
 	beachMidpointDepth: 0.2, // Intermediate depth at transition midpoint (0-1 range)
 }
@@ -69,13 +69,9 @@ export const RIVER_CONFIG = {
 	// River dimensions
 	width: 75, // Base width of river
 	widthVariation: 15, // Random width variation
-	depth: 2.5, // How deep the river carves (must go below water level at Y=-1)
+	depth: 2.5, // Depth below WATER_LEVEL
 	bankSlope: 25, // Width of the sloped banks
 }
-
-// Water visibility thresholds
-export const WATER_LOAD_DISTANCE = 1500 // Start loading water when this close to edge
-export const WATER_UNLOAD_BUFFER = 400 // Extra distance before unloading to prevent flicker
 
 // Base size of the entire terrain quadtree (power of 2 recommended)
 export const QUADTREE_ROOT_SIZE = 4096
