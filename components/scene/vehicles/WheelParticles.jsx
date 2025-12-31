@@ -1,13 +1,12 @@
 import { useRef, useMemo } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
-import { Vector3, NormalBlending, TextureLoader } from 'three'
-import { vehicleState } from '../../../store/gameStore'
+import { Vector3, NormalBlending, TextureLoader, Quaternion } from 'three'
 import { WATER_LEVEL } from '../../../config/water'
 
 const MAX_DUST_PARTICLES = 500
-const MAX_WATER_PARTICLES = 500
+const MAX_WATER_PARTICLES = 1500
 
-const WheelParticles = ({ vehicleController, wheelRefs }) => {
+const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, wheelWidth = 0.3 }) => {
 	const sandTexture = useLoader(TextureLoader, '/assets/images/ground/sand.jpg')
 	const dustGeometryRef = useRef()
 	const waterGeometryRef = useRef()
@@ -20,6 +19,9 @@ const WheelParticles = ({ vehicleController, wheelRefs }) => {
 	const prevWheelPositions = useRef(wheelRefs.map(() => new Vector3()))
 	const tempVec = useMemo(() => new Vector3(), [])
 	const wheelVelocity = useMemo(() => new Vector3(), [])
+	const tempQuat = useMemo(() => new Quaternion(), [])
+	const forwardDir = useMemo(() => new Vector3(), [])
+	const rightDir = useMemo(() => new Vector3(), [])
 
 	// Dust particle pool
 	const dustParticles = useMemo(() => {
@@ -38,7 +40,7 @@ const WheelParticles = ({ vehicleController, wheelRefs }) => {
 		return data
 	}, [])
 
-	// Water particle pool (bubbles and spray combined)
+	// Water particle pool (spray only)
 	const waterParticles = useMemo(() => {
 		const data = []
 		for (let i = 0; i < MAX_WATER_PARTICLES; i++) {
@@ -50,7 +52,6 @@ const WheelParticles = ({ vehicleController, wheelRefs }) => {
 				maxLife: 0,
 				size: 0,
 				initialSize: 0,
-				isBubble: false,
 			})
 		}
 		return data
@@ -157,102 +158,141 @@ const WheelParticles = ({ vehicleController, wheelRefs }) => {
 		if (!dustGeometryRef.current || !waterGeometryRef.current) return
 
 		const controller = vehicleController.current
-		const isInWater = vehicleState.isInWater
 
-		// Get vehicle speed
+		// Get vehicle speed and chassis orientation
 		let speed = 0
 		let chassisVel = null
 		try {
 			chassisVel = controller.chassis().linvel()
 			speed = Math.sqrt(chassisVel.x * chassisVel.x + chassisVel.y * chassisVel.y + chassisVel.z * chassisVel.z)
+
+			// Get chassis rotation to determine forward and right directions
+			const chassisRotation = controller.chassis().rotation()
+			tempQuat.set(chassisRotation.x, chassisRotation.y, chassisRotation.z, chassisRotation.w)
+
+			// Forward is -Z in local space (typical vehicle forward)
+			forwardDir.set(0, 0, -1).applyQuaternion(tempQuat)
+			// Right is +X in local space
+			rightDir.set(1, 0, 0).applyQuaternion(tempQuat)
 		} catch (e) {
 			return
 		}
 
 		// Spawn particles
-		const minSpeed = isInWater ? 1 : 2
-		if (speed > minSpeed) {
+		if (speed > 1) {
 			for (let wi = 0; wi < wheelRefs.length; wi++) {
 				const wheelRef = wheelRefs[wi]
 				const wheelInContact = controller.wheelIsInContact(wi)
-				const shouldSpawn = (wheelInContact || isInWater) && wheelRef.current
 
-				if (shouldSpawn) {
+				if (wheelRef.current) {
 					wheelRef.current.getWorldPosition(tempVec)
-					tempVec.y -= 0.3
 
-					const prevPos = prevWheelPositions.current[wi]
-					wheelVelocity.copy(tempVec).sub(prevPos)
+					// Check if this specific wheel's bottom is in water
+					const wheelBottomY = tempVec.y - wheelRadius
+					const wheelIsInWater = wheelBottomY < WATER_LEVEL
 
-					const speedFactor = Math.min((speed - minSpeed) / 15, 1.0)
-					// In water, guarantee at least 1 particle; for dust, match original behavior (can be 0 at low speeds)
-					const baseCount = Math.floor(speedFactor * speedFactor * 2 + 0.5)
-					const particlesPerFrame = isInWater ? Math.max(1, baseCount) : baseCount
+					const shouldSpawn = wheelInContact || wheelIsInWater
 
-					for (let s = 0; s < particlesPerFrame; s++) {
-						if (isInWater) {
-							// Spawn water particles
-							const p = waterParticles[nextWaterIndex.current]
-							nextWaterIndex.current = (nextWaterIndex.current + 1) % MAX_WATER_PARTICLES
+					if (shouldSpawn) {
+						tempVec.y = wheelBottomY
 
-							p.active = true
-							p.life = 0
-							p.isBubble = s % 2 === 0
+						const prevPos = prevWheelPositions.current[wi]
+						wheelVelocity.copy(tempVec).sub(prevPos)
 
-							if (p.isBubble) {
-								// Bubble: underwater, rises
-								p.maxLife = 1.5 + Math.random() * 2.0
-								p.position.x = tempVec.x + (Math.random() - 0.5) * 0.5
-								p.position.z = tempVec.z + (Math.random() - 0.5) * 0.5
-								p.position.y = WATER_LEVEL - 0.3 - Math.random() * 0.8
-								p.velocity.set(
-									(Math.random() - 0.5) * 0.3,
-									0.5 + Math.random() * 0.5,
-									(Math.random() - 0.5) * 0.3
-								)
-								p.initialSize = Math.random() * 1.0 + 0.4
-							} else {
-								// Spray: above water, arcs
+						const minSpeed = wheelIsInWater ? 1 : 2
+						const speedFactor = Math.min((speed - minSpeed) / 15, 1.0)
+						// In water, guarantee at least 2 particles and spawn more for better spray effect
+						const baseCount = Math.floor(speedFactor * speedFactor * 2 + 0.5)
+						const particlesPerFrame = wheelIsInWater ? Math.max(2, baseCount * 3) : baseCount
+
+						for (let s = 0; s < particlesPerFrame; s++) {
+							if (wheelIsInWater) {
+								// Spawn spray particles at the tire surface where it meets water
+								const p = waterParticles[nextWaterIndex.current]
+								nextWaterIndex.current = (nextWaterIndex.current + 1) % MAX_WATER_PARTICLES
+
+								p.active = true
+								p.life = 0
 								p.maxLife = 0.5 + Math.random() * 0.5
-								p.position.x = tempVec.x + (Math.random() - 0.5) * 0.3
-								p.position.z = tempVec.z + (Math.random() - 0.5) * 0.3
-								p.position.y = WATER_LEVEL + 0.05
-								const spreadX = (Math.random() - 0.5) * 1.5 - chassisVel.x * 0.2
-								const spreadZ = (Math.random() - 0.5) * 1.5 - chassisVel.z * 0.2
-								p.velocity.set(spreadX, 1.5 + Math.random() * 1.5, spreadZ)
-								p.initialSize = Math.random() * 0.5 + 0.2
+
+								// Get wheel center position
+								wheelRef.current.getWorldPosition(tempVec)
+								const wheelCenterY = tempVec.y
+
+								// Calculate how deep the wheel is submerged
+								const submersionDepth = wheelCenterY - WATER_LEVEL
+								const clampedDepth = Math.max(-wheelRadius, Math.min(wheelRadius, submersionDepth))
+
+								// Calculate angle where tire meets water surface at the BACK
+								// Angle 0 = front, π/2 = top, π = back, 3π/2 = bottom
+								// We want the back-bottom quadrant where water is flung off (π to 3π/2)
+								// First find where the tire surface intersects water level
+								const waterLineAngle = Math.asin(-clampedDepth / wheelRadius)
+								// The back intersection is at π - waterLineAngle (back-bottom area)
+								const backBottomAngle = Math.PI - waterLineAngle
+
+								// Add variation around the back-bottom spray zone
+								const angleVariation = (Math.random() - 0.5) * 0.5
+								const spawnAngle = backBottomAngle + angleVariation
+
+								// Calculate spawn position on tire surface
+								const offsetY = Math.sin(spawnAngle) * wheelRadius
+								const offsetBackward = -Math.cos(spawnAngle) * wheelRadius
+
+								// Position at tire surface using chassis orientation
+								// Back direction is opposite of forward
+								const backDirX = -forwardDir.x
+								const backDirZ = -forwardDir.z
+
+								// Spread spray across tire width using right direction
+								const lateralOffset = (Math.random() - 0.5) * wheelWidth
+								p.position.x = tempVec.x + backDirX * offsetBackward + rightDir.x * lateralOffset + (Math.random() - 0.5) * 0.1
+								// Ensure spray spawns at or above water level
+								p.position.y = Math.max(WATER_LEVEL, wheelCenterY + offsetY)
+								p.position.z = tempVec.z + backDirZ * offsetBackward + rightDir.z * lateralOffset + (Math.random() - 0.5) * 0.1
+
+								// Direction is backward + outward from wheel
+								const tangentUpward = Math.cos(spawnAngle) // More upward when closer to water line
+								const tangentBackward = Math.sin(spawnAngle) // More backward when deeper
+
+								const flingSpeed = 2.0 + Math.random() * 1.5
+								const spreadX = (Math.random() - 0.5) * 0.8 + backDirX * flingSpeed * tangentBackward
+								const spreadZ = (Math.random() - 0.5) * 0.8 + backDirZ * flingSpeed * tangentBackward
+								const spreadY = 1.0 + Math.random() * 1.0 + tangentUpward * 1.5
+
+								p.velocity.set(spreadX, spreadY, spreadZ)
+								p.initialSize = Math.random() * 0.15 + 0.05
+								p.size = p.initialSize
+							} else {
+								// Spawn dust particles
+								const p = dustParticles[nextDustIndex.current]
+								nextDustIndex.current = (nextDustIndex.current + 1) % MAX_DUST_PARTICLES
+
+								p.active = true
+								p.life = 0
+								p.maxLife = 1.5 + Math.random() * 2.0
+
+								const t = particlesPerFrame > 1 ? s / (particlesPerFrame - 1) : 0.5
+								p.position.lerpVectors(prevPos, tempVec, t)
+
+								// Spread particles across tire width
+								const lateralOffset = (Math.random() - 0.5) * wheelWidth
+								const sideOffset = (Math.random() - 0.5) * 0.6
+								p.position.x += sideOffset + lateralOffset
+								const inheritFactor = 0.3 + Math.random() * 0.15
+								p.velocity.set(
+									-chassisVel.x * inheritFactor + sideOffset * 2.0,
+									Math.random() * 0.3 + 0.1,
+									-chassisVel.z * inheritFactor + (Math.random() - 0.5) * 0.5
+								)
+
+								p.initialSize = Math.random() * 2.5 + 1.5
+								p.size = p.initialSize
 							}
-							p.size = p.initialSize
-						} else {
-							// Spawn dust particles
-							const p = dustParticles[nextDustIndex.current]
-							nextDustIndex.current = (nextDustIndex.current + 1) % MAX_DUST_PARTICLES
-
-							p.active = true
-							p.life = 0
-							p.maxLife = 1.5 + Math.random() * 2.0
-
-							const t = particlesPerFrame > 1 ? s / (particlesPerFrame - 1) : 0.5
-							p.position.lerpVectors(prevPos, tempVec, t)
-
-							const sideOffset = (Math.random() - 0.5) * 0.6
-							p.position.x += sideOffset
-							p.position.z += (Math.random() - 0.5) * 0.6
-							p.position.y += Math.random() * 0.05
-
-							const inheritFactor = 0.3 + Math.random() * 0.15
-							p.velocity.set(
-								-chassisVel.x * inheritFactor + sideOffset * 2.0,
-								Math.random() * 0.3 + 0.1,
-								-chassisVel.z * inheritFactor + (Math.random() - 0.5) * 0.5
-							)
-
-							p.initialSize = Math.random() * 2.5 + 1.5
-							p.size = p.initialSize
 						}
-					}
 
-					prevPos.copy(tempVec)
+						prevPos.copy(tempVec)
+					}
 				}
 			}
 		}
@@ -285,18 +325,13 @@ const WheelParticles = ({ vehicleController, wheelRefs }) => {
 			}
 		}
 
-		// Update water particles
+		// Update water particles (spray only)
 		for (let i = 0; i < MAX_WATER_PARTICLES; i++) {
 			const p = waterParticles[i]
 			if (p.active) {
 				p.life += delta
 
-				let shouldKill = p.life > p.maxLife
-				if (p.isBubble && p.position.y >= WATER_LEVEL - 0.05) {
-					shouldKill = true
-				}
-
-				if (shouldKill) {
+				if (p.life > p.maxLife) {
 					p.active = false
 					waterSizes[i] = 0
 					waterOpacities[i] = 0
@@ -305,25 +340,13 @@ const WheelParticles = ({ vehicleController, wheelRefs }) => {
 
 					const lifeRatio = p.life / p.maxLife
 
-					if (p.isBubble) {
-						p.velocity.y *= 0.99
-						p.velocity.x += (Math.random() - 0.5) * 0.05
-						p.velocity.z += (Math.random() - 0.5) * 0.05
-						p.velocity.x *= 0.98
-						p.velocity.z *= 0.98
-						p.position.y = Math.min(p.position.y, WATER_LEVEL - 0.05)
+					// Spray: gravity arc
+					p.velocity.y -= 9.8 * delta
+					p.velocity.x *= 0.99
+					p.velocity.z *= 0.99
 
-						waterSizes[i] = p.initialSize
-						const distToSurface = WATER_LEVEL - p.position.y
-						waterOpacities[i] = Math.min(1.0 - lifeRatio * 0.3, distToSurface * 2.0)
-					} else {
-						p.velocity.y -= 9.8 * delta
-						p.velocity.x *= 0.99
-						p.velocity.z *= 0.99
-
-						waterSizes[i] = p.initialSize
-						waterOpacities[i] = (1.0 - lifeRatio) * 0.8
-					}
+					waterSizes[i] = p.initialSize
+					waterOpacities[i] = (1.0 - lifeRatio) * 0.8
 
 					waterPositions[i * 3] = p.position.x
 					waterPositions[i * 3 + 1] = p.position.y
@@ -368,13 +391,7 @@ const WheelParticles = ({ vehicleController, wheelRefs }) => {
 					<bufferAttribute attach='attributes-size' count={MAX_WATER_PARTICLES} array={waterSizes} itemSize={1} />
 					<bufferAttribute attach='attributes-opacity' count={MAX_WATER_PARTICLES} array={waterOpacities} itemSize={1} />
 				</bufferGeometry>
-				<shaderMaterial
-					transparent
-					depthWrite={false}
-					blending={NormalBlending}
-					vertexShader={waterShader.vertexShader}
-					fragmentShader={waterShader.fragmentShader}
-				/>
+				<shaderMaterial transparent depthWrite={false} blending={NormalBlending} vertexShader={waterShader.vertexShader} fragmentShader={waterShader.fragmentShader} />
 			</points>
 		</>
 	)

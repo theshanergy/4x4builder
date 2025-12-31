@@ -45,6 +45,9 @@ const Vehicle = () => {
 	// Get vehicle dimensions and wheel positions from shared hook
 	const { axleHeight, vehicleHeight, wheelbase, wheelPositions } = useVehicleDimensions(config)
 
+	// Convert wheel width from inches to meters
+	const wheelWidth = (config.rim_width * 2.54) / 100
+
 	// Create wheel configurations
 	const physicsWheels = useMemo(() => {
 		return wheelPositions.map((wheel, i) => ({
@@ -130,8 +133,8 @@ const Vehicle = () => {
 			</RigidBody>
 			{!performanceDegraded && !isMobile && (
 				<>
-					<WheelParticles vehicleController={vehicleController} wheelRefs={wheelRefs} />
-					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={(config.rim_width * 2.54) / 100} tireRadius={axleHeight} />
+					<WheelParticles vehicleController={vehicleController} wheelRefs={wheelRefs} wheelRadius={axleHeight} wheelWidth={wheelWidth} />
+					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={wheelWidth} tireRadius={axleHeight} />
 				</>
 			)}
 		</>
