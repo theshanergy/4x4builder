@@ -485,7 +485,11 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			brakeForce = FORCES.brake * throttleInput
 		} else {
 			// Normal forward mode
-			if (throttleInput > 0) {
+			if (brakeInput > 0) {
+				// Active braking - no engine force
+				engineForce = 0
+				brakeForce = FORCES.brake * brakeInput
+			} else if (throttleInput > 0) {
 				// Get torque multiplier from curve based on current RPM
 				const torqueMultiplier = getTorqueMultiplier(vehicleState.rpm)
 
@@ -499,6 +503,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 				// Combined force: base * throttle * torque curve * gear advantage
 				engineForce = FORCES.accelerate * throttleInput * torqueMultiplier * gearMultiplier
+				brakeForce = 0
 			} else if (forwardSpeed > 1.0) {
 				// Engine braking when coasting forward
 				const gearRatio = TRANSMISSION.gearRatios[currentGear] || 1
@@ -510,30 +515,34 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 				// Apply as negative engine force (opposing forward motion)
 				engineForce = -brakingForce
+				brakeForce = 0
 			} else {
 				engineForce = 0
+				brakeForce = 0
 			}
-
-			brakeForce = FORCES.brake * brakeInput
 		}
 
-		if (!isAirborne.current) {
-			// Front wheels steering (assuming first two wheels are front)
-			for (let i = 0; i < 2 && i < wheels.length; i++) {
-				vehicleController.current.setWheelSteering(i, steerForce)
-			}
+		// Front wheels
+		for (let i = 0; i < 2 && i < wheels.length; i++) {
+			// Set steering for front wheels
+			vehicleController.current.setWheelSteering(i, steerForce)
+			// Apply 40% of engine force to front wheels
+			vehicleController.current.setWheelEngineForce(i, -engineForce * 0.4)
+		}
 
-			// Rear wheels driving (assuming last two wheels are rear)
-			for (let i = 2; i < 4 && i < wheels.length; i++) {
-				vehicleController.current.setWheelEngineForce(i, -engineForce)
-			}
+		// Rear wheels
+		for (let i = 2; i < 4 && i < wheels.length; i++) {
+			// 60% of engine force to rear wheels
+			vehicleController.current.setWheelEngineForce(i, -engineForce * 0.6)
+		}
 
-			// All wheels braking
-			for (let i = 0; i < wheels.length; i++) {
-				vehicleController.current.setWheelBrake(i, brakeForce)
-			}
-		} else if (!isInWater.current) {
-			// Airborne controls when all wheels are not in contact (disabled in water)
+		// All wheels braking
+		for (let i = 0; i < wheels.length; i++) {
+			vehicleController.current.setWheelBrake(i, brakeForce)
+		}
+
+		// Airborne controls when all wheels are not in contact (disabled in water)
+		if (isAirborne.current && !isInWater.current) {
 			if (vehicle) {
 				// Construct torque vector in world space using reusable objects
 				tempLocalTorque.set(pitchInput, yawInput, rollInput)
