@@ -3,395 +3,357 @@ import { useFrame, useLoader } from '@react-three/fiber'
 import { Vector3, NormalBlending, TextureLoader, Quaternion } from 'three'
 import { WATER_LEVEL } from '../../../config/water'
 
-const MAX_DUST_PARTICLES = 500
-const MAX_WATER_PARTICLES = 1500
+// Configuration values only - no behavior
+const WATER_CONFIG = {
+	maxParticles: 1500,
+	spawnMin: 1,
+	spawnMax: 16,
+	spawnMultiplier: 0.5,
+	maxSpeed: 2.0,
+	speedMultiplier: 0.15,
+	upwardVariance: 1.5,
+	randomness: 0.2,
+	lifetimeMin: 0.4,
+	lifetimeMax: 0.8,
+	sizeMin: 0.05,
+	sizeRange: 0.15,
+}
+
+const DUST_CONFIG = {
+	maxParticles: 500,
+	spawnMin: 1,
+	spawnMax: 4,
+	spawnMultiplier: 0.3,
+	maxSpeed: 1.5,
+	speedMultiplier: 0.08,
+	upwardMultiplier: 0.4,
+	upwardVariance: 0.5,
+	randomness: 0.3,
+	lifetimeMin: 1.5,
+	lifetimeMax: 3.5,
+	sizeMin: 1.5,
+	sizeRange: 2.5,
+}
+
+// Shared vertex shader
+const PARTICLE_VERTEX_SHADER = `
+	attribute float size;
+	attribute float opacity;
+	varying float vOpacity;
+	void main() {
+		vOpacity = opacity;
+		vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+		gl_PointSize = size * (450.0 / -mvPosition.z);
+		gl_Position = projectionMatrix * mvPosition;
+	}
+`
+
+const WATER_FRAGMENT_SHADER = `
+	varying float vOpacity;
+	void main() {
+		vec2 uv = gl_PointCoord.xy - 0.5;
+		float r2 = dot(uv, uv);
+		if (r2 > 0.25) discard;
+		float r = sqrt(r2);
+		float alpha = 1.0 - smoothstep(0.3, 0.5, r);
+		vec3 color = vec3(0.95, 0.97, 1.0);
+		gl_FragColor = vec4(color, vOpacity * alpha * 0.4);
+	}
+`
+
+const DUST_FRAGMENT_SHADER = `
+	uniform sampler2D uTexture;
+	varying float vOpacity;
+	void main() {
+		vec2 uv = gl_PointCoord.xy - 0.5;
+		float r2 = dot(uv, uv);
+		if (r2 > 0.25) discard;
+		vec3 texColor = texture2D(uTexture, vec2(0.5, 0.5)).rgb;
+		float luminance = dot(texColor, vec3(0.299, 0.587, 0.114));
+		vec3 finalColor = mix(texColor, vec3(luminance), 0.3);
+		float alpha = exp(-r2 * 8.0) * 0.1;
+		gl_FragColor = vec4(finalColor, vOpacity * alpha);
+	}
+`
+
+// Create particle system with typed arrays
+const createParticleSystem = (maxParticles) => ({
+	nextIndex: 0,
+	activeCount: 0,
+	// Particle state
+	active: new Uint8Array(maxParticles),
+	life: new Float32Array(maxParticles),
+	maxLife: new Float32Array(maxParticles),
+	initialSize: new Float32Array(maxParticles),
+	velocityX: new Float32Array(maxParticles),
+	velocityY: new Float32Array(maxParticles),
+	velocityZ: new Float32Array(maxParticles),
+	// Geometry attributes (written directly to GPU)
+	positions: new Float32Array(maxParticles * 3),
+	sizes: new Float32Array(maxParticles),
+	opacities: new Float32Array(maxParticles),
+})
 
 const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, wheelWidth = 0.3 }) => {
 	const sandTexture = useLoader(TextureLoader, '/assets/images/ground/sand.jpg')
-	const dustGeometryRef = useRef()
-	const waterGeometryRef = useRef()
 
-	// Track particle pool with index-based allocation
-	const nextDustIndex = useRef(0)
-	const nextWaterIndex = useRef(0)
+	// Geometry refs
+	const waterGeomRef = useRef()
+	const dustGeomRef = useRef()
 
-	// Store previous wheel positions for interpolation
-	const prevWheelPositions = useRef(wheelRefs.map(() => new Vector3()))
+	// Particle systems
+	const waterSystem = useRef(createParticleSystem(WATER_CONFIG.maxParticles))
+	const dustSystem = useRef(createParticleSystem(DUST_CONFIG.maxParticles))
+
+	// Track wheel state
+	const prevWheelRotations = useRef(wheelRefs.map(() => 0))
+
+	// Reusable vectors
 	const tempVec = useMemo(() => new Vector3(), [])
-	const wheelVelocity = useMemo(() => new Vector3(), [])
 	const tempQuat = useMemo(() => new Quaternion(), [])
 	const forwardDir = useMemo(() => new Vector3(), [])
 	const rightDir = useMemo(() => new Vector3(), [])
 
-	// Dust particle pool
-	const dustParticles = useMemo(() => {
-		const data = []
-		for (let i = 0; i < MAX_DUST_PARTICLES; i++) {
-			data.push({
-				active: false,
-				position: new Vector3(),
-				velocity: new Vector3(),
-				life: 0,
-				maxLife: 0,
-				size: 0,
-				initialSize: 0,
-			})
+	// Spawn water particles at water surface intersection
+	const spawnWaterParticles = (system, angularVel, wheelCenterY, spawnX, spawnZ) => {
+		const cfg = WATER_CONFIG
+		const spinRate = Math.abs(angularVel)
+		const spinDir = angularVel >= 0 ? 1 : -1
+		const count = Math.min(cfg.spawnMax, Math.max(cfg.spawnMin, (spinRate * cfg.spawnMultiplier) | 0))
+
+		// Calculate tangent direction at water intersection
+		const depthBelowCenter = wheelCenterY - WATER_LEVEL
+		const horizontalOffset = Math.sqrt(Math.max(0, wheelRadius * wheelRadius - depthBelowCenter * depthBelowCenter))
+		const tangentUp = horizontalOffset / wheelRadius
+		const tangentForward = depthBelowCenter / wheelRadius
+
+		for (let s = 0; s < count; s++) {
+			const i = system.nextIndex
+			system.nextIndex = (system.nextIndex + 1) % cfg.maxParticles
+
+			if (!system.active[i]) system.activeCount++
+			system.active[i] = 1
+			system.life[i] = 0
+			system.maxLife[i] = cfg.lifetimeMin + Math.random() * (cfg.lifetimeMax - cfg.lifetimeMin)
+
+			// Position at water surface with lateral spread
+			const lateralOffset = (Math.random() - 0.5) * wheelWidth
+			const i3 = i * 3
+			system.positions[i3] = spawnX + forwardDir.x * horizontalOffset * spinDir + rightDir.x * lateralOffset
+			system.positions[i3 + 1] = WATER_LEVEL
+			system.positions[i3 + 2] = spawnZ + forwardDir.z * horizontalOffset * spinDir + rightDir.z * lateralOffset
+
+			// Velocity follows wheel tangent at intersection point
+			const speed = Math.min(cfg.maxSpeed, spinRate * wheelRadius * cfg.speedMultiplier)
+			system.velocityX[i] = forwardDir.x * spinDir * speed * tangentForward + (Math.random() - 0.5) * cfg.randomness
+			system.velocityY[i] = speed * tangentUp + (Math.random() - 0.5) * cfg.upwardVariance
+			system.velocityZ[i] = forwardDir.z * spinDir * speed * tangentForward + (Math.random() - 0.5) * cfg.randomness
+
+			system.initialSize[i] = cfg.sizeMin + Math.random() * cfg.sizeRange
 		}
-		return data
-	}, [])
+	}
 
-	// Water particle pool (spray only)
-	const waterParticles = useMemo(() => {
-		const data = []
-		for (let i = 0; i < MAX_WATER_PARTICLES; i++) {
-			data.push({
-				active: false,
-				position: new Vector3(),
-				velocity: new Vector3(),
-				life: 0,
-				maxLife: 0,
-				size: 0,
-				initialSize: 0,
-			})
+	// Spawn dust particles behind wheel
+	const spawnDustParticles = (system, angularVel, spawnX, spawnY, spawnZ) => {
+		const cfg = DUST_CONFIG
+		const spinRate = Math.abs(angularVel)
+		const spinDir = angularVel >= 0 ? 1 : -1
+		const count = Math.min(cfg.spawnMax, Math.max(cfg.spawnMin, (spinRate * cfg.spawnMultiplier) | 0))
+
+		for (let s = 0; s < count; s++) {
+			const i = system.nextIndex
+			system.nextIndex = (system.nextIndex + 1) % cfg.maxParticles
+
+			if (!system.active[i]) system.activeCount++
+			system.active[i] = 1
+			system.life[i] = 0
+			system.maxLife[i] = cfg.lifetimeMin + Math.random() * (cfg.lifetimeMax - cfg.lifetimeMin)
+
+			// Position behind wheel with lateral spread
+			const lateralOffset = (Math.random() - 0.5) * wheelWidth
+			const i3 = i * 3
+			system.positions[i3] = spawnX + rightDir.x * lateralOffset
+			system.positions[i3 + 1] = spawnY
+			system.positions[i3 + 2] = spawnZ + rightDir.z * lateralOffset
+
+			// Velocity kicks backward and up
+			const speed = Math.min(cfg.maxSpeed, spinRate * wheelRadius * cfg.speedMultiplier)
+			system.velocityX[i] = -forwardDir.x * spinDir * speed + (Math.random() - 0.5) * cfg.randomness
+			system.velocityY[i] = speed * cfg.upwardMultiplier + (Math.random() - 0.5) * cfg.upwardVariance
+			system.velocityZ[i] = -forwardDir.z * spinDir * speed + (Math.random() - 0.5) * cfg.randomness
+
+			system.initialSize[i] = cfg.sizeMin + Math.random() * cfg.sizeRange
 		}
-		return data
-	}, [])
+	}
 
-	// Dust geometry attributes
-	const dustPositions = useMemo(() => new Float32Array(MAX_DUST_PARTICLES * 3), [])
-	const dustSizes = useMemo(() => new Float32Array(MAX_DUST_PARTICLES), [])
-	const dustOpacities = useMemo(() => new Float32Array(MAX_DUST_PARTICLES), [])
+	// Update water particles - gravity + slight drag
+	const updateWaterSystem = (system, geomRef, delta) => {
+		if (system.activeCount === 0) return
 
-	// Water geometry attributes
-	const waterPositions = useMemo(() => new Float32Array(MAX_WATER_PARTICLES * 3), [])
-	const waterSizes = useMemo(() => new Float32Array(MAX_WATER_PARTICLES), [])
-	const waterOpacities = useMemo(() => new Float32Array(MAX_WATER_PARTICLES), [])
+		const cfg = WATER_CONFIG
+		let activeCount = 0
 
-	// Dust shader - samples ground texture
-	const dustShader = useMemo(
-		() => ({
-			uniforms: {
-				uTexture: { value: sandTexture },
-			},
-			vertexShader: `
-				attribute float size;
-				attribute float opacity;
-				varying float vOpacity;
-				void main() {
-					vOpacity = opacity;
-					vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-					gl_PointSize = size * (450.0 / -mvPosition.z);
-					gl_Position = projectionMatrix * mvPosition;
-				}
-			`,
-			fragmentShader: `
-				uniform sampler2D uTexture;
-				varying float vOpacity;
+		for (let i = 0; i < cfg.maxParticles; i++) {
+			if (!system.active[i]) continue
 
-				void main() {
-					vec2 uv = gl_PointCoord.xy - 0.5;
-					float r = length(uv);
-					if (r > 0.5) discard;
+			system.life[i] += delta
+			if (system.life[i] > system.maxLife[i]) {
+				system.active[i] = 0
+				system.sizes[i] = 0
+				continue
+			}
 
-					// Sample texture for ground color
-					vec3 texColor = vec3(0.0);
-					texColor += texture2D(uTexture, vec2(0.25, 0.25)).rgb;
-					texColor += texture2D(uTexture, vec2(0.75, 0.25)).rgb;
-					texColor += texture2D(uTexture, vec2(0.25, 0.75)).rgb;
-					texColor += texture2D(uTexture, vec2(0.75, 0.75)).rgb;
-					texColor += texture2D(uTexture, vec2(0.5, 0.5)).rgb;
-					texColor /= 5.0;
+			activeCount++
+			const i3 = i * 3
 
-					// Desaturate to simulate airborne dust
-					float luminance = dot(texColor, vec3(0.299, 0.587, 0.114));
-					vec3 finalColor = mix(texColor, vec3(luminance), 0.3);
+			// Apply gravity and drag
+			system.velocityY[i] -= 9.8 * delta
+			system.velocityX[i] *= 0.99
+			system.velocityZ[i] *= 0.99
 
-					// Soft gaussian-like falloff
-					float alpha = exp(-r * r * 8.0) * 0.1;
-					float finalAlpha = vOpacity * alpha;
+			// Update position
+			system.positions[i3] += system.velocityX[i] * delta
+			system.positions[i3 + 1] += system.velocityY[i] * delta
+			system.positions[i3 + 2] += system.velocityZ[i] * delta
 
-					gl_FragColor = vec4(finalColor, finalAlpha);
-				}
-			`,
-		}),
-		[sandTexture]
-	)
+			// Size stays constant, opacity fades
+			const lifeRatio = system.life[i] / system.maxLife[i]
+			system.sizes[i] = system.initialSize[i]
+			system.opacities[i] = (1.0 - lifeRatio) * 0.8
+		}
 
-	// Water shader - simple soft white particles
-	const waterShader = useMemo(
-		() => ({
-			vertexShader: `
-				attribute float size;
-				attribute float opacity;
-				varying float vOpacity;
-				void main() {
-					vOpacity = opacity;
-					vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-					gl_PointSize = size * (450.0 / -mvPosition.z);
-					gl_Position = projectionMatrix * mvPosition;
-				}
-			`,
-			fragmentShader: `
-				varying float vOpacity;
+		system.activeCount = activeCount
+		geomRef.current.attributes.position.needsUpdate = true
+		geomRef.current.attributes.size.needsUpdate = true
+		geomRef.current.attributes.opacity.needsUpdate = true
+	}
 
-				void main() {
-					vec2 uv = gl_PointCoord.xy - 0.5;
-					float r = length(uv);
-					if (r > 0.5) discard;
+	// Update dust particles - drag only, grows over time
+	const updateDustSystem = (system, geomRef, delta) => {
+		if (system.activeCount === 0) return
 
-					// Soft edge falloff
-					float alpha = 1.0 - smoothstep(0.3, 0.5, r);
+		const cfg = DUST_CONFIG
+		let activeCount = 0
 
-					// Subtle white/very light blue
-					vec3 color = vec3(0.95, 0.97, 1.0);
+		for (let i = 0; i < cfg.maxParticles; i++) {
+			if (!system.active[i]) continue
 
-					float finalAlpha = vOpacity * alpha * 0.4;
-					gl_FragColor = vec4(color, finalAlpha);
-				}
-			`,
-		}),
-		[]
-	)
+			system.life[i] += delta
+			if (system.life[i] > system.maxLife[i]) {
+				system.active[i] = 0
+				system.sizes[i] = 0
+				continue
+			}
+
+			activeCount++
+			const i3 = i * 3
+
+			// Apply drag
+			system.velocityX[i] *= 0.97
+			system.velocityY[i] *= 0.97
+			system.velocityZ[i] *= 0.97
+
+			// Update position
+			system.positions[i3] += system.velocityX[i] * delta
+			system.positions[i3 + 1] += system.velocityY[i] * delta
+			system.positions[i3 + 2] += system.velocityZ[i] * delta
+
+			// Size grows, opacity fades quadratically
+			const lifeRatio = system.life[i] / system.maxLife[i]
+			system.sizes[i] = system.initialSize[i] * (1 + lifeRatio * 6.0)
+			system.opacities[i] = 1.0 - lifeRatio * lifeRatio
+		}
+
+		system.activeCount = activeCount
+		geomRef.current.attributes.position.needsUpdate = true
+		geomRef.current.attributes.size.needsUpdate = true
+		geomRef.current.attributes.opacity.needsUpdate = true
+	}
 
 	useFrame((state, delta) => {
 		if (!vehicleController.current) return
-		if (!dustGeometryRef.current || !waterGeometryRef.current) return
+		if (!waterGeomRef.current || !dustGeomRef.current) return
 
 		const controller = vehicleController.current
 
-		// Get vehicle speed and chassis orientation
+		// Get chassis velocity and orientation
 		let speed = 0
-		let chassisVel = null
 		try {
-			chassisVel = controller.chassis().linvel()
-			speed = Math.sqrt(chassisVel.x * chassisVel.x + chassisVel.y * chassisVel.y + chassisVel.z * chassisVel.z)
+			const vel = controller.chassis().linvel()
+			speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z)
 
-			// Get chassis rotation to determine forward and right directions
-			const chassisRotation = controller.chassis().rotation()
-			tempQuat.set(chassisRotation.x, chassisRotation.y, chassisRotation.z, chassisRotation.w)
-
-			// Forward is -Z in local space (typical vehicle forward)
+			const rot = controller.chassis().rotation()
+			tempQuat.set(rot.x, rot.y, rot.z, rot.w)
 			forwardDir.set(0, 0, -1).applyQuaternion(tempQuat)
-			// Right is +X in local space
 			rightDir.set(1, 0, 0).applyQuaternion(tempQuat)
-		} catch (e) {
+		} catch {
 			return
 		}
 
-		// Spawn particles
-		if (speed > 1) {
-			for (let wi = 0; wi < wheelRefs.length; wi++) {
-				const wheelRef = wheelRefs[wi]
-				const wheelInContact = controller.wheelIsInContact(wi)
+		// Process each wheel
+		for (let wi = 0; wi < wheelRefs.length; wi++) {
+			const wheelRef = wheelRefs[wi]
+			if (!wheelRef.current) continue
 
-				if (wheelRef.current) {
-					wheelRef.current.getWorldPosition(tempVec)
+			// Compute angular velocity from rotation delta
+			const currentRotation = controller.wheelRotation(wi) || 0
+			const angularVel = delta > 0 ? (currentRotation - prevWheelRotations.current[wi]) / delta : 0
+			prevWheelRotations.current[wi] = currentRotation
 
-					// Check if this specific wheel's bottom is in water
-					const wheelBottomY = tempVec.y - wheelRadius
-					const wheelIsInWater = wheelBottomY < WATER_LEVEL
+			wheelRef.current.getWorldPosition(tempVec)
+			const wheelCenterY = tempVec.y
+			const wheelBottomY = wheelCenterY - wheelRadius
+			const wheelTopY = wheelCenterY + wheelRadius
+			const inWater = wheelBottomY < WATER_LEVEL
+			const fullySubmerged = wheelTopY < WATER_LEVEL
+			const onGround = controller.wheelIsInContact(wi)
 
-					const shouldSpawn = wheelInContact || wheelIsInWater
+			// Water spray when partially submerged
+			if (inWater && !fullySubmerged) {
+				spawnWaterParticles(waterSystem.current, angularVel, wheelCenterY, tempVec.x, tempVec.z)
+			}
 
-					if (shouldSpawn) {
-						tempVec.y = wheelBottomY
-
-						const prevPos = prevWheelPositions.current[wi]
-						wheelVelocity.copy(tempVec).sub(prevPos)
-
-						const minSpeed = wheelIsInWater ? 1 : 2
-						const speedFactor = Math.min((speed - minSpeed) / 15, 1.0)
-						// In water, guarantee at least 2 particles and spawn more for better spray effect
-						const baseCount = Math.floor(speedFactor * speedFactor * 2 + 0.5)
-						const particlesPerFrame = wheelIsInWater ? Math.max(2, baseCount * 3) : baseCount
-
-						for (let s = 0; s < particlesPerFrame; s++) {
-							if (wheelIsInWater) {
-								// Spawn spray particles at the tire surface where it meets water
-								const p = waterParticles[nextWaterIndex.current]
-								nextWaterIndex.current = (nextWaterIndex.current + 1) % MAX_WATER_PARTICLES
-
-								p.active = true
-								p.life = 0
-								p.maxLife = 0.5 + Math.random() * 0.5
-
-								// Get wheel center position
-								wheelRef.current.getWorldPosition(tempVec)
-								const wheelCenterY = tempVec.y
-
-								// Calculate how deep the wheel is submerged
-								const submersionDepth = wheelCenterY - WATER_LEVEL
-								const clampedDepth = Math.max(-wheelRadius, Math.min(wheelRadius, submersionDepth))
-
-								// Calculate angle where tire meets water surface at the BACK
-								// Angle 0 = front, π/2 = top, π = back, 3π/2 = bottom
-								// We want the back-bottom quadrant where water is flung off (π to 3π/2)
-								// First find where the tire surface intersects water level
-								const waterLineAngle = Math.asin(-clampedDepth / wheelRadius)
-								// The back intersection is at π - waterLineAngle (back-bottom area)
-								const backBottomAngle = Math.PI - waterLineAngle
-
-								// Add variation around the back-bottom spray zone
-								const angleVariation = (Math.random() - 0.5) * 0.5
-								const spawnAngle = backBottomAngle + angleVariation
-
-								// Calculate spawn position on tire surface
-								const offsetY = Math.sin(spawnAngle) * wheelRadius
-								const offsetBackward = -Math.cos(spawnAngle) * wheelRadius
-
-								// Position at tire surface using chassis orientation
-								// Back direction is opposite of forward
-								const backDirX = -forwardDir.x
-								const backDirZ = -forwardDir.z
-
-								// Spread spray across tire width using right direction
-								const lateralOffset = (Math.random() - 0.5) * wheelWidth
-								p.position.x = tempVec.x + backDirX * offsetBackward + rightDir.x * lateralOffset + (Math.random() - 0.5) * 0.1
-								// Ensure spray spawns at or above water level
-								p.position.y = Math.max(WATER_LEVEL, wheelCenterY + offsetY)
-								p.position.z = tempVec.z + backDirZ * offsetBackward + rightDir.z * lateralOffset + (Math.random() - 0.5) * 0.1
-
-								// Direction is backward + outward from wheel
-								const tangentUpward = Math.cos(spawnAngle) // More upward when closer to water line
-								const tangentBackward = Math.sin(spawnAngle) // More backward when deeper
-
-								const flingSpeed = 2.0 + Math.random() * 1.5
-								const spreadX = (Math.random() - 0.5) * 0.8 + backDirX * flingSpeed * tangentBackward
-								const spreadZ = (Math.random() - 0.5) * 0.8 + backDirZ * flingSpeed * tangentBackward
-								const spreadY = 1.0 + Math.random() * 1.0 + tangentUpward * 1.5
-
-								p.velocity.set(spreadX, spreadY, spreadZ)
-								p.initialSize = Math.random() * 0.15 + 0.05
-								p.size = p.initialSize
-							} else {
-								// Spawn dust particles
-								const p = dustParticles[nextDustIndex.current]
-								nextDustIndex.current = (nextDustIndex.current + 1) % MAX_DUST_PARTICLES
-
-								p.active = true
-								p.life = 0
-								p.maxLife = 1.5 + Math.random() * 2.0
-
-								const t = particlesPerFrame > 1 ? s / (particlesPerFrame - 1) : 0.5
-								p.position.lerpVectors(prevPos, tempVec, t)
-
-								// Spread particles across tire width
-								const lateralOffset = (Math.random() - 0.5) * wheelWidth
-								const sideOffset = (Math.random() - 0.5) * 0.6
-								p.position.x += sideOffset + lateralOffset
-								const inheritFactor = 0.3 + Math.random() * 0.15
-								p.velocity.set(
-									-chassisVel.x * inheritFactor + sideOffset * 2.0,
-									Math.random() * 0.3 + 0.1,
-									-chassisVel.z * inheritFactor + (Math.random() - 0.5) * 0.5
-								)
-
-								p.initialSize = Math.random() * 2.5 + 1.5
-								p.size = p.initialSize
-							}
-						}
-
-						prevPos.copy(tempVec)
-					}
-				}
+			// Dust when on dry ground and moving
+			if (onGround && !inWater && speed > 2) {
+				const spinDir = angularVel >= 0 ? 1 : -1
+				const spawnX = tempVec.x + forwardDir.x * wheelRadius * 0.7 * spinDir
+				const spawnZ = tempVec.z + forwardDir.z * wheelRadius * 0.7 * spinDir
+				spawnDustParticles(dustSystem.current, angularVel, spawnX, wheelBottomY, spawnZ)
 			}
 		}
 
-		// Update dust particles
-		for (let i = 0; i < MAX_DUST_PARTICLES; i++) {
-			const p = dustParticles[i]
-			if (p.active) {
-				p.life += delta
-				if (p.life > p.maxLife) {
-					p.active = false
-					dustSizes[i] = 0
-					dustOpacities[i] = 0
-				} else {
-					p.position.addScaledVector(p.velocity, delta)
-
-					const drag = 0.97
-					p.velocity.x *= drag
-					p.velocity.y *= drag
-					p.velocity.z *= drag
-
-					const lifeRatio = p.life / p.maxLife
-					dustSizes[i] = p.initialSize * (1 + lifeRatio * 6.0)
-					dustOpacities[i] = 1.0 - lifeRatio * lifeRatio
-
-					dustPositions[i * 3] = p.position.x
-					dustPositions[i * 3 + 1] = p.position.y
-					dustPositions[i * 3 + 2] = p.position.z
-				}
-			}
-		}
-
-		// Update water particles (spray only)
-		for (let i = 0; i < MAX_WATER_PARTICLES; i++) {
-			const p = waterParticles[i]
-			if (p.active) {
-				p.life += delta
-
-				if (p.life > p.maxLife) {
-					p.active = false
-					waterSizes[i] = 0
-					waterOpacities[i] = 0
-				} else {
-					p.position.addScaledVector(p.velocity, delta)
-
-					const lifeRatio = p.life / p.maxLife
-
-					// Spray: gravity arc
-					p.velocity.y -= 9.8 * delta
-					p.velocity.x *= 0.99
-					p.velocity.z *= 0.99
-
-					waterSizes[i] = p.initialSize
-					waterOpacities[i] = (1.0 - lifeRatio) * 0.8
-
-					waterPositions[i * 3] = p.position.x
-					waterPositions[i * 3 + 1] = p.position.y
-					waterPositions[i * 3 + 2] = p.position.z
-				}
-			}
-		}
-
-		// Mark attributes as needing update
-		dustGeometryRef.current.attributes.position.needsUpdate = true
-		dustGeometryRef.current.attributes.size.needsUpdate = true
-		dustGeometryRef.current.attributes.opacity.needsUpdate = true
-
-		waterGeometryRef.current.attributes.position.needsUpdate = true
-		waterGeometryRef.current.attributes.size.needsUpdate = true
-		waterGeometryRef.current.attributes.opacity.needsUpdate = true
+		// Update particle systems
+		updateWaterSystem(waterSystem.current, waterGeomRef, delta)
+		updateDustSystem(dustSystem.current, dustGeomRef, delta)
 	})
 
 	return (
 		<>
+			{/* Water particles */}
+			<points frustumCulled={false}>
+				<bufferGeometry ref={waterGeomRef}>
+					<bufferAttribute attach='attributes-position' count={WATER_CONFIG.maxParticles} array={waterSystem.current.positions} itemSize={3} />
+					<bufferAttribute attach='attributes-size' count={WATER_CONFIG.maxParticles} array={waterSystem.current.sizes} itemSize={1} />
+					<bufferAttribute attach='attributes-opacity' count={WATER_CONFIG.maxParticles} array={waterSystem.current.opacities} itemSize={1} />
+				</bufferGeometry>
+				<shaderMaterial transparent depthWrite={false} blending={NormalBlending} vertexShader={PARTICLE_VERTEX_SHADER} fragmentShader={WATER_FRAGMENT_SHADER} />
+			</points>
+
 			{/* Dust particles */}
 			<points frustumCulled={false}>
-				<bufferGeometry ref={dustGeometryRef}>
-					<bufferAttribute attach='attributes-position' count={MAX_DUST_PARTICLES} array={dustPositions} itemSize={3} />
-					<bufferAttribute attach='attributes-size' count={MAX_DUST_PARTICLES} array={dustSizes} itemSize={1} />
-					<bufferAttribute attach='attributes-opacity' count={MAX_DUST_PARTICLES} array={dustOpacities} itemSize={1} />
+				<bufferGeometry ref={dustGeomRef}>
+					<bufferAttribute attach='attributes-position' count={DUST_CONFIG.maxParticles} array={dustSystem.current.positions} itemSize={3} />
+					<bufferAttribute attach='attributes-size' count={DUST_CONFIG.maxParticles} array={dustSystem.current.sizes} itemSize={1} />
+					<bufferAttribute attach='attributes-opacity' count={DUST_CONFIG.maxParticles} array={dustSystem.current.opacities} itemSize={1} />
 				</bufferGeometry>
 				<shaderMaterial
 					transparent
 					depthWrite={false}
 					blending={NormalBlending}
-					uniforms={dustShader.uniforms}
-					vertexShader={dustShader.vertexShader}
-					fragmentShader={dustShader.fragmentShader}
+					uniforms={{ uTexture: { value: sandTexture } }}
+					vertexShader={PARTICLE_VERTEX_SHADER}
+					fragmentShader={DUST_FRAGMENT_SHADER}
 				/>
-			</points>
-
-			{/* Water particles */}
-			<points frustumCulled={false}>
-				<bufferGeometry ref={waterGeometryRef}>
-					<bufferAttribute attach='attributes-position' count={MAX_WATER_PARTICLES} array={waterPositions} itemSize={3} />
-					<bufferAttribute attach='attributes-size' count={MAX_WATER_PARTICLES} array={waterSizes} itemSize={1} />
-					<bufferAttribute attach='attributes-opacity' count={MAX_WATER_PARTICLES} array={waterOpacities} itemSize={1} />
-				</bufferGeometry>
-				<shaderMaterial transparent depthWrite={false} blending={NormalBlending} vertexShader={waterShader.vertexShader} fragmentShader={waterShader.fragmentShader} />
 			</points>
 		</>
 	)
