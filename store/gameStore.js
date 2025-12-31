@@ -22,6 +22,7 @@ export const vehicleState = {
 	load: 0.2, // Engine load (0 = no load/airborne, 1 = max load/climbing)
 	position: new Vector3(0, 0, 0), // Vehicle world position (updated every frame)
 	heading: 0, // Vehicle heading/yaw in radians (updated every frame)
+	isInWater: false, // Whether vehicle is currently submerged in water
 }
 
 // Game store

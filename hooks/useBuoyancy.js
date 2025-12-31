@@ -1,7 +1,9 @@
 import { useRef, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
 import { generateFlowMap, FLOW_MAP_CONFIG } from '../components/scene/environment/terrain/flowMapGenerator'
 import { WATER_LEVEL, BUOYANCY } from '../config/water'
+import { vehicleState } from '../store/gameStore'
 
 /**
  * Sample flow data from the flow map at a given world position
@@ -42,12 +44,10 @@ const sampleFlowMap = (flowMapData, worldX, worldZ) => {
 
 /**
  * Buoyancy hook for vehicle water physics
+ * Automatically applies buoyancy forces each frame when vehicle is in water
  * @param {Object} vehicleRef - Reference to the vehicle rigid body
- * @returns {Object} - Buoyancy state and update function
  */
-export const useBuoyancy = (vehicleRef) => {
-	// Track if vehicle is in water
-	const isInWater = useRef(false)
+const useBuoyancy = (vehicleRef) => {
 	// Track water intake (0 = dry, 1 = full/sunk)
 	const waterIntake = useRef(0)
 
@@ -66,20 +66,16 @@ export const useBuoyancy = (vehicleRef) => {
 	const vec2 = useMemo(() => new Vector3(), [])
 	const quat = useMemo(() => new Quaternion(), [])
 
-	/**
-	 * Apply buoyancy forces to the vehicle
-	 * @param {number} delta - Frame delta time
-	 * @returns {boolean} - Whether the vehicle is in water
-	 */
-	const applyBuoyancy = (delta) => {
+	// Apply buoyancy forces each frame
+	useFrame((state, delta) => {
 		const vehicle = vehicleRef.current
-		if (!vehicle) return false
+		if (!vehicle) return
 
 		const vehiclePos = vehicle.translation()
 		const submersionDepth = WATER_LEVEL - vehiclePos.y
 
 		if (submersionDepth > 0) {
-			isInWater.current = true
+			vehicleState.isInWater = true
 
 			// 1. Update water intake (sinking mechanic)
 			waterIntake.current = Math.min(1, waterIntake.current + delta * BUOYANCY.sinkingRate)
@@ -173,20 +169,12 @@ export const useBuoyancy = (vehicleRef) => {
 				vec.set(alignTorque.x, alignTorque.y, alignTorque.z)
 				vehicle.applyTorqueImpulse(vec, true)
 			}
-
-			return true
 		} else {
-			isInWater.current = false
+			vehicleState.isInWater = false
 			// Drain water slowly when out of water
 			waterIntake.current = Math.max(0, waterIntake.current - delta * 0.2)
-			return false
 		}
-	}
-
-	return {
-		isInWater,
-		applyBuoyancy,
-	}
+	})
 }
 
 export default useBuoyancy

@@ -12,7 +12,7 @@ import useVehicleBroadcast from '../../../hooks/useVehicleBroadcast'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
 
 import VehicleAudio from './VehicleAudio'
-import Dust from './Dust'
+import WheelParticles from './WheelParticles'
 import TireTracks from './TireTracks'
 import Wheels from './Wheels'
 import VehicleBody from './VehicleBody'
@@ -130,7 +130,7 @@ const Vehicle = () => {
 			</RigidBody>
 			{!performanceDegraded && !isMobile && (
 				<>
-					<Dust vehicleController={vehicleController} wheelRefs={wheelRefs} />
+					<WheelParticles vehicleController={vehicleController} wheelRefs={wheelRefs} />
 					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={(config.rim_width * 2.54) / 100} tireRadius={axleHeight} />
 				</>
 			)}

@@ -114,8 +114,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	const wheelQuat1 = useMemo(() => new Quaternion(), [])
 	const wheelQuat2 = useMemo(() => new Quaternion(), [])
 
-	// Buoyancy hook for water physics
-	const { isInWater, applyBuoyancy } = useBuoyancy(vehicleRef)
+	// Water buoyancy
+	useBuoyancy(vehicleRef)
 
 	// Engine load tracking
 	const smoothedLoad = useRef(0.5)
@@ -255,9 +255,6 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 			// Update speed for UI (mutate directly to avoid re-renders)
 			vehicleState.speed = forwardSpeed
-
-			// Apply buoyancy forces when in water
-			applyBuoyancy(delta)
 		}
 
 		// Get processed vehicle input
@@ -542,7 +539,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		}
 
 		// Airborne controls when all wheels are not in contact (disabled in water)
-		if (isAirborne.current && !isInWater.current) {
+		if (isAirborne.current && !vehicleState.isInWater) {
 			if (vehicle) {
 				// Construct torque vector in world space using reusable objects
 				tempLocalTorque.set(pitchInput, yawInput, rollInput)
