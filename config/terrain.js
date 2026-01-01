@@ -1,9 +1,9 @@
 // Default Terrain Parameters
 export const TERRAIN_CONFIG = {
 	// Base terrain noise smoothness (higher = smoother, lower = more jagged)
-	smoothness: 15,
-	// Maximum terrain height
-	maxHeight: 4,
+	smoothness: 25,
+	// Height scale for base/valley terrain (mountains use their own scale)
+	baseHeightScale: 4,
 	// Regional height modulation scale (size of flat/hilly regions)
 	regionScale: 240,
 }

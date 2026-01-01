@@ -11,12 +11,12 @@ import { TILE_RESOLUTION } from '../../../../config/terrain'
  * Handles edge stitching to prevent cracks between LOD levels.
  *
  * @param {Object} node - Quadtree node with size, centerX, centerZ
- * @param {number} maxHeight - Maximum terrain height for scaling
- * @param {Object} terrainHelpers - Object with getRawHeight and getNormal functions
+ * @param {Object} terrainHelpers - Object with getRawHeight, getNormal, and baseHeightScale
  * @param {Object} edgeStitchInfo - Edge stitching configuration per direction
  * @returns {BufferGeometry} The generated terrain geometry
  */
-export const createTileGeometry = (node, maxHeight, terrainHelpers, edgeStitchInfo) => {
+export const createTileGeometry = (node, terrainHelpers, edgeStitchInfo) => {
+	const { baseHeightScale } = terrainHelpers
 	const { size, centerX, centerZ } = node
 	const resolution = TILE_RESOLUTION
 	const segments = resolution
@@ -46,7 +46,7 @@ export const createTileGeometry = (node, maxHeight, terrainHelpers, edgeStitchIn
 
 			const h0 = terrainHelpers.getRawHeight(x0, worldZ)
 			const h1 = terrainHelpers.getRawHeight(x1, worldZ)
-			return (h0 * (1 - t) + h1 * t) * maxHeight
+			return (h0 * (1 - t) + h1 * t) * baseHeightScale
 		} else {
 			const gridZ = worldZ / neighborStep
 			const z0 = Math.floor(gridZ) * neighborStep
@@ -55,7 +55,7 @@ export const createTileGeometry = (node, maxHeight, terrainHelpers, edgeStitchIn
 
 			const h0 = terrainHelpers.getRawHeight(worldX, z0)
 			const h1 = terrainHelpers.getRawHeight(worldX, z1)
-			return (h0 * (1 - t) + h1 * t) * maxHeight
+			return (h0 * (1 - t) + h1 * t) * baseHeightScale
 		}
 	}
 
@@ -84,7 +84,7 @@ export const createTileGeometry = (node, maxHeight, terrainHelpers, edgeStitchIn
 			} else if (onNorthEdge && edgeStitchInfo.north.needsStitch) {
 				height = getStitchedHeight(worldX, worldZ, edgeStitchInfo.north.neighborStep, 'x')
 			} else {
-				height = terrainHelpers.getRawHeight(worldX, worldZ) * maxHeight
+				height = terrainHelpers.getRawHeight(worldX, worldZ) * baseHeightScale
 			}
 
 			const vertIndex = i + sampleCount * j
@@ -97,7 +97,7 @@ export const createTileGeometry = (node, maxHeight, terrainHelpers, edgeStitchIn
 			positions[posIndex + 2] = localZ - halfSize
 
 			// Normal
-			terrainHelpers.getNormal(worldX, worldZ, maxHeight, normalVec)
+			terrainHelpers.getNormal(worldX, worldZ, normalVec)
 			normals[posIndex] = normalVec.x
 			normals[posIndex + 1] = normalVec.y
 			normals[posIndex + 2] = normalVec.z

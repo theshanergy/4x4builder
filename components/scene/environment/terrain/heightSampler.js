@@ -70,10 +70,10 @@ const getMountainNoise = (noise, x, z) => {
  * a clean API for the rest of the terrain system.
  *
  * @param {Object} noise - Noise instance from noisejs
- * @param {number} smoothness - Base terrain noise scale
  * @returns {Object} Object with getRawHeight, getHeight, and getNormal functions
  */
-export const createTerrainHelpers = (noise, smoothness) => {
+export const createTerrainHelpers = (noise) => {
+	const { baseHeightScale, smoothness } = TERRAIN_CONFIG
 	const flatAreaRadiusSq = STAGING_AREA.flatRadius * STAGING_AREA.flatRadius
 	const transitionEndDistSq = STAGING_AREA.transitionEnd * STAGING_AREA.transitionEnd
 
@@ -135,7 +135,7 @@ export const createTerrainHelpers = (noise, smoothness) => {
 
 			// Get mountain noise and apply blend
 			const rawMountainHeight = getMountainNoise(noise, worldX, worldZ)
-			// Scale to normalized units (will be multiplied by maxHeight later)
+			// Scale to normalized units (will be multiplied by baseHeightScale later)
 			mountainHeight = rawMountainHeight * (MOUNTAIN_CONFIG.maxHeight / 4) * mountainBlend * oceanFade
 		}
 
@@ -150,10 +150,10 @@ export const createTerrainHelpers = (noise, smoothness) => {
 			// Carve river bed into terrain - depth is relative to water level
 			// At river center (depthFactor=1): 95% terrain suppressed, 5% variance
 			// At river edges (depthFactor=0): full terrain height
-			const normalizedRiverDepth = RIVER_CONFIG.depth / TERRAIN_CONFIG.maxHeight
+			const normalizedRiverDepth = RIVER_CONFIG.depth / baseHeightScale
 			const varianceRetention = 1 - riverDepthFactor * 0.95
 			const carvedHeight = combinedHeight * varianceRetention - riverDepthFactor * normalizedRiverDepth
-			const riverBedFloor = WATER_LEVEL / TERRAIN_CONFIG.maxHeight - normalizedRiverDepth * 1.1
+			const riverBedFloor = WATER_LEVEL / baseHeightScale - normalizedRiverDepth * 1.1
 			combinedHeight = Math.max(carvedHeight, riverBedFloor)
 		}
 
@@ -161,15 +161,15 @@ export const createTerrainHelpers = (noise, smoothness) => {
 		if (distSq > oceanTransitionStartSq) {
 			if (dist >= OCEAN_CONFIG.radius) {
 				// Beyond ocean radius - full ocean depth (relative to water level)
-				const normalizedWaterLevel = WATER_LEVEL / TERRAIN_CONFIG.maxHeight
-				const normalizedOceanDepth = OCEAN_CONFIG.depth / TERRAIN_CONFIG.maxHeight
+				const normalizedWaterLevel = WATER_LEVEL / baseHeightScale
+				const normalizedOceanDepth = OCEAN_CONFIG.depth / baseHeightScale
 				return normalizedWaterLevel - normalizedOceanDepth
 			} else {
 				// In transition zone - smooth bezier-like curve through control point
 				const t = (dist - oceanTransitionStart) / OCEAN_CONFIG.transition // 0 at shore, 1 at deep ocean
 
-				const normalizedWaterLevel = WATER_LEVEL / TERRAIN_CONFIG.maxHeight
-				const normalizedOceanDepth = OCEAN_CONFIG.depth / TERRAIN_CONFIG.maxHeight
+				const normalizedWaterLevel = WATER_LEVEL / baseHeightScale
+				const normalizedOceanDepth = OCEAN_CONFIG.depth / baseHeightScale
 				const oceanFloorHeight = normalizedWaterLevel - normalizedOceanDepth
 				const midpointHeight = oceanFloorHeight * OCEAN_CONFIG.beachMidpointDepth
 
@@ -200,22 +200,22 @@ export const createTerrainHelpers = (noise, smoothness) => {
 	/**
 	 * Get terrain height at any world position (in world units)
 	 */
-	const getHeight = (worldX, worldZ, maxHeight) => {
-		return getRawHeight(worldX, worldZ) * maxHeight
+	const getHeight = (worldX, worldZ) => {
+		return getRawHeight(worldX, worldZ) * baseHeightScale
 	}
 
 	/**
 	 * Get terrain normal at any world position using numerical gradient
 	 */
-	const getNormal = (worldX, worldZ, maxHeight, target) => {
+	const getNormal = (worldX, worldZ, target) => {
 		// Use larger epsilon for distant terrain to avoid noise artifacts
 		const dist = Math.sqrt(worldX * worldX + worldZ * worldZ)
 		const epsilon = dist > 500 ? GRADIENT_EPSILON * 4 : GRADIENT_EPSILON
 
-		const hL = getRawHeight(worldX - epsilon, worldZ) * maxHeight
-		const hR = getRawHeight(worldX + epsilon, worldZ) * maxHeight
-		const hD = getRawHeight(worldX, worldZ - epsilon) * maxHeight
-		const hU = getRawHeight(worldX, worldZ + epsilon) * maxHeight
+		const hL = getRawHeight(worldX - epsilon, worldZ) * baseHeightScale
+		const hR = getRawHeight(worldX + epsilon, worldZ) * baseHeightScale
+		const hD = getRawHeight(worldX, worldZ - epsilon) * baseHeightScale
+		const hU = getRawHeight(worldX, worldZ + epsilon) * baseHeightScale
 
 		const dhdx = (hR - hL) / (2 * epsilon)
 		const dhdz = (hU - hD) / (2 * epsilon)
@@ -223,5 +223,5 @@ export const createTerrainHelpers = (noise, smoothness) => {
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}
 
-	return { getRawHeight, getHeight, getNormal }
+	return { getRawHeight, getHeight, getNormal, baseHeightScale }
 }

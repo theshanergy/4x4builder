@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { Vector3 } from 'three'
 
+import { TERRAIN_CONFIG } from '../config/terrain'
+
 /**
  * useTerrainCollider - Generates both physics collider args and mesh geometry data
  * from a single set of sane terrain inputs.
@@ -21,7 +23,6 @@ import { Vector3 } from 'three'
  * @param {Object} options - Terrain configuration
  * @param {number} options.segments - Number of terrain cells per axis (NOT vertices)
  * @param {number} options.size - World-space size of the terrain patch
- * @param {number} options.maxHeight - Maximum terrain height for scaling normalized values
  * @param {Function} options.getHeight - Function(localX, localZ) => normalized height (0-1, can be negative)
  *                                       localX/localZ are in range [0, size], starting from corner
  * @param {Function} [options.getNormal] - Optional Function(localX, localZ, target: Vector3) => Vector3
@@ -37,7 +38,8 @@ import { Vector3 } from 'three'
  * @returns {number} return.segments - Echo back segments for PlaneGeometry creation
  * @returns {number} return.size - Echo back size for PlaneGeometry creation
  */
-const useTerrainCollider = ({ segments, size, maxHeight, getHeight, getNormal, getUV }) => {
+const useTerrainCollider = ({ segments, size, getHeight, getNormal, getUV }) => {
+	const { baseHeightScale } = TERRAIN_CONFIG
 	return useMemo(() => {
 		const sampleCount = segments + 1
 		const totalSamples = sampleCount * sampleCount
@@ -76,7 +78,7 @@ const useTerrainCollider = ({ segments, size, maxHeight, getHeight, getNormal, g
 
 				// Position: centered around origin, height scaled
 				positions[posIndex] = localX - size / 2
-				positions[posIndex + 1] = normalizedHeight * maxHeight
+				positions[posIndex + 1] = normalizedHeight * baseHeightScale
 				positions[posIndex + 2] = localZ - size / 2
 
 				// Compute normal
@@ -89,8 +91,8 @@ const useTerrainCollider = ({ segments, size, maxHeight, getHeight, getNormal, g
 					const hD = getHeight(localX, Math.max(0, localZ - EPSILON))
 					const hU = getHeight(localX, Math.min(size, localZ + EPSILON))
 
-					const dhdx = ((hR - hL) * maxHeight) / (2 * EPSILON)
-					const dhdz = ((hU - hD) * maxHeight) / (2 * EPSILON)
+					const dhdx = ((hR - hL) * baseHeightScale) / (2 * EPSILON)
+					const dhdz = ((hU - hD) * baseHeightScale) / (2 * EPSILON)
 
 					normalVec.set(-dhdx, 1, -dhdz).normalize()
 				}
@@ -117,7 +119,7 @@ const useTerrainCollider = ({ segments, size, maxHeight, getHeight, getNormal, g
 			segments, // nrows (cell count, NOT sample count)
 			segments, // ncols (cell count, NOT sample count)
 			heightSamples, // (segments+1)² samples in row-major order
-			{ x: size, y: maxHeight, z: size },
+			{ x: size, y: baseHeightScale, z: size },
 		]
 
 		return {
@@ -128,7 +130,7 @@ const useTerrainCollider = ({ segments, size, maxHeight, getHeight, getNormal, g
 			segments,
 			size,
 		}
-	}, [segments, size, maxHeight, getHeight, getNormal, getUV])
+	}, [segments, size, baseHeightScale, getHeight, getNormal, getUV])
 }
 
 export default useTerrainCollider

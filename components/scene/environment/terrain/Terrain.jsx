@@ -6,7 +6,7 @@ import { Noise } from 'noisejs'
 import useGameStore, { vehicleState } from '../../../../store/gameStore'
 
 // Import terrain modules
-import { OCEAN_CONFIG, QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, TERRAIN_CONFIG, RIVER_CONFIG } from '../../../../config/terrain'
+import { OCEAN_CONFIG, QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, RIVER_CONFIG } from '../../../../config/terrain'
 import { WATER_LOAD_DISTANCE, WATER_UNLOAD_BUFFER } from '../../../../config/water'
 import { QuadtreeNode, getEdgeStitchInfo, DEFAULT_EDGE_STITCH_INFO } from './quadtree'
 import { getDistanceToRiver } from './riverUtils'
@@ -28,7 +28,6 @@ import Water from '../Water'
  * - Grass rendering (disabled on mobile/low performance)
  */
 const Terrain = () => {
-	const { smoothness, maxHeight } = TERRAIN_CONFIG
 	const [leafTiles, setLeafTiles] = useState([])
 	const [showWater, setShowWater] = useState(false)
 	const lastUpdatePosition = useRef({ x: null, z: null })
@@ -46,29 +45,24 @@ const Terrain = () => {
 	const noise = useMemo(() => new Noise(1234), [])
 
 	// Load textures
-	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
-
-	// Create shared terrain helpers (height/normal sampling)
-	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, smoothness), [noise, smoothness])
+	const [sandTexture, sandNormalMap, cliffTexture, cliffNormalMap] = useLoader(TextureLoader, [
+		'/assets/images/ground/sand.jpg',
+		'/assets/images/ground/sand_normal.jpg',
+		'/assets/images/ground/cliff_albedo.jpg',
+		'/assets/images/ground/cliff_normal.jpg',
+	])
 
 	// Scratch vector for normal calculations
 	const normalScratch = useMemo(() => new Vector3(), [])
 
+	// Create shared terrain helpers (height/normal sampling)
+	const terrainHelpers = useMemo(() => createTerrainHelpers(noise), [noise])
+
 	// Public API: Get terrain height at any world position
-	const getTerrainHeight = useCallback(
-		(worldX, worldZ) => {
-			return terrainHelpers.getHeight(worldX, worldZ, maxHeight)
-		},
-		[terrainHelpers, maxHeight]
-	)
+	const getTerrainHeight = useCallback((worldX, worldZ) => terrainHelpers.getHeight(worldX, worldZ), [terrainHelpers])
 
 	// Public API: Get terrain normal at any world position
-	const getTerrainNormal = useCallback(
-		(worldX, worldZ, target = normalScratch) => {
-			return terrainHelpers.getNormal(worldX, worldZ, maxHeight, target)
-		},
-		[terrainHelpers, maxHeight, normalScratch]
-	)
+	const getTerrainNormal = useCallback((worldX, worldZ, target = normalScratch) => terrainHelpers.getNormal(worldX, worldZ, target), [terrainHelpers, normalScratch])
 
 	// Update quadtree based on vehicle position each frame
 	useFrame(() => {
@@ -200,10 +194,11 @@ const Terrain = () => {
 				<TerrainTile
 					key={node.key}
 					node={node}
-					maxHeight={maxHeight}
 					terrainHelpers={terrainHelpers}
 					map={sandTexture}
 					normalMap={sandNormalMap}
+					cliffMap={cliffTexture}
+					cliffNormalMap={cliffNormalMap}
 					hasCollider={hasCollider}
 					edgeStitchInfo={edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO}
 				/>

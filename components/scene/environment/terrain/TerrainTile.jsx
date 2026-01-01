@@ -3,29 +3,27 @@
 // React component for rendering a single quadtree terrain tile with optional
 // physics collider support.
 
-import { useRef, useMemo, useEffect, useCallback, memo } from 'react'
+import { useMemo, useEffect, useCallback, useRef, memo } from 'react'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
-import { RepeatWrapping } from 'three'
 
 import { TILE_RESOLUTION } from '../../../../config/terrain'
 import { createTileGeometry } from './geometry'
 import useTerrainCollider from '../../../../hooks/useTerrainCollider'
+import TerrainMaterial from './TerrainMaterial'
 
 /**
  * Custom comparison for QuadtreeTerrainTile props.
  * Prevents unnecessary re-renders when props haven't meaningfully changed.
  */
 const arePropsEqual = (prevProps, nextProps) => {
-	// Node comparison - check key
-	if (prevProps.node.key !== nextProps.node.key) return false
-
-	// Check node properties that affect rendering
-	if (prevProps.node.size !== nextProps.node.size || prevProps.node.centerX !== nextProps.node.centerX || prevProps.node.centerZ !== nextProps.node.centerZ) {
-		return false
-	}
-
-	// Simple value comparisons
-	if (prevProps.maxHeight !== nextProps.maxHeight || prevProps.hasCollider !== nextProps.hasCollider) {
+	// Check properties that affect rendering
+	if (
+		prevProps.node.key !== nextProps.node.key ||
+		prevProps.node.size !== nextProps.node.size ||
+		prevProps.node.centerX !== nextProps.node.centerX ||
+		prevProps.node.centerZ !== nextProps.node.centerZ ||
+		prevProps.hasCollider !== nextProps.hasCollider
+	) {
 		return false
 	}
 
@@ -61,28 +59,13 @@ const arePropsEqual = (prevProps, nextProps) => {
  *
  * @param {Object} props
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
- * @param {number} props.maxHeight - Maximum terrain height
  * @param {Object} props.terrainHelpers - Height/normal sampling functions
  * @param {Texture} props.map - Diffuse texture
  * @param {Texture} props.normalMap - Normal map texture
  * @param {boolean} props.hasCollider - Whether to include physics collider
  * @param {Object} props.edgeStitchInfo - Edge stitching configuration
  */
-const TerrainTile = memo(({ node, maxHeight, terrainHelpers, map, normalMap, hasCollider = false, edgeStitchInfo }) => {
-	const materialRef = useRef()
-
-	// Apply texture settings
-	useMemo(() => {
-		if (map) {
-			map.wrapS = map.wrapT = RepeatWrapping
-			map.repeat.set(1, 1)
-		}
-		if (normalMap) {
-			normalMap.wrapS = normalMap.wrapT = RepeatWrapping
-			normalMap.repeat.set(0.33, 0.33)
-		}
-	}, [map, normalMap])
-
+const TerrainTile = memo(({ node, terrainHelpers, map, normalMap, cliffMap, cliffNormalMap, hasCollider = false, edgeStitchInfo }) => {
 	const { size, centerX, centerZ } = node
 	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
 
@@ -100,9 +83,9 @@ const TerrainTile = memo(({ node, maxHeight, terrainHelpers, map, normalMap, has
 		(localX, localZ, target) => {
 			const worldX = centerX + localX - size / 2
 			const worldZ = centerZ + localZ - size / 2
-			return terrainHelpers.getNormal(worldX, worldZ, maxHeight, target)
+			return terrainHelpers.getNormal(worldX, worldZ, target)
 		},
-		[centerX, centerZ, size, maxHeight, terrainHelpers]
+		[centerX, centerZ, size, terrainHelpers]
 	)
 
 	const getUV = useCallback(
@@ -121,12 +104,11 @@ const TerrainTile = memo(({ node, maxHeight, terrainHelpers, map, normalMap, has
 			? {
 					segments: TILE_RESOLUTION,
 					size,
-					maxHeight,
 					getHeight,
 					getNormal,
 					getUV,
 			  }
-			: { segments: 1, size: 1, maxHeight: 1, getHeight: () => 0, getNormal: null, getUV: null }
+			: { segments: 1, size: 1, getHeight: () => 0, getNormal: null, getUV: null }
 	)
 
 	// Create a stable key for edge stitch info
@@ -141,9 +123,9 @@ const TerrainTile = memo(({ node, maxHeight, terrainHelpers, map, normalMap, has
 
 	// Create geometry
 	const geometry = useMemo(() => {
-		return createTileGeometry(node, maxHeight, terrainHelpers, edgeStitchInfo)
+		return createTileGeometry(node, terrainHelpers, edgeStitchInfo)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [node.key, maxHeight, terrainHelpers, edgeStitchKey])
+	}, [node.key, terrainHelpers, edgeStitchKey])
 
 	// Dispose old geometry when it changes and on unmount
 	useEffect(() => {
@@ -167,7 +149,7 @@ const TerrainTile = memo(({ node, maxHeight, terrainHelpers, map, normalMap, has
 			<RigidBody type='fixed' position={position} colliders={false}>
 				<HeightfieldCollider args={colliderData.colliderArgs} name={`QTTile-${node.key}`} />
 				<mesh geometry={geometry} receiveShadow>
-					<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} />
+					<TerrainMaterial sandTexture={map} sandNormalMap={normalMap} cliffTexture={cliffMap} cliffNormalMap={cliffNormalMap} />
 				</mesh>
 			</RigidBody>
 		)
@@ -175,7 +157,7 @@ const TerrainTile = memo(({ node, maxHeight, terrainHelpers, map, normalMap, has
 
 	return (
 		<mesh geometry={geometry} position={position} receiveShadow>
-			<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} />
+			<TerrainMaterial sandTexture={map} sandNormalMap={normalMap} cliffTexture={cliffMap} cliffNormalMap={cliffNormalMap} />
 		</mesh>
 	)
 }, arePropsEqual)
