@@ -4,32 +4,31 @@ import { useFrame } from '@react-three/fiber'
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import { sunDirection, sunColor } from '../../../config/environment'
 
-// Sun directional light that follows camera target
+// Sun directional sun that follows camera target
 const Sun = () => {
-	const lightRef = useRef()
+	const sunRef = useRef()
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 
 	useFrame(() => {
-		const light = lightRef.current
+		const sun = sunRef.current
 
-		if (!light) return
+		if (!sun) return
 
-		// Position light based on sun direction relative to vehicle position
-		const lightDistance = 50
+		// Position sun based on sun direction relative to vehicle position
+		const sunDistance = 50
 		const targetPos = vehicleState.position
-		light.position.set(targetPos.x + sunDirection.x * lightDistance, targetPos.y + sunDirection.y * lightDistance, targetPos.z + sunDirection.z * lightDistance)
-		light.target.position.set(targetPos.x, targetPos.y, targetPos.z)
-		light.target.updateMatrixWorld()
+		sun.position.set(targetPos.x + sunDirection.x * sunDistance, targetPos.y + sunDirection.y * sunDistance, targetPos.z + sunDirection.z * sunDistance)
+		sun.target.position.set(targetPos.x, targetPos.y, targetPos.z)
+		sun.target.updateMatrixWorld()
 	})
 
 	// Use sun color from shared atmosphere config
 	return (
 		<directionalLight
-			ref={lightRef}
+			ref={sunRef}
 			castShadow={!performanceDegraded}
-			intensity={2.5}
+			intensity={2.0}
 			color={sunColor}
-			position={[10, 10, 10]}
 			shadow-mapSize={performanceDegraded ? [512, 512] : [1024, 1024]}
 			shadow-camera-far={100}
 			shadow-camera-left={-30}
@@ -37,6 +36,7 @@ const Sun = () => {
 			shadow-camera-top={30}
 			shadow-camera-bottom={-30}
 			shadow-radius={2}
+			shadow-bias={-0.01}
 		/>
 	)
 }

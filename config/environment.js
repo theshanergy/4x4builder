@@ -1,7 +1,7 @@
 import { Vector3, Color } from 'three'
 
 // Sun configuration
-export const sunDirection = new Vector3(0.6, 0.45, 0.5).normalize()
+export const sunDirection = new Vector3(0.545, 0.365, 0.4).normalize()
 export const sunColor = new Color().setHSL(0.1, 1.0, 0.93) // Warm sun
 
 // Sky colors - matching old sky appearance

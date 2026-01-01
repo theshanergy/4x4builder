@@ -22,8 +22,9 @@ const cloneWithMaterials = (scene) => {
 
 	clone.traverse((child) => {
 		if (child.isMesh) {
-			// Enable shadow casting
+			// Enable shadows
 			child.castShadow = true
+			child.receiveShadow = true
 
 			if (Array.isArray(child.material)) {
 				child.material = child.material.map((m) => cloneMaterial(m))
