@@ -36,7 +36,7 @@ const Sun = () => {
 			shadow-camera-top={30}
 			shadow-camera-bottom={-30}
 			shadow-radius={2}
-			shadow-bias={-0.01}
+			shadow-normalBias={0.15}
 		/>
 	)
 }
