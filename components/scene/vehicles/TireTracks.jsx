@@ -453,7 +453,7 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 		}
 	})
 
-	return <instancedMesh ref={meshRef} args={[geometry, material, MAX_TRACK_SEGMENTS]} frustumCulled={false} />
+	return <instancedMesh ref={meshRef} args={[geometry, material, MAX_TRACK_SEGMENTS]} frustumCulled={false} renderOrder={-1} />
 }
 
 export default TireTracks

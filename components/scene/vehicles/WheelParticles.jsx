@@ -71,7 +71,8 @@ const DUST_FRAGMENT_SHADER = `
 		vec3 texColor = texture2D(uTexture, vec2(0.5, 0.5)).rgb;
 		float luminance = dot(texColor, vec3(0.299, 0.587, 0.114));
 		vec3 finalColor = mix(texColor, vec3(luminance), 0.3);
-		float alpha = exp(-r2 * 8.0) * 0.1;
+		// Softer gaussian falloff with lower max opacity for better blending
+		float alpha = exp(-r2 * 6.0) * 0.04;
 		gl_FragColor = vec4(finalColor, vOpacity * alpha);
 	}
 `
@@ -258,10 +259,10 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 			system.positions[i3 + 1] += system.velocityY[i] * delta
 			system.positions[i3 + 2] += system.velocityZ[i] * delta
 
-			// Size grows, opacity fades quadratically
+			// Size grows, opacity fades faster with cubic falloff
 			const lifeRatio = system.life[i] / system.maxLife[i]
 			system.sizes[i] = system.initialSize[i] * (1 + lifeRatio * 6.0)
-			system.opacities[i] = 1.0 - lifeRatio * lifeRatio
+			system.opacities[i] = (1.0 - lifeRatio) * (1.0 - lifeRatio * lifeRatio)
 		}
 
 		system.activeCount = activeCount
