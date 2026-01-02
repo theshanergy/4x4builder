@@ -2,42 +2,38 @@ import { useMemo, useRef } from 'react'
 import { RepeatWrapping } from 'three'
 import { TERRAIN_LAYERS } from '../../../../config/terrain'
 
+// Uniform field definitions - maps layer properties to shader uniform names and values
+const UNIFORM_FIELDS = [
+	{ key: 'TextureScale', path: 'textureScale', condition: () => true },
+	{ key: 'DistanceScaleStart', path: 'lod.distanceScaleStart', condition: (layer) => layer.lod },
+	{ key: 'DistanceScaleFactor', path: 'lod.distanceScaleFactor', condition: (layer) => layer.lod },
+	{ key: 'LODLevels', path: 'lod.levels', condition: (layer) => layer.lod },
+	{ key: 'NormalScale', path: 'normalScale', condition: (layer) => layer.normalScale !== undefined },
+	{ key: 'HeightStart', path: 'blend.height.start', condition: (layer) => layer.blend?.height },
+	{ key: 'HeightEnd', path: 'blend.height.end', condition: (layer) => layer.blend?.height },
+	{ key: 'HeightInfluence', path: 'blend.height.influence', condition: (layer) => layer.blend?.height },
+	{ key: 'SlopeStart', path: 'blend.slope.start', condition: (layer) => layer.blend?.slope },
+	{ key: 'SlopeEnd', path: 'blend.slope.end', condition: (layer) => layer.blend?.slope },
+	{ key: 'SlopeInfluence', path: 'blend.slope.influence', condition: (layer) => layer.blend?.slope },
+	{ key: 'CurvatureScale', path: 'blend.curvature.scale', condition: (layer) => layer.blend?.curvature },
+	{ key: 'CurvatureSoftness', path: 'blend.curvature.softness', condition: (layer) => layer.blend?.curvature },
+	{ key: 'RidgeInfluence', path: 'blend.curvature.ridgeInfluence', condition: (layer) => layer.blend?.curvature }
+]
+
+// Get nested property value from object using dot notation
+const getNestedValue = (obj, path) => path.split('.').reduce((acc, key) => acc?.[key], obj)
+
 // Generate shader uniforms from layer config
 const generateLayerUniforms = (layers) => {
 	const uniforms = {}
 
 	layers.forEach((layer, index) => {
 		const prefix = `uLayer${index}`
-
-		uniforms[`${prefix}TextureScale`] = layer.textureScale
-
-		if (layer.lod) {
-			uniforms[`${prefix}DistanceScaleStart`] = layer.lod.distanceScaleStart
-			uniforms[`${prefix}DistanceScaleFactor`] = layer.lod.distanceScaleFactor
-			uniforms[`${prefix}LODLevels`] = layer.lod.levels
-		}
-
-		if (layer.normalScale !== undefined) {
-			uniforms[`${prefix}NormalScale`] = layer.normalScale
-		}
-
-		if (layer.blend) {
-			if (layer.blend.height) {
-				uniforms[`${prefix}HeightStart`] = layer.blend.height.start
-				uniforms[`${prefix}HeightEnd`] = layer.blend.height.end
-				uniforms[`${prefix}HeightInfluence`] = layer.blend.height.influence
+		UNIFORM_FIELDS.forEach(({ key, path, condition }) => {
+			if (condition(layer)) {
+				uniforms[`${prefix}${key}`] = getNestedValue(layer, path)
 			}
-			if (layer.blend.slope) {
-				uniforms[`${prefix}SlopeStart`] = layer.blend.slope.start
-				uniforms[`${prefix}SlopeEnd`] = layer.blend.slope.end
-				uniforms[`${prefix}SlopeInfluence`] = layer.blend.slope.influence
-			}
-			if (layer.blend.curvature) {
-				uniforms[`${prefix}CurvatureScale`] = layer.blend.curvature.scale
-				uniforms[`${prefix}CurvatureSoftness`] = layer.blend.curvature.softness
-				uniforms[`${prefix}RidgeInfluence`] = layer.blend.curvature.ridgeInfluence
-			}
-		}
+		})
 	})
 
 	return uniforms
@@ -49,38 +45,14 @@ const generateUniformDeclarations = (layers) => {
 
 	layers.forEach((layer, index) => {
 		const prefix = `uLayer${index}`
-
 		declarations += `uniform sampler2D ${prefix}Texture;\n`
 		declarations += `uniform sampler2D ${prefix}NormalMap;\n`
-		declarations += `uniform float ${prefix}TextureScale;\n`
-
-		if (layer.lod) {
-			declarations += `uniform float ${prefix}DistanceScaleStart;\n`
-			declarations += `uniform float ${prefix}DistanceScaleFactor;\n`
-			declarations += `uniform float ${prefix}LODLevels;\n`
-		}
-
-		if (layer.normalScale !== undefined) {
-			declarations += `uniform float ${prefix}NormalScale;\n`
-		}
-
-		if (layer.blend) {
-			if (layer.blend.height) {
-				declarations += `uniform float ${prefix}HeightStart;\n`
-				declarations += `uniform float ${prefix}HeightEnd;\n`
-				declarations += `uniform float ${prefix}HeightInfluence;\n`
+		
+		UNIFORM_FIELDS.forEach(({ key, condition }) => {
+			if (condition(layer)) {
+				declarations += `uniform float ${prefix}${key};\n`
 			}
-			if (layer.blend.slope) {
-				declarations += `uniform float ${prefix}SlopeStart;\n`
-				declarations += `uniform float ${prefix}SlopeEnd;\n`
-				declarations += `uniform float ${prefix}SlopeInfluence;\n`
-			}
-			if (layer.blend.curvature) {
-				declarations += `uniform float ${prefix}CurvatureScale;\n`
-				declarations += `uniform float ${prefix}CurvatureSoftness;\n`
-				declarations += `uniform float ${prefix}RidgeInfluence;\n`
-			}
-		}
+		})
 	})
 
 	return declarations
@@ -176,59 +148,36 @@ const generateBlendCode = (layer, index) => {
 // Generate color sampling code for a layer
 const generateSamplingCode = (layer, index) => {
 	const prefix = `uLayer${index}`
-	// For non-base layers, wrap sampling in a conditional to skip when blend is near zero
 	const isBaseLayer = index === 0
-
-	if (layer.triplanar && layer.lod) {
-		const useNoTile = layer.stochastic ? 'true' : 'false'
-		const sampling = `
-	// Layer ${index} (${layer.name}) - triplanar with LOD
+	const useNoTile = layer.stochastic ? 'true' : 'false'
+	const normalScaleStr = layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'
+	
+	// Conditional wrapper for non-base layers
+	const conditionalStart = isBaseLayer ? '' : `\n	if (layer${index}Blend > 0.01) {`
+	const conditionalEnd = isBaseLayer ? '' : `\n	}`
+	
+	// Common initialization
+	let code = `
+	// Layer ${index} (${layer.name})${layer.triplanar ? ' - triplanar' : ' - world-space UV'}${layer.lod ? ' with LOD' : ''}
 	vec4 layer${index}Color = vec4(0.0);
-	vec3 layer${index}Normal = vWorldNormal;${
-			isBaseLayer
-				? ''
-				: `
-	if (layer${index}Blend > 0.01) {`
-		}
+	vec3 layer${index}Normal = vWorldNormal;${conditionalStart}`
+
+	if (layer.triplanar) {
+		// Triplanar projection
+		if (layer.lod) {
+			code += `
 		vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
 		layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true, ${useNoTile});
-		layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});${
-			isBaseLayer
-				? ''
-				: `
-	}`
-		}`
-		return sampling
-	} else if (layer.triplanar) {
-		const useNoTile = layer.stochastic ? 'true' : 'false'
-		const sampling = `
-	// Layer ${index} (${layer.name}) - triplanar
-	vec4 layer${index}Color = vec4(0.0);
-	vec3 layer${index}Normal = vWorldNormal;${
-			isBaseLayer
-				? ''
-				: `
-	if (layer${index}Blend > 0.01) {`
-		}
+		layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});`
+		} else {
+			code += `
 		layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, true, ${useNoTile});
-		layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, ${useNoTile});${
-			isBaseLayer
-				? ''
-				: `
-	}`
-		}`
-		return sampling
-	} else if (layer.lod) {
-		// Non-triplanar layer with LOD
-		const sampling = `
-	// Layer ${index} (${layer.name}) - world-space UV mapping with LOD
-	vec4 layer${index}Color = vec4(0.0);
-	vec3 layer${index}Normal = vWorldNormal;${
-			isBaseLayer
-				? ''
-				: `
-	if (layer${index}Blend > 0.01) {`
+		layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, ${useNoTile});`
 		}
+	} else {
+		// World-space UV mapping
+		if (layer.lod) {
+			code += `
 		vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
 		float scaleLower${index} = ${prefix}TextureScale / lodInfo${index}.x;
 		float scaleUpper${index} = ${prefix}TextureScale / lodInfo${index}.y;
@@ -244,47 +193,30 @@ const generateSamplingCode = (layer, index) => {
 		vec3 normalLower${index} = textureNoTile(${prefix}NormalMap, uvLower${index}).xyz * 2.0 - 1.0;
 		vec3 normalUpper${index} = textureNoTile(${prefix}NormalMap, uvUpper${index}).xyz * 2.0 - 1.0;
 		vec3 normalSample${index} = mix(normalLower${index}, normalUpper${index}, lodBlend${index});
-		normalSample${index}.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
+		normalSample${index}.xy *= ${normalScaleStr};
 		// Convert tangent-space normal to world-space using UDN blending for Y-up projection
 		layer${index}Normal = normalize(vec3(
 			normalSample${index}.x + vWorldNormal.x,
 			abs(normalSample${index}.z) * vWorldNormal.y,
 			normalSample${index}.y + vWorldNormal.z
-		));${
-			isBaseLayer
-				? ''
-				: `
-	}`
-		}`
-		return sampling
-	} else {
-		// Non-triplanar layers without LOD (sand, snow) with stochastic sampling
-		const sampling = `
-	// Layer ${index} (${layer.name}) - world-space UV mapping with stochastic sampling
-	vec4 layer${index}Color = vec4(0.0);
-	vec3 layer${index}Normal = vWorldNormal;${
-			isBaseLayer
-				? ''
-				: `
-	if (layer${index}Blend > 0.01) {`
-		}
+		));`
+		} else {
+			code += `
 		vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
 		layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV, true);
 		vec3 layer${index}NormalSample = textureNoTile(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
-		layer${index}NormalSample.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
+		layer${index}NormalSample.xy *= ${normalScaleStr};
 		// Convert tangent-space normal to world-space using UDN blending for Y-up projection
 		layer${index}Normal = normalize(vec3(
 			layer${index}NormalSample.x + vWorldNormal.x,
 			abs(layer${index}NormalSample.z) * vWorldNormal.y,
 			layer${index}NormalSample.y + vWorldNormal.z
-		));${
-			isBaseLayer
-				? ''
-				: `
-	}`
-		}`
-		return sampling
+		));`
+		}
 	}
+	
+	code += conditionalEnd
+	return code
 }
 
 // Generate the final color blending code
