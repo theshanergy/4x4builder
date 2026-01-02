@@ -27,8 +27,8 @@ const Terrain = () => {
 	const [sandTexture, sandNormalMap, cliffTexture, cliffNormalMap] = useLoader(TextureLoader, [
 		'/assets/images/ground/sand.jpg',
 		'/assets/images/ground/sand_normal.jpg',
-		'/assets/images/ground/cliff_albedo.jpg',
-		'/assets/images/ground/cliff_normal.jpg',
+		'/assets/images/ground/slatecliffrock_albedo.jpg',
+		'/assets/images/ground/slatecliffrock_normal.jpg',
 	])
 
 	// Create shared terrain helpers (height/normal sampling)
