@@ -22,7 +22,7 @@ const CLIFF_CONFIG = {
 	ridgeInfluence: 0.5, // How much ridges (convex) show cliff texture (0-1)
 
 	// Texture settings
-	textureScale: 0.05, // World-space texture tiling scale
+	textureScale: 0.015, // World-space texture tiling scale
 
 	// Distance-based texture scaling (reduces tiling on distant terrain)
 	distanceScaleStart: 100, // Distance where scaling starts
@@ -134,20 +134,26 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 					return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
 				}
 
-				// Sample texture without tiling artifacts using stochastic sampling
-				// Blends 2 neighboring tiles for performance (reduced from 4)
+				// Sample texture - uses stochastic sampling nearby, plain sampling at distance
 				vec4 textureNoTile(sampler2D samp, vec2 uv) {
-					// Tile scale - controls size of variation regions
-					float tileScale = 0.25;
-					vec2 scaledUV = uv * tileScale;
-
-					// Get tile coordinates and fractional position within tile
-					vec2 tile = floor(scaledUV);
-					vec2 f = fract(scaledUV);
-
 					// Compute derivatives for mip-mapping
 					vec2 dx = dFdx(uv);
 					vec2 dy = dFdy(uv);
+
+					// Fade out stochastic sampling at distance to avoid seams on large LOD tiles
+					float dist = length(vWorldPos - cameraPosition);
+					float stochasticBlend = 1.0 - smoothstep(150.0, 400.0, dist);
+
+					// Early out for distant terrain - just use plain sampling
+					if (stochasticBlend < 0.01) {
+						return textureGrad(samp, uv, dx, dy);
+					}
+
+					// Stochastic sampling for nearby terrain
+					float tileScale = 0.08;
+					vec2 scaledUV = uv * tileScale;
+					vec2 tile = floor(scaledUV);
+					vec2 f = fract(scaledUV);
 
 					// Use diagonal blend (2 samples instead of 4)
 					float w = smoothstep(0.0, 1.0, f.x + f.y - 0.5);
@@ -157,8 +163,11 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 
 					vec4 col0 = textureGrad(samp, uv + off0, dx, dy);
 					vec4 col1 = textureGrad(samp, uv + off1, dx, dy);
+					vec4 stochasticColor = mix(col0, col1, w);
 
-					return mix(col0, col1, w);
+					// Blend between stochastic (near) and plain (far) sampling
+					vec4 plainColor = textureGrad(samp, uv, dx, dy);
+					return mix(plainColor, stochasticColor, stochasticBlend);
 				}
 
 				// Calculate LOD blend info - returns vec3(lowerScale, upperScale, blendFactor)
