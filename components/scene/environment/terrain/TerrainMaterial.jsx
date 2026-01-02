@@ -20,11 +20,14 @@ const CLIFF_CONFIG = {
 	curvatureScale: 50.0, // Multiplier for curvature detection sensitivity
 	curvatureSoftness: 0.3, // Softness of curvature-based blending (higher = softer)
 	ridgeInfluence: 0.5, // How much ridges (convex) show cliff texture (0-1)
-	valleyDarkening: 0.3, // Maximum valley darkening amount (0-1)
-	lowAreaDarkening: 0.1, // Darkening for low elevation areas (0-1)
 
 	// Texture settings
 	textureScale: 0.05, // World-space texture tiling scale
+
+	// Distance-based texture scaling (reduces tiling on distant terrain)
+	distanceScaleStart: 500, // Distance where scaling starts
+	distanceScaleEnd: 1500, // Distance where max scaling is reached
+	distanceScaleMax: 4.0, // Maximum scale multiplier at far distance (larger = bigger textures)
 }
 
 /**
@@ -73,8 +76,10 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 			shader.uniforms.uCurvatureScale = { value: CLIFF_CONFIG.curvatureScale }
 			shader.uniforms.uCurvatureSoftness = { value: CLIFF_CONFIG.curvatureSoftness }
 			shader.uniforms.uRidgeInfluence = { value: CLIFF_CONFIG.ridgeInfluence }
-			shader.uniforms.uValleyDarkening = { value: CLIFF_CONFIG.valleyDarkening }
-			shader.uniforms.uLowAreaDarkening = { value: CLIFF_CONFIG.lowAreaDarkening } // Darker valley color
+			// Distance-based scaling
+			shader.uniforms.uDistanceScaleStart = { value: CLIFF_CONFIG.distanceScaleStart }
+			shader.uniforms.uDistanceScaleEnd = { value: CLIFF_CONFIG.distanceScaleEnd }
+			shader.uniforms.uDistanceScaleMax = { value: CLIFF_CONFIG.distanceScaleMax }
 
 			// Vertex shader - pass world position
 			shader.vertexShader = shader.vertexShader.replace(
@@ -116,12 +121,14 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				uniform float uCurvatureScale;
 				uniform float uCurvatureSoftness;
 				uniform float uRidgeInfluence;
-				uniform float uValleyDarkening;
-				uniform float uLowAreaDarkening;
+				uniform float uDistanceScaleStart;
+				uniform float uDistanceScaleEnd;
+				uniform float uDistanceScaleMax;
 				varying vec3 vWorldPos;
 				varying vec3 vWorldNormal;
 				varying vec2 vCliffUV;
 				float cliffBlend;
+				float distanceScale;
 
 				// Hash function for pseudo-random variation
 				vec2 hash2(vec2 p) {
@@ -163,6 +170,14 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 					return mix(colX0, colX1, w.y);
 				}
 
+				// Calculate distance-based texture scale multiplier
+				// Returns a scale divisor that makes textures larger (less tiled) at distance
+				float getDistanceScale(vec3 worldPos) {
+					float dist = length(worldPos - cameraPosition);
+					float t = smoothstep(uDistanceScaleStart, uDistanceScaleEnd, dist);
+					return mix(1.0, uDistanceScaleMax, t);
+				}
+
 				// Calculate approximate curvature from world position derivatives
 				float getCurvature() {
 					vec3 dx = dFdx(vWorldPos);
@@ -173,6 +188,60 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 					// Mean curvature approximation
 					float curvature = (dot(ddx, dx) + dot(ddy, dy)) * 0.5;
 					return curvature;
+				}
+
+				// Triplanar texture sampling - projects texture from 3 axes and blends based on normal
+				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale) {
+					// Calculate blend weights from world normal (sharper falloff for cleaner transitions)
+					vec3 blend = abs(worldNormal);
+					blend = pow(blend, vec3(4.0));
+					blend /= (blend.x + blend.y + blend.z);
+
+					// Calculate UVs for each axis projection
+					vec2 uvX = worldPos.zy * scale;
+					vec2 uvY = worldPos.xz * scale;
+					vec2 uvZ = worldPos.xy * scale;
+
+					// Sample from each projection with anti-tiling
+					vec4 colX = textureNoTile(samp, uvX);
+					vec4 colY = textureNoTile(samp, uvY);
+					vec4 colZ = textureNoTile(samp, uvZ);
+
+					// Blend based on normal direction
+					return colX * blend.x + colY * blend.y + colZ * blend.z;
+				}
+
+				// Triplanar normal sampling with proper tangent space blending (UDN method)
+				vec3 normalTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale) {
+					// Calculate blend weights from world normal
+					vec3 blend = abs(worldNormal);
+					blend = pow(blend, vec3(4.0));
+					blend /= (blend.x + blend.y + blend.z);
+
+					// Calculate UVs for each axis projection
+					vec2 uvX = worldPos.zy * scale;
+					vec2 uvY = worldPos.xz * scale;
+					vec2 uvZ = worldPos.xy * scale;
+
+					// Sample normals from each projection with anti-tiling
+					vec3 tnormX = textureNoTile(samp, uvX).xyz * 2.0 - 1.0;
+					vec3 tnormY = textureNoTile(samp, uvY).xyz * 2.0 - 1.0;
+					vec3 tnormZ = textureNoTile(samp, uvZ).xyz * 2.0 - 1.0;
+
+					// Swizzle world normals into tangent space for each axis and apply UDN blend
+					// This properly handles the orientation of each projection plane
+					vec3 normalX = vec3(tnormX.xy + worldNormal.zy, abs(tnormX.z) * worldNormal.x);
+					vec3 normalY = vec3(tnormY.xy + worldNormal.xz, abs(tnormY.z) * worldNormal.y);
+					vec3 normalZ = vec3(tnormZ.xy + worldNormal.xy, abs(tnormZ.z) * worldNormal.z);
+
+					// Swizzle back to world space and blend
+					vec3 result = normalize(
+						normalX.zxy * blend.x +
+						normalY.xzy * blend.y +
+						normalZ.xyz * blend.z
+					);
+
+					return result;
 				}`
 			)
 
@@ -181,9 +250,12 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				'#include <map_fragment>',
 				`#include <map_fragment>
 
-				// Sample cliff texture using world position UV with anti-tiling
-				vec2 cliffUV = vWorldPos.xz * uTextureScale;
-				vec4 cliffColor = textureNoTile(uCliffTexture, cliffUV);
+				// Calculate distance-based scale for cliffs only (larger textures at distance to reduce tiling)
+				distanceScale = getDistanceScale(vWorldPos);
+				float cliffScale = uTextureScale / distanceScale;
+
+				// Sample cliff texture using triplanar projection to avoid stretching on steep slopes
+				vec4 cliffColor = textureTriplanar(uCliffTexture, vWorldPos, vWorldNormal, cliffScale);
 
 				// Height factor (0 = low, 1 = high) using absolute world heights
 				float heightFactor = smoothstep(uHeightBlendStart, uHeightBlendEnd, vWorldPos.y);
@@ -195,12 +267,9 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				// Curvature for erosion patterns
 				float curvature = getCurvature();
 
-				// Positive curvature = convex (ridges), negative = concave (valleys)
+				// Positive curvature = convex (ridges) show more cliff texture
 				float ridgeFactor = clamp(curvature * uCurvatureScale, 0.0, 1.0);
 				ridgeFactor = ridgeFactor / (uCurvatureSoftness + ridgeFactor);
-
-				float valleyFactor = clamp(-curvature * uCurvatureScale, 0.0, 1.0);
-				valleyFactor = valleyFactor / (uCurvatureSoftness + valleyFactor);
 
 				// Blend factors for cliff texture
 				// Cliff appears on: steep slopes, high areas, ridges
@@ -208,34 +277,28 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				cliffBlend = max(cliffBlend, ridgeFactor * uRidgeInfluence);
 				cliffBlend = clamp(cliffBlend, 0.0, 1.0);
 
-				// Valley darkening in concave areas and low spots
-				float valleyBlend = valleyFactor * uValleyDarkening + (1.0 - heightFactor) * uLowAreaDarkening;
-				valleyBlend = clamp(valleyBlend, 0.0, uValleyDarkening);
+				// Mask out cliff below heightBlendStart - no cliff texture in low areas
+				float heightMask = smoothstep(uHeightBlendStart - 2.0, uHeightBlendStart, vWorldPos.y);
+				cliffBlend *= heightMask;
 
 				// Blend sand and cliff textures
-				vec3 blendedColor = mix(diffuseColor.rgb, cliffColor.rgb, cliffBlend);
-
-				// Darken valleys and low areas
-				blendedColor *= (1.0 - valleyBlend);
-
-				diffuseColor.rgb = blendedColor;`
+				diffuseColor.rgb = mix(diffuseColor.rgb, cliffColor.rgb, cliffBlend);`
 			)
 
 			// Replace normal map fragment to blend both normal maps
 			shader.fragmentShader = shader.fragmentShader.replace(
 				'#include <normal_fragment_maps>',
 				`#ifdef USE_NORMALMAP
-					// Sample sand normal from the standard normal map
+					// Sample sand normal from the standard normal map (tangent space)
 					vec3 sandNormal = texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0;
+					sandNormal.xy *= normalScale;
+					vec3 sandWorldNormal = normalize(tbn * sandNormal);
 
-					// Sample cliff normal using world-space UVs with anti-tiling
-					vec3 cliffNormal = textureNoTile(uCliffNormalMap, vCliffUV).xyz * 2.0 - 1.0;
+					// Sample cliff normal using triplanar projection with distance-based scaling
+					vec3 cliffWorldNormal = normalTriplanar(uCliffNormalMap, vWorldPos, vWorldNormal, cliffScale);
 
-					// Blend normals based on terrain blend factor
-					vec3 mapN = mix(sandNormal, cliffNormal, cliffBlend);
-					mapN.xy *= normalScale;
-
-					normal = normalize(tbn * mapN);
+					// Blend world-space normals based on terrain blend factor
+					normal = normalize(mix(sandWorldNormal, cliffWorldNormal, cliffBlend));
 				#endif`
 			)
 		}
