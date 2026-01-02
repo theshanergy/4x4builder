@@ -13,7 +13,6 @@ import { RepeatWrapping } from 'three'
  *   - height: { start, end, influence } - Height-based blending
  *   - slope: { start, end, influence } - Slope-based blending (0=flat, 1=steep)
  *   - curvature: { scale, softness, ridgeInfluence } - Curvature-based erosion
- *   - invert: If true, layer appears where conditions are NOT met
  *
  * Layers are rendered bottom-to-top (first layer is base)
  */
@@ -73,15 +72,14 @@ export const TERRAIN_LAYERS = [
 		blend: {
 			type: 'height_slope',
 			height: {
-				start: 80, // Height where snow starts appearing
-				end: 120, // Height where snow is fully present
-				influence: 1.0,
+				start: 120, // Height where snow starts appearing
+				end: 200, // Height where snow is fully present
+				influence: 0.1,
 			},
 			slope: {
 				start: 0.5, // Snow fades on slopes steeper than this
 				end: 0.8, // Snow fully gone on very steep slopes
 				influence: 0.7,
-				invert: true, // Snow appears on flat areas, not steep
 			},
 		},
 	},
@@ -116,7 +114,6 @@ const generateLayerUniforms = (layers) => {
 				uniforms[`${prefix}SlopeStart`] = layer.blend.slope.start
 				uniforms[`${prefix}SlopeEnd`] = layer.blend.slope.end
 				uniforms[`${prefix}SlopeInfluence`] = layer.blend.slope.influence
-				uniforms[`${prefix}SlopeInvert`] = layer.blend.slope.invert ? 1.0 : 0.0
 			}
 			if (layer.blend.curvature) {
 				uniforms[`${prefix}CurvatureScale`] = layer.blend.curvature.scale
@@ -160,7 +157,6 @@ const generateUniformDeclarations = (layers) => {
 				declarations += `uniform float ${prefix}SlopeStart;\n`
 				declarations += `uniform float ${prefix}SlopeEnd;\n`
 				declarations += `uniform float ${prefix}SlopeInfluence;\n`
-				declarations += `uniform float ${prefix}SlopeInvert;\n`
 			}
 			if (layer.blend.curvature) {
 				declarations += `uniform float ${prefix}CurvatureScale;\n`
@@ -205,9 +201,7 @@ const generateBlendCode = (layer, index) => {
 			code += `
 		// Slope factor (0 = flat, 1 = steep)
 		float slopeFactor${index} = 1.0 - abs(vWorldNormal.y);
-		slopeFactor${index} = smoothstep(${prefix}SlopeStart, ${prefix}SlopeEnd, slopeFactor${index});
-		// Apply invert if needed (for layers that appear on flat areas)
-		slopeFactor${index} = mix(slopeFactor${index}, 1.0 - slopeFactor${index}, ${prefix}SlopeInvert);`
+		slopeFactor${index} = smoothstep(${prefix}SlopeStart, ${prefix}SlopeEnd, slopeFactor${index});`
 		}
 	}
 
