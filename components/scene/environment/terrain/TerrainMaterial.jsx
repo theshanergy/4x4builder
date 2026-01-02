@@ -31,6 +31,7 @@ export const TERRAIN_LAYERS = [
 		// Base layer - no blend config needed
 		// Uses triplanar projection with LOD and stochastic sampling
 		triplanar: true,
+		stochastic: true, // Enable stochastic sampling to reduce tiling
 		lod: {
 			distanceScaleStart: 100,
 			distanceScaleFactor: 300,
@@ -269,16 +270,18 @@ const generateSamplingCode = (layer, index) => {
 	const prefix = `uLayer${index}`
 
 	if (layer.triplanar && layer.lod) {
+		const useNoTile = layer.stochastic ? 'true' : 'false'
 		return `
 	// Layer ${index} (${layer.name}) - triplanar with LOD
 	vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
-	vec4 layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true);
-	vec3 layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index});`
+	vec4 layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true, ${useNoTile});
+	vec3 layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});`
 	} else if (layer.triplanar) {
+		const useNoTile = layer.stochastic ? 'true' : 'false'
 		return `
 	// Layer ${index} (${layer.name}) - triplanar
-	vec4 layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, true);
-	vec3 layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale);`
+	vec4 layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, true, ${useNoTile});
+	vec3 layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, ${useNoTile});`
 	} else {
 		return `
 	// Layer ${index} (${layer.name}) - world-space UV mapping with stochastic sampling
@@ -516,7 +519,8 @@ const TerrainMaterial = ({ layerTextures }) => {
 
 				// Triplanar texture sampling - projects texture from 3 axes and blends based on normal
 				// Set srgb=true for albedo textures to convert to linear space
-				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool srgb) {
+				// Set useNoTile=true to enable stochastic anti-tiling (more expensive)
+				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool srgb, bool useNoTile) {
 					// Calculate blend weights from world normal (sharper falloff for cleaner transitions)
 					vec3 blend = abs(worldNormal);
 					blend = pow(blend, vec3(4.0));
@@ -527,42 +531,62 @@ const TerrainMaterial = ({ layerTextures }) => {
 					vec2 uvY = worldPos.xz * scale;
 					vec2 uvZ = worldPos.xy * scale;
 
-					// Sample from each projection with anti-tiling
-					vec4 colX = textureNoTile(samp, uvX, srgb);
-					vec4 colY = textureNoTile(samp, uvY, srgb);
-					vec4 colZ = textureNoTile(samp, uvZ, srgb);
+					// Sample from each projection
+					vec4 colX, colY, colZ;
+					if (useNoTile) {
+						colX = textureNoTile(samp, uvX, srgb);
+						colY = textureNoTile(samp, uvY, srgb);
+						colZ = textureNoTile(samp, uvZ, srgb);
+					} else {
+						vec2 dxX = dFdx(uvX);
+						vec2 dyX = dFdy(uvX);
+						vec2 dxY = dFdx(uvY);
+						vec2 dyY = dFdy(uvY);
+						vec2 dxZ = dFdx(uvZ);
+						vec2 dyZ = dFdy(uvZ);
+						colX = textureGrad(samp, uvX, dxX, dyX);
+						colY = textureGrad(samp, uvY, dxY, dyY);
+						colZ = textureGrad(samp, uvZ, dxZ, dyZ);
+						if (srgb) {
+							colX = sRGBToLinear(colX);
+							colY = sRGBToLinear(colY);
+							colZ = sRGBToLinear(colZ);
+						}
+					}
 
 					// Blend based on normal direction
 					return colX * blend.x + colY * blend.y + colZ * blend.z;
 				}
 
 				// Convenience overload for normal maps (no sRGB conversion)
-				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale) {
-					return textureTriplanar(samp, worldPos, worldNormal, scale, false);
+				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool useNoTile) {
+					return textureTriplanar(samp, worldPos, worldNormal, scale, false, useNoTile);
 				}
 
 				// Triplanar with LOD blending - samples at two scales and blends between them
 				// Set srgb=true for albedo textures to convert to linear space
-				vec4 textureTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo, bool srgb) {
+				// Set useNoTile=true to enable stochastic anti-tiling (more expensive)
+				vec4 textureTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo, bool srgb, bool useNoTile) {
 					float scaleLower = baseScale / lodInfo.x;
 					float scaleUpper = baseScale / lodInfo.y;
 					float lodBlend = lodInfo.z;
 
 					// Sample at both LOD scales
-					vec4 colorLower = textureTriplanar(samp, worldPos, worldNormal, scaleLower, srgb);
-					vec4 colorUpper = textureTriplanar(samp, worldPos, worldNormal, scaleUpper, srgb);
+					vec4 colorLower = textureTriplanar(samp, worldPos, worldNormal, scaleLower, srgb, useNoTile);
+					vec4 colorUpper = textureTriplanar(samp, worldPos, worldNormal, scaleUpper, srgb, useNoTile);
 
 					// Blend between LOD levels
 					return mix(colorLower, colorUpper, lodBlend);
 				}
 
 				// Convenience overload for normal maps (no sRGB conversion)
-				vec4 textureTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo) {
-					return textureTriplanarLOD(samp, worldPos, worldNormal, baseScale, lodInfo, false);
+				vec4 textureTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo, bool useNoTile) {
+					return textureTriplanarLOD(samp, worldPos, worldNormal, baseScale, lodInfo, false, useNoTile);
 				}
 
 				// Triplanar normal sampling with proper tangent space blending (UDN method)
-				vec3 normalTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale) {
+				// Set useNoTile=true to enable stochastic anti-tiling (more expensive)
+				vec3 normalTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool useNoTile) {
 					// Calculate blend weights from world normal
 					vec3 blend = abs(worldNormal);
 					blend = pow(blend, vec3(4.0));
@@ -573,10 +597,23 @@ const TerrainMaterial = ({ layerTextures }) => {
 					vec2 uvY = worldPos.xz * scale;
 					vec2 uvZ = worldPos.xy * scale;
 
-					// Sample normals from each projection with anti-tiling
-					vec3 tnormX = textureNoTile(samp, uvX).xyz * 2.0 - 1.0;
-					vec3 tnormY = textureNoTile(samp, uvY).xyz * 2.0 - 1.0;
-					vec3 tnormZ = textureNoTile(samp, uvZ).xyz * 2.0 - 1.0;
+					// Sample normals from each projection
+					vec3 tnormX, tnormY, tnormZ;
+					if (useNoTile) {
+						tnormX = textureNoTile(samp, uvX).xyz * 2.0 - 1.0;
+						tnormY = textureNoTile(samp, uvY).xyz * 2.0 - 1.0;
+						tnormZ = textureNoTile(samp, uvZ).xyz * 2.0 - 1.0;
+					} else {
+						vec2 dxX = dFdx(uvX);
+						vec2 dyX = dFdy(uvX);
+						vec2 dxY = dFdx(uvY);
+						vec2 dyY = dFdy(uvY);
+						vec2 dxZ = dFdx(uvZ);
+						vec2 dyZ = dFdy(uvZ);
+						tnormX = textureGrad(samp, uvX, dxX, dyX).xyz * 2.0 - 1.0;
+						tnormY = textureGrad(samp, uvY, dxY, dyY).xyz * 2.0 - 1.0;
+						tnormZ = textureGrad(samp, uvZ, dxZ, dyZ).xyz * 2.0 - 1.0;
+					}
 
 					// Swizzle world normals into tangent space for each axis and apply UDN blend
 					// This properly handles the orientation of each projection plane
@@ -595,14 +632,15 @@ const TerrainMaterial = ({ layerTextures }) => {
 				}
 
 				// Triplanar normal with LOD blending
-				vec3 normalTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo) {
+				// Set useNoTile=true to enable stochastic anti-tiling (more expensive)
+				vec3 normalTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo, bool useNoTile) {
 					float scaleLower = baseScale / lodInfo.x;
 					float scaleUpper = baseScale / lodInfo.y;
 					float lodBlend = lodInfo.z;
 
 					// Sample normals at both LOD scales
-					vec3 normalLower = normalTriplanar(samp, worldPos, worldNormal, scaleLower);
-					vec3 normalUpper = normalTriplanar(samp, worldPos, worldNormal, scaleUpper);
+					vec3 normalLower = normalTriplanar(samp, worldPos, worldNormal, scaleLower, useNoTile);
+					vec3 normalUpper = normalTriplanar(samp, worldPos, worldNormal, scaleUpper, useNoTile);
 
 					// Blend between LOD levels
 					return normalize(mix(normalLower, normalUpper, lodBlend));
