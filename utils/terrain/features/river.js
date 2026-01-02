@@ -1,5 +1,5 @@
 import { DataTexture, RGBAFormat, LinearFilter, ClampToEdgeWrapping } from 'three'
-import { RIVER_CONFIG, OCEAN_CONFIG } from '../config/terrain'
+import { RIVER_CONFIG, OCEAN_CONFIG } from '../../../config/terrain'
 
 /**
  * Calculate the Z position of the river center at a given X coordinate.

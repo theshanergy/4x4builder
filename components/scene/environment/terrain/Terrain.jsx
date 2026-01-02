@@ -4,7 +4,7 @@ import { TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
 import { TERRAIN_LAYERS } from '../../../../config/terrain'
-import { createTerrainHelpers } from '../../../../utils/terrainGenerator'
+import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
 import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
 import useGameStore from '../../../../store/gameStore'
 import TerrainTile from './TerrainTile'

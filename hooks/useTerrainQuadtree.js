@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 
 import { vehicleState } from '../store/gameStore'
 import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS } from '../config/terrain'
-import { QuadtreeNode, getEdgeStitchInfo } from '../utils/terrainQuadtree'
+import { QuadtreeNode, getEdgeStitchInfo } from '../utils/terrain/quadtree'
 
 /**
  * Custom hook to manage quadtree LOD system
