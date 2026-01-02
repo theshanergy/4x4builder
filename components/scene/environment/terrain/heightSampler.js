@@ -3,9 +3,11 @@
 // Core height sampling logic including noise generation, mountains, ocean,
 // river carving, and normal calculation.
 
+import { Vector3 } from 'three'
 import { OCEAN_CONFIG, MOUNTAIN_CONFIG, TERRAIN_CONFIG, RIVER_CONFIG, STAGING_AREA } from '../../../../config/terrain'
 import { WATER_LEVEL } from '../../../../config/water'
 import { getRiverDepthFactor } from './riverUtils'
+import useGameStore from '../../../../store/gameStore'
 
 // Epsilon for numerical gradient approximation when calculating normals
 const GRADIENT_EPSILON = 0.01
@@ -207,7 +209,7 @@ export const createTerrainHelpers = (noise) => {
 	/**
 	 * Get terrain normal at any world position using numerical gradient
 	 */
-	const getNormal = (worldX, worldZ, target) => {
+	const getNormal = (worldX, worldZ, target = new Vector3()) => {
 		// Use larger epsilon for distant terrain to avoid noise artifacts
 		const dist = Math.sqrt(worldX * worldX + worldZ * worldZ)
 		const epsilon = dist > 500 ? GRADIENT_EPSILON * 4 : GRADIENT_EPSILON
@@ -222,6 +224,10 @@ export const createTerrainHelpers = (noise) => {
 
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}
+
+	// Register both height and normal functions in the game store for use by other components
+	useGameStore.getState().setTerrainHeightFunction(getHeight)
+	useGameStore.getState().setTerrainNormalFunction(getNormal)
 
 	return { getRawHeight, getHeight, getNormal, baseHeightScale }
 }

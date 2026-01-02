@@ -74,6 +74,12 @@ const useGameStore = create((set, get) => {
 		setCameraMode: (mode) => set({ cameraMode: mode }),
 		setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
 
+		// Terrain height/normal functions (set by terrain helpers)
+		getTerrainHeight: null,
+		getTerrainNormal: null,
+		setTerrainHeightFunction: (fn) => set({ getTerrainHeight: fn }),
+		setTerrainNormalFunction: (fn) => set({ getTerrainNormal: fn }),
+
 		// Saved vehicles
 		savedVehicles: (() => {
 			// Get from local storage or null.

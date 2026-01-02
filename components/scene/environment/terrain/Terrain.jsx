@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
-import { Vector3, TextureLoader } from 'three'
+import { TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
 import useGameStore, { vehicleState } from '../../../../store/gameStore'
@@ -52,17 +52,9 @@ const Terrain = () => {
 		'/assets/images/ground/cliff_normal.jpg',
 	])
 
-	// Scratch vector for normal calculations
-	const normalScratch = useMemo(() => new Vector3(), [])
-
 	// Create shared terrain helpers (height/normal sampling)
+	// This also registers the height/normal functions in the game store
 	const terrainHelpers = useMemo(() => createTerrainHelpers(noise), [noise])
-
-	// Public API: Get terrain height at any world position
-	const getTerrainHeight = useCallback((worldX, worldZ) => terrainHelpers.getHeight(worldX, worldZ), [terrainHelpers])
-
-	// Public API: Get terrain normal at any world position
-	const getTerrainNormal = useCallback((worldX, worldZ, target = normalScratch) => terrainHelpers.getNormal(worldX, worldZ, target), [terrainHelpers, normalScratch])
 
 	// Update quadtree based on vehicle position each frame
 	useFrame(() => {
@@ -203,7 +195,7 @@ const Terrain = () => {
 					edgeStitchInfo={edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO}
 				/>
 			))}
-			{showGrass && <Grass getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
+			{showGrass && <Grass />}
 		</group>
 	)
 }

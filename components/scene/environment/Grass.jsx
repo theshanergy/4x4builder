@@ -2,7 +2,7 @@ import { useRef, useMemo, memo, useEffect, useReducer } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion, CatmullRomCurve3, DoubleSide, Color, BufferGeometry, BufferAttribute, Object3D, InstancedMesh, ShaderMaterial } from 'three'
 
-import { vehicleState } from '../../../store/gameStore'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
 import { sunDirection, sunColor } from '../../../config/environment'
 import grassVertexShader from '../../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../../shaders/grass.frag.glsl'
@@ -204,8 +204,8 @@ const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerr
 		const distFromCenterSq = patchWorldX * patchWorldX + patchWorldZ * patchWorldZ
 		if (distFromCenterSq < flatAreaRadiusSq) continue
 
-		// Get terrain data at patch center
-		const patchTerrainNormal = getTerrainNormal(patchWorldX, patchWorldZ)
+		// Get terrain data at patch center (reuse scratch vector for performance)
+		const patchTerrainNormal = getTerrainNormal(patchWorldX, patchWorldZ, _normalScratch)
 
 		// Skip if slope is too steep
 		if (patchTerrainNormal.y < slopeThreshold) continue
@@ -325,7 +325,13 @@ const GrassChunk = memo(({ chunkKey, chunkPosition, chunkSize, lodFactor, getTer
 })
 
 // Main Grass component - shares geometry and material across all chunks
-const Grass = memo(({ getTerrainHeight, getTerrainNormal }) => {
+const Grass = memo(() => {
+	// Get terrain functions from store
+	const getTerrainHeight = useGameStore((state) => state.getTerrainHeight)
+	const getTerrainNormal = useGameStore((state) => state.getTerrainNormal)
+
+	// Don't render if terrain functions aren't ready yet
+	if (!getTerrainHeight || !getTerrainNormal) return null
 	const chunkCache = useRef(new Map())
 	const frameCount = useRef(0)
 	// Use useReducer for batch updates instead of useState (more efficient for arrays)
