@@ -40,7 +40,7 @@ const arePropsEqual = (prevProps, nextProps) => {
 	}
 
 	// Reference comparisons for objects that should be stable
-	if (prevProps.terrainHelpers !== nextProps.terrainHelpers || prevProps.map !== nextProps.map || prevProps.normalMap !== nextProps.normalMap) {
+	if (prevProps.terrainHelpers !== nextProps.terrainHelpers || prevProps.layerTextures !== nextProps.layerTextures) {
 		return false
 	}
 
@@ -53,12 +53,11 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
  * @param {Object} props.terrainHelpers - Height/normal sampling functions
- * @param {Texture} props.map - Diffuse texture
- * @param {Texture} props.normalMap - Normal map texture
+ * @param {Object} props.layerTextures - Textures for each terrain layer { layerName: { albedo, normal } }
  * @param {boolean} props.hasCollider - Whether to include physics collider
  * @param {Object} props.edgeStitchInfo - Edge stitching configuration
  */
-const TerrainTile = memo(({ node, terrainHelpers, map, normalMap, cliffMap, cliffNormalMap, hasCollider = false, edgeStitchInfo }) => {
+const TerrainTile = memo(({ node, terrainHelpers, layerTextures, hasCollider = false, edgeStitchInfo }) => {
 	const { centerX, centerZ } = node
 	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
 
@@ -86,7 +85,7 @@ const TerrainTile = memo(({ node, terrainHelpers, map, normalMap, cliffMap, clif
 
 	const terrainMesh = (
 		<mesh geometry={geometry} receiveShadow>
-			<TerrainMaterial sandTexture={map} sandNormalMap={normalMap} cliffTexture={cliffMap} cliffNormalMap={cliffNormalMap} />
+			<TerrainMaterial layerTextures={layerTextures} />
 		</mesh>
 	)
 

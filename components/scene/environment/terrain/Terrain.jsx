@@ -8,6 +8,7 @@ import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS
 import { QuadtreeNode, getEdgeStitchInfo, DEFAULT_EDGE_STITCH_INFO } from '../../../../utils/terrainQuadtree'
 import { createTerrainHelpers } from '../../../../utils/terrainGenerator'
 import TerrainTile from './TerrainTile'
+import { TERRAIN_LAYERS } from './TerrainMaterial'
 
 /**
  * Terrain - Main terrain component with quadtree LOD.
@@ -23,13 +24,30 @@ const Terrain = () => {
 	// Generate noise instance with fixed seed for consistency
 	const noise = useMemo(() => new Noise(1234), [])
 
-	// Load textures
-	const [sandTexture, sandNormalMap, cliffTexture, cliffNormalMap] = useLoader(TextureLoader, [
-		'/assets/images/ground/sand.jpg',
-		'/assets/images/ground/sand_normal.jpg',
-		'/assets/images/ground/slatecliffrock_albedo.jpg',
-		'/assets/images/ground/slatecliffrock_normal.jpg',
-	])
+	// Build texture paths array from layer config
+	const texturePaths = useMemo(() => {
+		const paths = []
+		TERRAIN_LAYERS.forEach((layer) => {
+			paths.push(layer.textures.albedo)
+			paths.push(layer.textures.normal)
+		})
+		return paths
+	}, [])
+
+	// Load all layer textures
+	const loadedTextures = useLoader(TextureLoader, texturePaths)
+
+	// Organize textures by layer name
+	const layerTextures = useMemo(() => {
+		const result = {}
+		TERRAIN_LAYERS.forEach((layer, index) => {
+			result[layer.name] = {
+				albedo: loadedTextures[index * 2],
+				normal: loadedTextures[index * 2 + 1],
+			}
+		})
+		return result
+	}, [loadedTextures])
 
 	// Create shared terrain helpers (height/normal sampling)
 	// This also registers the height/normal functions in the game store
@@ -152,10 +170,7 @@ const Terrain = () => {
 					key={node.key}
 					node={node}
 					terrainHelpers={terrainHelpers}
-					map={sandTexture}
-					normalMap={sandNormalMap}
-					cliffMap={cliffTexture}
-					cliffNormalMap={cliffNormalMap}
+					layerTextures={layerTextures}
 					hasCollider={hasCollider}
 					edgeStitchInfo={edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO}
 				/>

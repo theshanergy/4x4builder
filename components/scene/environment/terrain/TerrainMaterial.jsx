@@ -4,30 +4,349 @@
 import { useMemo, useRef } from 'react'
 import { RepeatWrapping } from 'three'
 
-// Terrain blending configuration
-const CLIFF_CONFIG = {
-	// Height blending (absolute world units)
-	heightBlendStart: 4, // Height where cliff starts appearing
-	heightBlendEnd: 60, // Height where cliff is fully visible
-	heightInfluence: 0.8, // How much height affects cliff blend (0-1)
+/**
+ * Terrain Layer Configuration
+ *
+ * Each layer defines:
+ * - name: Layer identifier
+ * - textures: Paths to albedo and normal textures
+ * - textureScale: World-space texture tiling scale
+ * - blend: Blending configuration (not needed for base layer)
+ *   - type: 'height', 'slope', or 'height_slope' (combined)
+ *   - height: { start, end, influence } - Height-based blending
+ *   - slope: { start, end, influence } - Slope-based blending (0=flat, 1=steep)
+ *   - curvature: { scale, softness, ridgeInfluence } - Curvature-based erosion
+ *   - invert: If true, layer appears where conditions are NOT met
+ *
+ * Layers are rendered bottom-to-top (first layer is base)
+ */
+export const TERRAIN_LAYERS = [
+	{
+		name: 'rock',
+		textures: {
+			albedo: '/assets/images/ground/slatecliffrock_albedo.jpg',
+			normal: '/assets/images/ground/slatecliffrock_normal.jpg',
+		},
+		textureScale: 0.015,
+		// Base layer - no blend config needed
+		// Uses triplanar projection with LOD and stochastic sampling
+		triplanar: true,
+		lod: {
+			distanceScaleStart: 100,
+			distanceScaleFactor: 300,
+			levels: 3,
+		},
+	},
+	{
+		name: 'sand',
+		textures: {
+			albedo: '/assets/images/ground/sand.jpg',
+			normal: '/assets/images/ground/sand_normal.jpg',
+		},
+		// Use built-in mesh UVs (sampled via Three.js map_fragment)
+		useBuiltinUV: true,
+		normalScale: 0.35,
+		blend: {
+			type: 'height_slope',
+			height: {
+				start: 4, // Height where sand starts fading out
+				end: 60, // Height where sand is fully gone
+				influence: 0.8,
+			},
+			slope: {
+				start: 0.1, // Slope threshold where sand starts fading
+				end: 0.3, // Slope threshold where sand is fully gone
+				influence: 0.9,
+			},
+			curvature: {
+				scale: 50.0,
+				softness: 0.3,
+				ridgeInfluence: 0.5,
+			},
+		},
+	},
+	{
+		name: 'snow',
+		textures: {
+			albedo: '/assets/images/ground/snow.jpg',
+			normal: '/assets/images/ground/snow_normal.jpg',
+		},
+		textureScale: 0.05,
+		normalScale: 0.5,
+		blend: {
+			type: 'height_slope',
+			height: {
+				start: 80, // Height where snow starts appearing
+				end: 120, // Height where snow is fully present
+				influence: 1.0,
+			},
+			slope: {
+				start: 0.5, // Snow fades on slopes steeper than this
+				end: 0.8, // Snow fully gone on very steep slopes
+				influence: 0.7,
+				invert: true, // Snow appears on flat areas, not steep
+			},
+		},
+	},
+]
 
-	// Slope blending
-	slopeBlendStart: 0.1, // Slope threshold where cliff starts appearing
-	slopeBlendEnd: 0.3, // Slope threshold where cliff is fully visible
-	slopeInfluence: 0.9, // How much slope affects cliff blend (0-1)
+// Generate shader uniforms from layer config
+const generateLayerUniforms = (layers) => {
+	const uniforms = {}
 
-	// Curvature blending
-	curvatureScale: 50.0, // Multiplier for curvature detection sensitivity
-	curvatureSoftness: 0.3, // Softness of curvature-based blending (higher = softer)
-	ridgeInfluence: 0.5, // How much ridges (convex) show cliff texture (0-1)
+	layers.forEach((layer, index) => {
+		const prefix = `uLayer${index}`
 
-	// Texture settings
-	textureScale: 0.015, // World-space texture tiling scale
+		uniforms[`${prefix}TextureScale`] = layer.textureScale
 
-	// Distance-based texture scaling (reduces tiling on distant terrain)
-	distanceScaleStart: 100, // Distance where scaling starts
-	distanceScaleFactor: 300, // Distance between LOD levels
-	distanceLODLevels: 3, // Number of discrete LOD levels (prevents smooth animation)
+		if (layer.lod) {
+			uniforms[`${prefix}DistanceScaleStart`] = layer.lod.distanceScaleStart
+			uniforms[`${prefix}DistanceScaleFactor`] = layer.lod.distanceScaleFactor
+			uniforms[`${prefix}LODLevels`] = layer.lod.levels
+		}
+
+		if (layer.normalScale !== undefined) {
+			uniforms[`${prefix}NormalScale`] = layer.normalScale
+		}
+
+		if (layer.blend) {
+			if (layer.blend.height) {
+				uniforms[`${prefix}HeightStart`] = layer.blend.height.start
+				uniforms[`${prefix}HeightEnd`] = layer.blend.height.end
+				uniforms[`${prefix}HeightInfluence`] = layer.blend.height.influence
+			}
+			if (layer.blend.slope) {
+				uniforms[`${prefix}SlopeStart`] = layer.blend.slope.start
+				uniforms[`${prefix}SlopeEnd`] = layer.blend.slope.end
+				uniforms[`${prefix}SlopeInfluence`] = layer.blend.slope.influence
+				uniforms[`${prefix}SlopeInvert`] = layer.blend.slope.invert ? 1.0 : 0.0
+			}
+			if (layer.blend.curvature) {
+				uniforms[`${prefix}CurvatureScale`] = layer.blend.curvature.scale
+				uniforms[`${prefix}CurvatureSoftness`] = layer.blend.curvature.softness
+				uniforms[`${prefix}RidgeInfluence`] = layer.blend.curvature.ridgeInfluence
+			}
+		}
+	})
+
+	return uniforms
+}
+
+// Generate uniform declarations for fragment shader
+const generateUniformDeclarations = (layers) => {
+	let declarations = ''
+
+	layers.forEach((layer, index) => {
+		const prefix = `uLayer${index}`
+
+		declarations += `uniform sampler2D ${prefix}Texture;\n`
+		declarations += `uniform sampler2D ${prefix}NormalMap;\n`
+		declarations += `uniform float ${prefix}TextureScale;\n`
+
+		if (layer.lod) {
+			declarations += `uniform float ${prefix}DistanceScaleStart;\n`
+			declarations += `uniform float ${prefix}DistanceScaleFactor;\n`
+			declarations += `uniform float ${prefix}LODLevels;\n`
+		}
+
+		if (layer.normalScale !== undefined) {
+			declarations += `uniform float ${prefix}NormalScale;\n`
+		}
+
+		if (layer.blend) {
+			if (layer.blend.height) {
+				declarations += `uniform float ${prefix}HeightStart;\n`
+				declarations += `uniform float ${prefix}HeightEnd;\n`
+				declarations += `uniform float ${prefix}HeightInfluence;\n`
+			}
+			if (layer.blend.slope) {
+				declarations += `uniform float ${prefix}SlopeStart;\n`
+				declarations += `uniform float ${prefix}SlopeEnd;\n`
+				declarations += `uniform float ${prefix}SlopeInfluence;\n`
+				declarations += `uniform float ${prefix}SlopeInvert;\n`
+			}
+			if (layer.blend.curvature) {
+				declarations += `uniform float ${prefix}CurvatureScale;\n`
+				declarations += `uniform float ${prefix}CurvatureSoftness;\n`
+				declarations += `uniform float ${prefix}RidgeInfluence;\n`
+			}
+		}
+	})
+
+	return declarations
+}
+
+// Generate blend factor calculation for a layer
+const generateBlendCode = (layer, index) => {
+	if (!layer.blend) return ''
+
+	const prefix = `uLayer${index}`
+	let code = `
+	// Layer ${index} (${layer.name}) blend calculation
+	float layer${index}Blend = 0.0;
+	{`
+
+	if (layer.blend.type === 'height_slope' || layer.blend.type === 'height') {
+		if (layer.blend.height) {
+			code += `
+		// Height factor
+		float heightFactor${index} = smoothstep(${prefix}HeightStart, ${prefix}HeightEnd, vWorldPos.y);`
+
+			// For snow-like layers that appear at height (not fade out)
+			if (layer.blend.height.start < layer.blend.height.end && index > 1) {
+				code += `
+		// Layer appears at height (not fading out)`
+			} else {
+				code += `
+		heightFactor${index} = 1.0 - heightFactor${index}; // Invert: visible at low heights`
+			}
+		}
+	}
+
+	if (layer.blend.type === 'height_slope' || layer.blend.type === 'slope') {
+		if (layer.blend.slope) {
+			code += `
+		// Slope factor (0 = flat, 1 = steep)
+		float slopeFactor${index} = 1.0 - abs(vWorldNormal.y);
+		slopeFactor${index} = smoothstep(${prefix}SlopeStart, ${prefix}SlopeEnd, slopeFactor${index});
+		// Apply invert if needed (for layers that appear on flat areas)
+		slopeFactor${index} = mix(slopeFactor${index}, 1.0 - slopeFactor${index}, ${prefix}SlopeInvert);`
+		}
+	}
+
+	if (layer.blend.curvature) {
+		code += `
+		// Curvature for erosion patterns
+		float ridgeFactor${index} = clamp(curvature * ${prefix}CurvatureScale, 0.0, 1.0);
+		ridgeFactor${index} = ridgeFactor${index} / (${prefix}CurvatureSoftness + ridgeFactor${index});`
+	}
+
+	// Combine factors based on blend type
+	if (layer.blend.type === 'height_slope') {
+		if (layer.blend.height && layer.blend.slope) {
+			// For layers that appear at conditions (like snow at high + flat)
+			if (layer.blend.height.start < layer.blend.height.end && index > 1) {
+				code += `
+		// Combine: layer visible where height AND slope conditions are met
+		layer${index}Blend = heightFactor${index} * ${prefix}HeightInfluence;
+		layer${index}Blend *= (1.0 - slopeFactor${index} * ${prefix}SlopeInfluence);`
+			} else {
+				// For layers that fade at conditions (like sand fading at high/steep)
+				code += `
+		// Rock visibility (inverse = this layer visibility)
+		float rockBlend${index} = max(slopeFactor${index} * ${prefix}SlopeInfluence, (1.0 - heightFactor${index}) * ${prefix}HeightInfluence);`
+
+				if (layer.blend.curvature) {
+					code += `
+		rockBlend${index} = max(rockBlend${index}, ridgeFactor${index} * ${prefix}RidgeInfluence);`
+				}
+
+				code += `
+		rockBlend${index} = clamp(rockBlend${index}, 0.0, 1.0);
+		layer${index}Blend = 1.0 - rockBlend${index};
+
+		// Mask out above height end
+		float heightMask${index} = 1.0 - smoothstep(${prefix}HeightStart, ${prefix}HeightEnd + 2.0, vWorldPos.y);
+		layer${index}Blend *= heightMask${index};`
+			}
+		}
+	} else if (layer.blend.type === 'height') {
+		code += `
+		layer${index}Blend = heightFactor${index} * ${prefix}HeightInfluence;`
+	} else if (layer.blend.type === 'slope') {
+		code += `
+		layer${index}Blend = (1.0 - slopeFactor${index}) * ${prefix}SlopeInfluence;`
+	}
+
+	code += `
+	}
+	layer${index}Blend = clamp(layer${index}Blend, 0.0, 1.0);`
+
+	return code
+}
+
+// Generate color sampling code for a layer
+const generateSamplingCode = (layer, index) => {
+	const prefix = `uLayer${index}`
+
+	if (layer.triplanar && layer.lod) {
+		return `
+	// Layer ${index} (${layer.name}) - triplanar with LOD
+	vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+	vec4 layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index});
+	vec3 layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index});`
+	} else if (layer.triplanar) {
+		return `
+	// Layer ${index} (${layer.name}) - triplanar
+	vec4 layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale);
+	vec3 layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale);`
+	} else if (layer.useBuiltinUV) {
+		// Use Three.js built-in UV sampling (already done in map_fragment for diffuseColor)
+		return `
+	// Layer ${index} (${layer.name}) - uses built-in mesh UVs (from diffuseColor/normalMap)
+	vec4 layer${index}Color = diffuseColor;
+	vec3 layer${index}NormalSample = texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0;
+	layer${index}NormalSample.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
+	// Convert tangent-space normal to world-space using UDN blending for Y-up projection
+	vec3 layer${index}Normal = normalize(vec3(
+		layer${index}NormalSample.x + vWorldNormal.x,
+		abs(layer${index}NormalSample.z) * vWorldNormal.y,
+		layer${index}NormalSample.y + vWorldNormal.z
+	));`
+	} else {
+		return `
+	// Layer ${index} (${layer.name}) - world-space UV mapping with stochastic sampling
+	vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
+	vec4 layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV);
+	vec3 layer${index}NormalSample = textureNoTile(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
+	layer${index}NormalSample.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
+	// Convert tangent-space normal to world-space using UDN blending for Y-up projection
+	vec3 layer${index}Normal = normalize(vec3(
+		layer${index}NormalSample.x + vWorldNormal.x,
+		abs(layer${index}NormalSample.z) * vWorldNormal.y,
+		layer${index}NormalSample.y + vWorldNormal.z
+	));`
+	}
+}
+
+// Generate the final color blending code
+const generateColorBlendingCode = (layers) => {
+	let code = `
+	// Start with base layer (layer 0)
+	vec3 finalColor = layer0Color.rgb;
+	vec3 finalNormal = layer0Normal;
+	`
+
+	// Blend each subsequent layer on top
+	for (let i = 1; i < layers.length; i++) {
+		code += `
+	// Blend layer ${i} (${layers[i].name})
+	finalColor = mix(finalColor, layer${i}Color.rgb, layer${i}Blend);
+	finalNormal = normalize(mix(finalNormal, layer${i}Normal, layer${i}Blend));`
+	}
+
+	code += `
+
+	diffuseColor.rgb = finalColor;`
+
+	return code
+}
+
+// Generate normal blending code
+const generateNormalBlendingCode = (layers) => {
+	let code = `
+	// Start with base layer normal
+	vec3 blendedNormal = layer0Normal;`
+
+	for (let i = 1; i < layers.length; i++) {
+		code += `
+	blendedNormal = normalize(mix(blendedNormal, layer${i}Normal, layer${i}Blend));`
+	}
+
+	code += `
+	normal = blendedNormal;`
+
+	return code
 }
 
 /**
@@ -35,99 +354,82 @@ const CLIFF_CONFIG = {
  *
  * Features:
  * - Preserves standard PBR lighting (identical to meshStandardMaterial)
- * - Height-based color blending (sand in valleys, rock on peaks)
- * - Slope-based variation (steeper = more exposed rock)
- * - Curvature-based erosion patterns (ridges and valleys highlighted)
+ * - Config-driven layer system with arbitrary texture layers
+ * - Height-based, slope-based, and curvature-based blending
+ * - Triplanar projection and stochastic sampling for base layer
  */
-const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormalMap }) => {
+const TerrainMaterial = ({ layerTextures }) => {
 	const materialRef = useRef()
 
 	// Configure textures for proper wrapping
 	useMemo(() => {
-		if (sandTexture) {
-			sandTexture.wrapS = sandTexture.wrapT = RepeatWrapping
-		}
-		if (sandNormalMap) {
-			sandNormalMap.wrapS = sandNormalMap.wrapT = RepeatWrapping
-			sandNormalMap.repeat.set(0.35, 0.35)
-		}
-		if (cliffTexture) {
-			cliffTexture.wrapS = cliffTexture.wrapT = RepeatWrapping
-		}
-		if (cliffNormalMap) {
-			cliffNormalMap.wrapS = cliffNormalMap.wrapT = RepeatWrapping
-		}
-	}, [sandTexture, sandNormalMap, cliffTexture, cliffNormalMap])
+		Object.values(layerTextures).forEach((textures) => {
+			if (textures.albedo) {
+				textures.albedo.wrapS = textures.albedo.wrapT = RepeatWrapping
+			}
+			if (textures.normal) {
+				textures.normal.wrapS = textures.normal.wrapT = RepeatWrapping
+			}
+		})
+	}, [layerTextures])
+
+	// Pre-generate shader code from config
+	const shaderCode = useMemo(() => {
+		const uniformDeclarations = generateUniformDeclarations(TERRAIN_LAYERS)
+		const blendCalculations = TERRAIN_LAYERS.map((layer, i) => generateBlendCode(layer, i)).join('\n')
+		const samplingCode = TERRAIN_LAYERS.map((layer, i) => generateSamplingCode(layer, i)).join('\n')
+		const colorBlending = generateColorBlendingCode(TERRAIN_LAYERS)
+		const normalBlending = generateNormalBlendingCode(TERRAIN_LAYERS)
+
+		return { uniformDeclarations, blendCalculations, samplingCode, colorBlending, normalBlending }
+	}, [])
 
 	// Shader customization callback
 	const onBeforeCompile = useMemo(() => {
 		return (shader) => {
-			// Add uniforms from config
-			shader.uniforms.uTextureScale = { value: CLIFF_CONFIG.textureScale }
-			shader.uniforms.uCliffTexture = { value: cliffTexture }
-			shader.uniforms.uCliffNormalMap = { value: cliffNormalMap }
-			// Blend parameters
-			shader.uniforms.uHeightBlendStart = { value: CLIFF_CONFIG.heightBlendStart }
-			shader.uniforms.uHeightBlendEnd = { value: CLIFF_CONFIG.heightBlendEnd }
-			shader.uniforms.uHeightInfluence = { value: CLIFF_CONFIG.heightInfluence }
-			shader.uniforms.uSlopeBlendStart = { value: CLIFF_CONFIG.slopeBlendStart }
-			shader.uniforms.uSlopeBlendEnd = { value: CLIFF_CONFIG.slopeBlendEnd }
-			shader.uniforms.uSlopeInfluence = { value: CLIFF_CONFIG.slopeInfluence }
-			shader.uniforms.uCurvatureScale = { value: CLIFF_CONFIG.curvatureScale }
-			shader.uniforms.uCurvatureSoftness = { value: CLIFF_CONFIG.curvatureSoftness }
-			shader.uniforms.uRidgeInfluence = { value: CLIFF_CONFIG.ridgeInfluence }
-			// Distance-based scaling
-			shader.uniforms.uDistanceScaleStart = { value: CLIFF_CONFIG.distanceScaleStart }
-			shader.uniforms.uDistanceScaleFactor = { value: CLIFF_CONFIG.distanceScaleFactor }
-			shader.uniforms.uDistanceLODLevels = { value: CLIFF_CONFIG.distanceLODLevels }
+			// Set texture uniforms
+			TERRAIN_LAYERS.forEach((layer, index) => {
+				const prefix = `uLayer${index}`
+				const textures = layerTextures[layer.name]
+				if (textures) {
+					shader.uniforms[`${prefix}Texture`] = { value: textures.albedo }
+					shader.uniforms[`${prefix}NormalMap`] = { value: textures.normal }
+				}
+			})
+
+			// Set parameter uniforms from config
+			const paramUniforms = generateLayerUniforms(TERRAIN_LAYERS)
+			Object.entries(paramUniforms).forEach(([key, value]) => {
+				shader.uniforms[key] = { value }
+			})
 
 			// Vertex shader - pass world position
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <common>',
 				`#include <common>
 				varying vec3 vWorldPos;
-				varying vec3 vWorldNormal;
-				varying vec2 vCliffUV;`
+				varying vec3 vWorldNormal;`
 			)
 
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <worldpos_vertex>',
 				`#include <worldpos_vertex>
 				vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-				vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
-				vCliffUV = vWorldPos.xz * uTextureScale;`
-			)
-
-			// Add texture scale uniform to vertex shader for UV calculation
-			shader.vertexShader = shader.vertexShader.replace(
-				'void main() {',
-				`uniform float uTextureScale;
-				void main() {`
+				vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);`
 			)
 
 			// Fragment shader - add terrain blending
 			shader.fragmentShader = shader.fragmentShader.replace(
 				'#include <common>',
 				`#include <common>
-				uniform float uTextureScale;
-				uniform sampler2D uCliffTexture;
-				uniform sampler2D uCliffNormalMap;
-				uniform float uHeightBlendStart;
-				uniform float uHeightBlendEnd;
-				uniform float uHeightInfluence;
-				uniform float uSlopeBlendStart;
-				uniform float uSlopeBlendEnd;
-				uniform float uSlopeInfluence;
-				uniform float uCurvatureScale;
-				uniform float uCurvatureSoftness;
-				uniform float uRidgeInfluence;
-				uniform float uDistanceScaleStart;
-				uniform float uDistanceScaleFactor;
-				uniform float uDistanceLODLevels;
+				// Layer uniforms (generated from config)
+				${shaderCode.uniformDeclarations}
+				// Varyings
 				varying vec3 vWorldPos;
 				varying vec3 vWorldNormal;
-				varying vec2 vCliffUV;
-				float cliffBlend;
+
+				// Blend factors for each layer
+				${TERRAIN_LAYERS.map((_, i) => `float layer${i}Blend;`).join('\n				')}
 
 				// Hash function for pseudo-random variation
 				vec2 hash2(vec2 p) {
@@ -171,15 +473,15 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				}
 
 				// Calculate LOD blend info - returns vec3(lowerScale, upperScale, blendFactor)
-				vec3 getDistanceLODBlend(vec3 worldPos) {
+				vec3 getDistanceLODBlend(vec3 worldPos, float distanceStart, float distanceFactor, float lodLevels) {
 					float dist = length(worldPos - cameraPosition);
 					// Calculate continuous LOD level
-					float lodContinuous = (dist - uDistanceScaleStart) / uDistanceScaleFactor;
-					lodContinuous = clamp(lodContinuous, 0.0, uDistanceLODLevels - 1.0);
+					float lodContinuous = (dist - distanceStart) / distanceFactor;
+					lodContinuous = clamp(lodContinuous, 0.0, lodLevels - 1.0);
 
 					// Get lower and upper LOD levels
 					float lodLower = floor(lodContinuous);
-					float lodUpper = min(lodLower + 1.0, uDistanceLODLevels - 1.0);
+					float lodUpper = min(lodLower + 1.0, lodLevels - 1.0);
 
 					// Blend factor between levels (0 = fully lower, 1 = fully upper)
 					float blend = fract(lodContinuous);
@@ -282,7 +584,9 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 
 					// Blend between LOD levels
 					return normalize(mix(normalLower, normalUpper, lodBlend));
-				}`
+				}
+
+`
 			)
 
 			// Modify diffuse color after it's set
@@ -290,60 +594,42 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				'#include <map_fragment>',
 				`#include <map_fragment>
 
-				// Get LOD blend info (lowerScale, upperScale, blendFactor)
-				vec3 lodInfo = getDistanceLODBlend(vWorldPos);
-
-				// Sample cliff texture using triplanar projection with LOD blending
-				vec4 cliffColor = textureTriplanarLOD(uCliffTexture, vWorldPos, vWorldNormal, uTextureScale, lodInfo);
-
-				// Height factor (0 = low, 1 = high) using absolute world heights
-				float heightFactor = smoothstep(uHeightBlendStart, uHeightBlendEnd, vWorldPos.y);
-
-				// Slope factor (0 = flat, 1 = steep cliff)
-				float slopeFactor = 1.0 - abs(vWorldNormal.y);
-				slopeFactor = smoothstep(uSlopeBlendStart, uSlopeBlendEnd, slopeFactor);
-
-				// Curvature for erosion patterns
+				// Calculate curvature once for all layers
 				float curvature = getCurvature();
 
-				// Positive curvature = convex (ridges) show more cliff texture
-				float ridgeFactor = clamp(curvature * uCurvatureScale, 0.0, 1.0);
-				ridgeFactor = ridgeFactor / (uCurvatureSoftness + ridgeFactor);
+				// Sample all layer textures
+				${shaderCode.samplingCode}
 
-				// Blend factors for cliff texture
-				// Cliff appears on: steep slopes, high areas, ridges
-				cliffBlend = max(slopeFactor * uSlopeInfluence, heightFactor * uHeightInfluence);
-				cliffBlend = max(cliffBlend, ridgeFactor * uRidgeInfluence);
-				cliffBlend = clamp(cliffBlend, 0.0, 1.0);
+				// Calculate blend factors for each layer
+				layer0Blend = 1.0; // Base layer always fully visible initially
+				${shaderCode.blendCalculations}
 
-				// Mask out cliff below heightBlendStart - no cliff texture in low areas
-				float heightMask = smoothstep(uHeightBlendStart - 2.0, uHeightBlendStart, vWorldPos.y);
-				cliffBlend *= heightMask;
-
-				// Blend sand and cliff textures
-				diffuseColor.rgb = mix(diffuseColor.rgb, cliffColor.rgb, cliffBlend);`
+				// Blend colors from all layers
+				${shaderCode.colorBlending}`
 			)
 
-			// Replace normal map fragment to blend both normal maps
+			// Replace normal map fragment to blend all layer normals
 			shader.fragmentShader = shader.fragmentShader.replace(
 				'#include <normal_fragment_maps>',
 				`#ifdef USE_NORMALMAP
-					// Sample sand normal from the standard normal map (tangent space)
-					vec3 sandNormal = texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0;
-					sandNormal.xy *= normalScale;
-					vec3 sandWorldNormal = normalize(tbn * sandNormal);
-
-					// Sample cliff normal using triplanar projection with LOD blending
-					vec3 cliffWorldNormal = normalTriplanarLOD(uCliffNormalMap, vWorldPos, vWorldNormal, uTextureScale, lodInfo);
-
-					// Blend world-space normals based on terrain blend factor
-					normal = normalize(mix(sandWorldNormal, cliffWorldNormal, cliffBlend));
+					${shaderCode.normalBlending}
 				#endif`
 			)
 		}
-	}, [cliffTexture, cliffNormalMap])
+	}, [layerTextures, shaderCode])
 
-	return <meshStandardMaterial ref={materialRef} map={sandTexture} normalMap={sandNormalMap} onBeforeCompile={onBeforeCompile} />
+	// Find the layer that uses built-in UVs - this will be passed to the material's map/normalMap
+	const builtinUVLayer = TERRAIN_LAYERS.find((layer) => layer.useBuiltinUV)
+	const builtinTextures = builtinUVLayer ? layerTextures[builtinUVLayer.name] : null
+
+	// Apply normal scale via repeat (as original code did)
+	useMemo(() => {
+		if (builtinTextures?.normal && builtinUVLayer?.normalScale) {
+			builtinTextures.normal.repeat.set(builtinUVLayer.normalScale, builtinUVLayer.normalScale)
+		}
+	}, [builtinTextures, builtinUVLayer])
+
+	return <meshStandardMaterial ref={materialRef} map={builtinTextures?.albedo} normalMap={builtinTextures?.normal} onBeforeCompile={onBeforeCompile} />
 }
 
 export default TerrainMaterial
