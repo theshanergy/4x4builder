@@ -27,10 +27,10 @@ const Water = () => {
 			uniforms: {
 				uTime: { value: 0 },
 				// Shared atmosphere uniforms
-				uSunDirection: { value: sunDirection.clone() },
-				uSunColor: { value: sunColor.clone() },
-				uSkyColor: { value: skyColorZenith.clone() },
-				uSkyHorizonColor: { value: skyColorHorizon.clone() },
+				uSunDirection: { value: sunDirection },
+				uSunColor: { value: sunColor },
+				uSkyColor: { value: skyColorZenith },
+				uSkyHorizonColor: { value: skyColorHorizon },
 				// Flow map for water movement
 				uFlowMap: { value: flowMap },
 				uFlowMapSize: { value: FLOW_MAP_CONFIG.worldSize },
