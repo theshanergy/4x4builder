@@ -1,9 +1,17 @@
 import { useMemo, useEffect, useRef, memo } from 'react'
 
-import { DEFAULT_EDGE_STITCH_INFO } from '../../../../utils/terrain/quadtree'
+import { TILE_RESOLUTION } from '../../../../config/terrain'
 import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
 import TerrainMaterial from './TerrainMaterial'
 import TerrainCollider from './TerrainCollider'
+
+// Default edge stitch info (no stitching needed)
+const DEFAULT_EDGE_STITCH_INFO = {
+	north: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
+	south: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
+	east: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
+	west: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
+}
 
 /**
  * Custom comparison for QuadtreeTerrainTile props.

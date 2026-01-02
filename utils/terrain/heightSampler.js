@@ -1,12 +1,12 @@
-// Height sampler - main terrain height calculation orchestrator
-// Coordinates all terrain features to produce final height values
+// Terrain orchestrator - coordinates all terrain features to produce final height values
+// This is the main entry point for terrain height calculation
 
 import { Vector3 } from 'three'
 import { TERRAIN_CONFIG, RIVER_CONFIG } from '../../config/terrain'
 import { WATER_LEVEL } from '../../config/water'
-import { getMountainHeight } from './features/mountains'
-import { applyOceanBlending } from './features/ocean'
-import { getRiverDepthFactor } from './features/river'
+import { getMountainContribution } from './features/mountains'
+import { blendOceanDepth } from './features/ocean'
+import { getRiverBlendFactor } from './features/river'
 import { getStagingBlend } from './features/staging'
 
 // Epsilon for numerical gradient approximation
@@ -18,19 +18,20 @@ const GRADIENT_EPSILON = 0.01
  * a clean API for the rest of the terrain system.
  *
  * @param {Object} noise - Noise instance from noisejs
- * @returns {Object} Object with getRawHeight, getHeight, and getNormal functions
+ * @returns {Object} Object with getNormalizedHeight, getWorldHeight, and getNormal functions
  */
 export const createTerrainHelpers = (noise) => {
 	const { baseHeightScale, smoothness, regionScale } = TERRAIN_CONFIG
 
 	/**
-	 * Get raw height value at any world position (normalized 0-1, can go negative for ocean)
+	 * Get normalized height value at any world position (0-1 range, can go negative for ocean).
+	 * This is the core terrain generation function that combines all features.
 	 *
 	 * @param {number} worldX - World X coordinate
 	 * @param {number} worldZ - World Z coordinate
-	 * @returns {number} Normalized height value
+	 * @returns {number} Normalized height value (will be multiplied by baseHeightScale for world units)
 	 */
-	const getRawHeight = (worldX, worldZ) => {
+	const getNormalizedHeight = (worldX, worldZ) => {
 		const distSq = worldX * worldX + worldZ * worldZ
 
 		// Calculate base terrain noise (gentle rolling terrain)
@@ -47,7 +48,7 @@ export const createTerrainHelpers = (noise) => {
 		const baseHeight = normalizedHeight * stagingBlend * regionModifier
 
 		// Add mountain height using parallel bands along the X axis
-		const mountainHeight = getMountainHeight(noise, worldX, worldZ, distSq)
+		const mountainHeight = getMountainContribution(worldX, worldZ, noise, distSq)
 
 		// Combine base terrain with mountains
 		// Base terrain is scaled down in mountain areas to let mountains dominate
@@ -55,33 +56,34 @@ export const createTerrainHelpers = (noise) => {
 		let combinedHeight = baseHeight * (1 - mountainInfluence * 0.7) + mountainHeight
 
 		// Apply river carving BEFORE ocean transition so river cuts through beach
-		const riverDepthFactor = getRiverDepthFactor(worldX, worldZ, noise)
-		if (riverDepthFactor > 0) {
+		const riverBlendFactor = getRiverBlendFactor(worldX, worldZ, noise)
+		if (riverBlendFactor > 0) {
 			// Carve river bed into terrain - depth is relative to water level
-			// At river center (depthFactor=1): 95% terrain suppressed, 5% variance
-			// At river edges (depthFactor=0): full terrain height
+			// At river center (blendFactor=1): 95% terrain suppressed, 5% variance
+			// At river edges (blendFactor=0): full terrain height
 			const normalizedRiverDepth = RIVER_CONFIG.depth / baseHeightScale
-			const varianceRetention = 1 - riverDepthFactor * 0.95
-			const carvedHeight = combinedHeight * varianceRetention - riverDepthFactor * normalizedRiverDepth
+			const varianceRetention = 1 - riverBlendFactor * 0.95
+			const carvedHeight = combinedHeight * varianceRetention - riverBlendFactor * normalizedRiverDepth
 			const riverBedFloor = WATER_LEVEL / baseHeightScale - normalizedRiverDepth * 1.1
 			combinedHeight = Math.max(carvedHeight, riverBedFloor)
 		}
 
 		// Apply ocean blending - creates realistic beach profile and ocean depth
-		combinedHeight = applyOceanBlending(combinedHeight, distSq, baseHeightScale)
+		combinedHeight = blendOceanDepth(combinedHeight, distSq, baseHeightScale)
 
 		return combinedHeight
 	}
 
 	/**
-	 * Get terrain height at any world position (in world units)
+	 * Get terrain height at any world position (in world units).
+	 * This is a convenience wrapper around getNormalizedHeight.
 	 *
 	 * @param {number} worldX - World X coordinate
 	 * @param {number} worldZ - World Z coordinate
 	 * @returns {number} Height in world units
 	 */
-	const getHeight = (worldX, worldZ) => {
-		return getRawHeight(worldX, worldZ) * baseHeightScale
+	const getWorldHeight = (worldX, worldZ) => {
+		return getNormalizedHeight(worldX, worldZ) * baseHeightScale
 	}
 
 	/**
@@ -99,10 +101,10 @@ export const createTerrainHelpers = (noise) => {
 		const epsilon = dist > 500 ? GRADIENT_EPSILON * 4 : GRADIENT_EPSILON
 
 		// Sample height at four neighboring points
-		const hL = getRawHeight(worldX - epsilon, worldZ) * baseHeightScale
-		const hR = getRawHeight(worldX + epsilon, worldZ) * baseHeightScale
-		const hD = getRawHeight(worldX, worldZ - epsilon) * baseHeightScale
-		const hU = getRawHeight(worldX, worldZ + epsilon) * baseHeightScale
+		const hL = getNormalizedHeight(worldX - epsilon, worldZ) * baseHeightScale
+		const hR = getNormalizedHeight(worldX + epsilon, worldZ) * baseHeightScale
+		const hD = getNormalizedHeight(worldX, worldZ - epsilon) * baseHeightScale
+		const hU = getNormalizedHeight(worldX, worldZ + epsilon) * baseHeightScale
 
 		// Calculate partial derivatives using central differences
 		const dhdx = (hR - hL) / (2 * epsilon)
@@ -113,5 +115,5 @@ export const createTerrainHelpers = (noise) => {
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}
 
-	return { getRawHeight, getHeight, getNormal, baseHeightScale }
+	return { getNormalizedHeight, getWorldHeight, getNormal, baseHeightScale }
 }

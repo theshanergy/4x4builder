@@ -14,7 +14,7 @@ import { TILE_RESOLUTION } from '../../../../config/terrain'
  */
 const TerrainCollider = memo(({ node, terrainHelpers, position, children }) => {
 	const { size, centerX, centerZ } = node
-	const { getRawHeight, baseHeightScale } = terrainHelpers
+	const { getNormalizedHeight, baseHeightScale } = terrainHelpers
 
 	const colliderArgs = useMemo(() => {
 		const segments = TILE_RESOLUTION
@@ -37,7 +37,7 @@ const TerrainCollider = memo(({ node, terrainHelpers, position, children }) => {
 				const worldZ = centerZ + localZ - size / 2
 
 				// Get normalized height
-				const normalizedHeight = getRawHeight(worldX, worldZ)
+				const normalizedHeight = getNormalizedHeight(worldX, worldZ)
 
 				// Store height sample in row-major order for Rapier collider
 				const sampleIndex = i * sampleCount + j

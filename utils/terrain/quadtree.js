@@ -198,11 +198,3 @@ export const getEdgeStitchInfo = (node, allNodes, minSize) => {
 
 	return edges
 }
-
-// Default edge stitch info (no stitching needed)
-export const DEFAULT_EDGE_STITCH_INFO = {
-	north: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
-	south: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
-	east: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
-	west: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
-}

@@ -5,13 +5,13 @@
  * Ridge noise function - creates sharp mountain ridges.
  * Uses absolute value of noise to create V-shaped valleys and ridges.
  * 
- * @param {Object} noise - Noise instance from noisejs
  * @param {number} x - X coordinate
  * @param {number} z - Z coordinate  
+ * @param {Object} noise - Noise instance from noisejs
  * @param {number} scale - Noise frequency scale
  * @returns {number} Ridge noise value (0-1)
  */
-export const getRidgeNoise = (noise, x, z, scale) => {
+export const getRidgeNoise = (x, z, noise, scale) => {
 	const n = noise.perlin2(x * scale, z * scale)
 	// Invert absolute value to get ridges instead of valleys
 	return 1 - Math.abs(n)
@@ -21,14 +21,14 @@ export const getRidgeNoise = (noise, x, z, scale) => {
  * Get domain-warped coordinates for organic noise patterns.
  * Domain warping displaces sample positions for more natural, flowing shapes.
  * 
- * @param {Object} noise - Noise instance from noisejs
  * @param {number} x - X coordinate
  * @param {number} z - Z coordinate
+ * @param {Object} noise - Noise instance from noisejs
  * @param {number} warpScale - Scale of the warping noise
  * @param {number} warpStrength - Amplitude of the warp displacement
  * @returns {Object} Warped coordinates {wx, wz}
  */
-export const getDomainWarp = (noise, x, z, warpScale, warpStrength) => {
+export const getDomainWarp = (x, z, noise, warpScale, warpStrength) => {
 	const warpX = noise.perlin2(x * warpScale + 50, z * warpScale + 50) * warpStrength
 	const warpZ = noise.perlin2(x * warpScale + 150, z * warpScale + 150) * warpStrength
 	return {
@@ -41,9 +41,9 @@ export const getDomainWarp = (noise, x, z, warpScale, warpStrength) => {
  * Get layered Perlin noise (Fractal Brownian Motion).
  * Combines multiple octaves of noise for detailed terrain.
  * 
- * @param {Object} noise - Noise instance from noisejs
  * @param {number} x - X coordinate
  * @param {number} z - Z coordinate
+ * @param {Object} noise - Noise instance from noisejs
  * @param {number} baseScale - Scale of the base layer
  * @param {Object} options - Optional parameters
  * @param {number} options.octaves - Number of noise layers (default: 3)
@@ -51,7 +51,7 @@ export const getDomainWarp = (noise, x, z, warpScale, warpStrength) => {
  * @param {number} options.persistence - Amplitude multiplier per octave (default: 0.5)
  * @returns {number} Layered noise value
  */
-export const getLayeredNoise = (noise, x, z, baseScale, options = {}) => {
+export const getLayeredNoise = (x, z, noise, baseScale, options = {}) => {
 	const { octaves = 3, lacunarity = 2.0, persistence = 0.5 } = options
 
 	let result = 0

@@ -1,10 +1,13 @@
 import { useRef, useMemo, useEffect } from 'react'
 import { CircleGeometry, ShaderMaterial, DoubleSide } from 'three'
 import { useFrame } from '@react-three/fiber'
+
 import { vehicleState } from '../../../store/gameStore'
 import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
 import { WATER_LEVEL } from '../../../config/water'
-import { getFlowMap, FLOW_MAP_CONFIG } from '../../../utils/terrain/features/river'
+import { RIVER_CONFIG } from '../../../config/terrain'
+import { getFlowMap } from '../../../utils/terrain/riverFlowMap'
+
 import waterVertexShader from '../../../shaders/water.vert.glsl'
 import waterFragmentShader from '../../../shaders/water.frag.glsl'
 
@@ -33,7 +36,7 @@ const Water = () => {
 				uSkyHorizonColor: { value: skyColorHorizon },
 				// Flow map for water movement
 				uFlowMap: { value: flowMap },
-				uFlowMapSize: { value: FLOW_MAP_CONFIG.worldSize },
+				uFlowMapSize: { value: RIVER_CONFIG.flowMap.worldSize },
 				// Water-specific parameters
 				uDistortionScale: { value: 1.5 },
 				uFlowSpeed: { value: 0.6 },

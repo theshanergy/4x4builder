@@ -41,8 +41,8 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				const x1 = x0 + neighborStep
 				const t = (worldX - x0) / neighborStep
 
-				const h0 = terrainHelpers.getRawHeight(x0, worldZ)
-				const h1 = terrainHelpers.getRawHeight(x1, worldZ)
+				const h0 = terrainHelpers.getNormalizedHeight(x0, worldZ)
+				const h1 = terrainHelpers.getNormalizedHeight(x1, worldZ)
 				return (h0 * (1 - t) + h1 * t) * baseHeightScale
 			} else {
 				const gridZ = worldZ / neighborStep
@@ -50,8 +50,8 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				const z1 = z0 + neighborStep
 				const t = (worldZ - z0) / neighborStep
 
-				const h0 = terrainHelpers.getRawHeight(worldX, z0)
-				const h1 = terrainHelpers.getRawHeight(worldX, z1)
+				const h0 = terrainHelpers.getNormalizedHeight(worldX, z0)
+				const h1 = terrainHelpers.getNormalizedHeight(worldX, z1)
 				return (h0 * (1 - t) + h1 * t) * baseHeightScale
 			}
 		}
@@ -81,7 +81,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				} else if (onNorthEdge && edgeStitchInfo.north.needsStitch) {
 					height = getStitchedHeight(worldX, worldZ, edgeStitchInfo.north.neighborStep, 'x')
 				} else {
-					height = terrainHelpers.getRawHeight(worldX, worldZ) * baseHeightScale
+					height = terrainHelpers.getNormalizedHeight(worldX, worldZ) * baseHeightScale
 				}
 
 				const vertIndex = i + sampleCount * j

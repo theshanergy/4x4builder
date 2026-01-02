@@ -22,7 +22,7 @@ const Terrain = () => {
 
 	// Register terrain functions in the game store
 	useEffect(() => {
-		useGameStore.getState().setTerrainHeightFunction(terrainHelpers.getHeight)
+		useGameStore.getState().setTerrainHeightFunction(terrainHelpers.getWorldHeight)
 		useGameStore.getState().setTerrainNormalFunction(terrainHelpers.getNormal)
 	}, [terrainHelpers])
 

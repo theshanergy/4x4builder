@@ -8,16 +8,16 @@ import { MOUNTAIN_CONFIG, OCEAN_CONFIG } from '../../../config/terrain'
  * Fractal Brownian Motion with ridged noise for mountains.
  * Combines multiple noise octaves with domain warping for natural shapes.
  * 
+ * @param {number} worldX - World X coordinate
+ * @param {number} worldZ - World Z coordinate
  * @param {Object} noise - Noise instance from noisejs
- * @param {number} x - World X coordinate
- * @param {number} z - World Z coordinate
  * @returns {number} Mountain height (normalized 0-1+)
  */
-export const getMountainNoise = (noise, x, z) => {
+const getMountainNoise = (worldX, worldZ, noise) => {
 	const { baseScale, ridgeScale, detailScale, warpScale, warpStrength, valleyScale, valleyDepth } = MOUNTAIN_CONFIG
 
 	// Domain warping - displaces sample position for more organic shapes
-	const { wx, wz } = getDomainWarp(noise, x, z, warpScale, warpStrength)
+	const { wx, wz } = getDomainWarp(worldX, worldZ, noise, warpScale, warpStrength)
 
 	// Base large-scale mountain shapes
 	const base =
@@ -26,15 +26,15 @@ export const getMountainNoise = (noise, x, z) => {
 		noise.perlin2(wx * baseScale * 5.1, wz * baseScale * 5.1) * 0.125
 
 	// Ridge noise for sharp peaks
-	const ridge1 = getRidgeNoise(noise, wx, wz, ridgeScale)
-	const ridge2 = getRidgeNoise(noise, wx + 100, wz + 100, ridgeScale * 1.7)
+	const ridge1 = getRidgeNoise(wx, wz, noise, ridgeScale)
+	const ridge2 = getRidgeNoise(wx + 100, wz + 100, noise, ridgeScale * 1.7)
 	const ridges = ridge1 * ridge1 * 0.6 + ridge2 * ridge2 * 0.4
 
 	// Combine base and ridges
 	let height = (base + 0.5) * 0.4 + ridges * 0.6
 
 	// Apply valley carving - creates river-like valleys
-	const valleyNoise = noise.perlin2(x * valleyScale + 200, z * valleyScale + 200)
+	const valleyNoise = noise.perlin2(worldX * valleyScale + 200, worldZ * valleyScale + 200)
 	const valleyFactor = Math.max(0, valleyNoise) * valleyDepth
 	height = height * (1 - valleyFactor * 0.5)
 
@@ -54,13 +54,13 @@ export const getMountainNoise = (noise, x, z) => {
  * Calculate mountain height contribution at a world position.
  * Mountains appear in parallel bands along the X axis on both sides of origin.
  * 
- * @param {Object} noise - Noise instance from noisejs
  * @param {number} worldX - World X coordinate
  * @param {number} worldZ - World Z coordinate
+ * @param {Object} noise - Noise instance from noisejs
  * @param {number} distSq - Squared distance from origin
  * @returns {number} Mountain height contribution (normalized units)
  */
-export const getMountainHeight = (noise, worldX, worldZ, distSq) => {
+export const getMountainContribution = (worldX, worldZ, noise, distSq) => {
 	const dist = Math.sqrt(distSq)
 	const absZ = Math.abs(worldZ) // Use absolute Z for symmetric bands on both sides
 
@@ -85,7 +85,7 @@ export const getMountainHeight = (noise, worldX, worldZ, distSq) => {
 	const oceanFade = Math.min(1, Math.max(0, oceanProximity))
 
 	// Get mountain noise and apply blend
-	const rawMountainHeight = getMountainNoise(noise, worldX, worldZ)
+	const rawMountainHeight = getMountainNoise(worldX, worldZ, noise)
 	// Scale to normalized units (will be multiplied by baseHeightScale later)
 	return rawMountainHeight * (MOUNTAIN_CONFIG.maxHeight / 4) * mountainBlend * oceanFade
 }

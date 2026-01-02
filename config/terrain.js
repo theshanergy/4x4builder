@@ -71,6 +71,12 @@ export const RIVER_CONFIG = {
 	widthVariation: 15, // Random width variation
 	depth: 2.5, // Depth below WATER_LEVEL
 	bankSlope: 25, // Width of the sloped banks
+
+	// Flow map texture configuration
+	flowMap: {
+		resolution: 512, // Texture resolution
+		worldSize: 12000, // World area covered by the flow map (must cover full river extent)
+	},
 }
 
 /**
@@ -176,7 +182,7 @@ export const TILE_RESOLUTION = 16
 // distance < nodeSize * LOD_SPLIT_FACTOR
 // Lower values = more aggressive LOD (less detail at distance)
 // Higher values = more detail at distance (more tiles)
-export const LOD_SPLIT_FACTOR = 1.5
+export const LOD_SPLIT_FACTOR = 2
 
 // Hysteresis factor to prevent tile popping at LOD boundaries
 // A node won't merge back until distance > nodeSize * LOD_SPLIT_FACTOR * LOD_HYSTERESIS
