@@ -4,11 +4,10 @@ import { TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
 import { vehicleState } from '../../../../store/gameStore'
-import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS } from '../../../../config/terrain'
+import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, TERRAIN_LAYERS } from '../../../../config/terrain'
 import { QuadtreeNode, getEdgeStitchInfo, DEFAULT_EDGE_STITCH_INFO } from '../../../../utils/terrainQuadtree'
 import { createTerrainHelpers } from '../../../../utils/terrainGenerator'
 import TerrainTile from './TerrainTile'
-import { TERRAIN_LAYERS } from './TerrainMaterial'
 
 /**
  * Terrain - Main terrain component with quadtree LOD.

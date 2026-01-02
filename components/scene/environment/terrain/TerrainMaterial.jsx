@@ -1,89 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { RepeatWrapping } from 'three'
-
-/**
- * Terrain Layer Configuration
- *
- * Each layer defines:
- * - name: Layer identifier
- * - textures: Paths to albedo and normal textures
- * - textureScale: World-space texture tiling scale
- * - blend: Blending configuration (not needed for base layer)
- *   - type: 'height', 'slope', or 'height_slope' (combined)
- *   - height: { start, end, influence } - Height-based blending
- *   - slope: { start, end, influence } - Slope-based blending (0=flat, 1=steep)
- *   - curvature: { scale, softness, ridgeInfluence } - Curvature-based erosion
- *
- * Layers are rendered bottom-to-top (first layer is base)
- */
-export const TERRAIN_LAYERS = [
-	{
-		name: 'rock',
-		textures: {
-			albedo: '/assets/images/ground/slatecliffrock_albedo.jpg',
-			normal: '/assets/images/ground/slatecliffrock_normal.jpg',
-		},
-		textureScale: 0.015,
-		// Base layer - no blend config needed
-		// Uses triplanar projection with LOD and stochastic sampling
-		triplanar: true,
-		stochastic: true, // Enable stochastic sampling to reduce tiling
-		lod: {
-			distanceScaleStart: 100,
-			distanceScaleFactor: 300,
-			levels: 3,
-		},
-	},
-	{
-		name: 'sand',
-		textures: {
-			albedo: '/assets/images/ground/sand.jpg',
-			normal: '/assets/images/ground/sand_normal.jpg',
-		},
-		textureScale: 0.4,
-		normalScale: 0.5,
-		blend: {
-			type: 'height_slope',
-			height: {
-				start: 4, // Height where sand starts fading out
-				end: 60, // Height where sand is fully gone
-				influence: 0.8,
-			},
-			slope: {
-				start: 0.1, // Slope threshold where sand starts fading
-				end: 0.3, // Slope threshold where sand is fully gone
-				influence: 0.9,
-			},
-			curvature: {
-				scale: 50.0,
-				softness: 0.3,
-				ridgeInfluence: 0.5,
-			},
-		},
-	},
-	{
-		name: 'snow',
-		textures: {
-			albedo: '/assets/images/ground/snow.jpg',
-			normal: '/assets/images/ground/snow_normal.jpg',
-		},
-		textureScale: 0.05,
-		normalScale: 0.5,
-		blend: {
-			type: 'height_slope',
-			height: {
-				start: 120, // Height where snow starts appearing
-				end: 200, // Height where snow is fully present
-				influence: 0.1,
-			},
-			slope: {
-				start: 0.5, // Snow fades on slopes steeper than this
-				end: 0.8, // Snow fully gone on very steep slopes
-				influence: 0.7,
-			},
-		},
-	},
-]
+import { TERRAIN_LAYERS } from '../../../../config/terrain'
 
 // Generate shader uniforms from layer config
 const generateLayerUniforms = (layers) => {
@@ -301,8 +218,47 @@ const generateSamplingCode = (layer, index) => {
 	}`
 		}`
 		return sampling
+	} else if (layer.lod) {
+		// Non-triplanar layer with LOD
+		const sampling = `
+	// Layer ${index} (${layer.name}) - world-space UV mapping with LOD
+	vec4 layer${index}Color = vec4(0.0);
+	vec3 layer${index}Normal = vWorldNormal;${
+			isBaseLayer
+				? ''
+				: `
+	if (layer${index}Blend > 0.01) {`
+		}
+		vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+		float scaleLower${index} = ${prefix}TextureScale / lodInfo${index}.x;
+		float scaleUpper${index} = ${prefix}TextureScale / lodInfo${index}.y;
+		float lodBlend${index} = lodInfo${index}.z;
+		
+		vec2 uvLower${index} = vWorldPos.xz * scaleLower${index};
+		vec2 uvUpper${index} = vWorldPos.xz * scaleUpper${index};
+		
+		vec4 colorLower${index} = textureNoTile(${prefix}Texture, uvLower${index}, true);
+		vec4 colorUpper${index} = textureNoTile(${prefix}Texture, uvUpper${index}, true);
+		layer${index}Color = mix(colorLower${index}, colorUpper${index}, lodBlend${index});
+		
+		vec3 normalLower${index} = textureNoTile(${prefix}NormalMap, uvLower${index}).xyz * 2.0 - 1.0;
+		vec3 normalUpper${index} = textureNoTile(${prefix}NormalMap, uvUpper${index}).xyz * 2.0 - 1.0;
+		vec3 normalSample${index} = mix(normalLower${index}, normalUpper${index}, lodBlend${index});
+		normalSample${index}.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
+		// Convert tangent-space normal to world-space using UDN blending for Y-up projection
+		layer${index}Normal = normalize(vec3(
+			normalSample${index}.x + vWorldNormal.x,
+			abs(normalSample${index}.z) * vWorldNormal.y,
+			normalSample${index}.y + vWorldNormal.z
+		));${
+			isBaseLayer
+				? ''
+				: `
+	}`
+		}`
+		return sampling
 	} else {
-		// Non-triplanar layers (sand, snow) with stochastic sampling
+		// Non-triplanar layers without LOD (sand, snow) with stochastic sampling
 		const sampling = `
 	// Layer ${index} (${layer.name}) - world-space UV mapping with stochastic sampling
 	vec4 layer${index}Color = vec4(0.0);

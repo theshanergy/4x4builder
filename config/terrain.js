@@ -73,6 +73,95 @@ export const RIVER_CONFIG = {
 	bankSlope: 25, // Width of the sloped banks
 }
 
+/**
+ * Terrain Layer Configuration
+ *
+ * Each layer defines:
+ * - name: Layer identifier
+ * - textures: Paths to albedo and normal textures
+ * - textureScale: World-space texture tiling scale
+ * - blend: Blending configuration (not needed for base layer)
+ *   - type: 'height', 'slope', or 'height_slope' (combined)
+ *   - height: { start, end, influence } - Height-based blending
+ *   - slope: { start, end, influence } - Slope-based blending (0=flat, 1=steep)
+ *   - curvature: { scale, softness, ridgeInfluence } - Curvature-based erosion
+ *
+ * Layers are rendered bottom-to-top (first layer is base)
+ */
+export const TERRAIN_LAYERS = [
+	{
+		name: 'rock',
+		textures: {
+			albedo: '/assets/images/ground/slatecliffrock_albedo.jpg',
+			normal: '/assets/images/ground/slatecliffrock_normal.jpg',
+		},
+		textureScale: 0.015,
+		// Base layer - no blend config needed
+		// Uses triplanar projection with LOD and stochastic sampling
+		triplanar: true,
+		stochastic: true, // Enable stochastic sampling to reduce tiling
+		lod: {
+			distanceScaleStart: 100,
+			distanceScaleFactor: 300,
+			levels: 3,
+		},
+	},
+	{
+		name: 'sand',
+		textures: {
+			albedo: '/assets/images/ground/sand.jpg',
+			normal: '/assets/images/ground/sand_normal.jpg',
+		},
+		textureScale: 0.4,
+		normalScale: 0.5,
+		blend: {
+			type: 'height_slope',
+			height: {
+				start: 4, // Height where sand starts fading out
+				end: 60, // Height where sand is fully gone
+				influence: 0.8,
+			},
+			slope: {
+				start: 0.1, // Slope threshold where sand starts fading
+				end: 0.3, // Slope threshold where sand is fully gone
+				influence: 0.9,
+			},
+			curvature: {
+				scale: 50.0,
+				softness: 0.3,
+				ridgeInfluence: 0.5,
+			},
+		},
+	},
+	{
+		name: 'snow',
+		textures: {
+			albedo: '/assets/images/ground/snow.jpg',
+			normal: '/assets/images/ground/snow_normal.jpg',
+		},
+		textureScale: 0.05,
+		normalScale: 0.5,
+		blend: {
+			type: 'height_slope',
+			height: {
+				start: 120, // Height where snow starts appearing
+				end: 200, // Height where snow is fully present
+				influence: 1.0,
+			},
+			slope: {
+				start: 0.5, // Snow fades on slopes steeper than this
+				end: 0.8, // Snow fully gone on very steep slopes
+				influence: 0.7,
+			},
+		},
+		lod: {
+			distanceScaleStart: 100,
+			distanceScaleFactor: 300,
+			levels: 3,
+		},
+	},
+]
+
 // Base size of the entire terrain quadtree (power of 2 recommended)
 export const QUADTREE_ROOT_SIZE = 4096
 
