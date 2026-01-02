@@ -25,9 +25,9 @@ const CLIFF_CONFIG = {
 	textureScale: 0.05, // World-space texture tiling scale
 
 	// Distance-based texture scaling (reduces tiling on distant terrain)
-	distanceScaleStart: 500, // Distance where scaling starts
-	distanceScaleEnd: 1500, // Distance where max scaling is reached
-	distanceScaleMax: 4.0, // Maximum scale multiplier at far distance (larger = bigger textures)
+	distanceScaleStart: 100, // Distance where scaling starts
+	distanceScaleFactor: 300, // Distance between LOD levels
+	distanceLODLevels: 3, // Number of discrete LOD levels (prevents smooth animation)
 }
 
 /**
@@ -78,8 +78,8 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 			shader.uniforms.uRidgeInfluence = { value: CLIFF_CONFIG.ridgeInfluence }
 			// Distance-based scaling
 			shader.uniforms.uDistanceScaleStart = { value: CLIFF_CONFIG.distanceScaleStart }
-			shader.uniforms.uDistanceScaleEnd = { value: CLIFF_CONFIG.distanceScaleEnd }
-			shader.uniforms.uDistanceScaleMax = { value: CLIFF_CONFIG.distanceScaleMax }
+			shader.uniforms.uDistanceScaleFactor = { value: CLIFF_CONFIG.distanceScaleFactor }
+			shader.uniforms.uDistanceLODLevels = { value: CLIFF_CONFIG.distanceLODLevels }
 
 			// Vertex shader - pass world position
 			shader.vertexShader = shader.vertexShader.replace(
@@ -122,13 +122,12 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				uniform float uCurvatureSoftness;
 				uniform float uRidgeInfluence;
 				uniform float uDistanceScaleStart;
-				uniform float uDistanceScaleEnd;
-				uniform float uDistanceScaleMax;
+				uniform float uDistanceScaleFactor;
+				uniform float uDistanceLODLevels;
 				varying vec3 vWorldPos;
 				varying vec3 vWorldNormal;
 				varying vec2 vCliffUV;
 				float cliffBlend;
-				float distanceScale;
 
 				// Hash function for pseudo-random variation
 				vec2 hash2(vec2 p) {
@@ -136,7 +135,7 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				}
 
 				// Sample texture without tiling artifacts using stochastic sampling
-				// Blends 4 neighboring tiles smoothly to avoid hard edges
+				// Blends 2 neighboring tiles for performance (reduced from 4)
 				vec4 textureNoTile(sampler2D samp, vec2 uv) {
 					// Tile scale - controls size of variation regions
 					float tileScale = 0.25;
@@ -146,36 +145,40 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 					vec2 tile = floor(scaledUV);
 					vec2 f = fract(scaledUV);
 
-					// Smooth interpolation weights (hermite curve)
-					vec2 w = f * f * (3.0 - 2.0 * f);
-
 					// Compute derivatives for mip-mapping
 					vec2 dx = dFdx(uv);
 					vec2 dy = dFdy(uv);
 
-					// Sample all 4 neighboring tiles with random offsets
-					vec2 off00 = hash2(tile + vec2(0.0, 0.0));
-					vec2 off10 = hash2(tile + vec2(1.0, 0.0));
-					vec2 off01 = hash2(tile + vec2(0.0, 1.0));
-					vec2 off11 = hash2(tile + vec2(1.0, 1.0));
+					// Use diagonal blend (2 samples instead of 4)
+					float w = smoothstep(0.0, 1.0, f.x + f.y - 0.5);
 
-					vec4 col00 = textureGrad(samp, uv + off00, dx, dy);
-					vec4 col10 = textureGrad(samp, uv + off10, dx, dy);
-					vec4 col01 = textureGrad(samp, uv + off01, dx, dy);
-					vec4 col11 = textureGrad(samp, uv + off11, dx, dy);
+					vec2 off0 = hash2(tile);
+					vec2 off1 = hash2(tile + vec2(1.0, 1.0));
 
-					// Bilinear blend between the 4 tiles
-					vec4 colX0 = mix(col00, col10, w.x);
-					vec4 colX1 = mix(col01, col11, w.x);
-					return mix(colX0, colX1, w.y);
+					vec4 col0 = textureGrad(samp, uv + off0, dx, dy);
+					vec4 col1 = textureGrad(samp, uv + off1, dx, dy);
+
+					return mix(col0, col1, w);
 				}
 
-				// Calculate distance-based texture scale multiplier
-				// Returns a scale divisor that makes textures larger (less tiled) at distance
-				float getDistanceScale(vec3 worldPos) {
+				// Calculate LOD blend info - returns vec3(lowerScale, upperScale, blendFactor)
+				vec3 getDistanceLODBlend(vec3 worldPos) {
 					float dist = length(worldPos - cameraPosition);
-					float t = smoothstep(uDistanceScaleStart, uDistanceScaleEnd, dist);
-					return mix(1.0, uDistanceScaleMax, t);
+					// Calculate continuous LOD level
+					float lodContinuous = (dist - uDistanceScaleStart) / uDistanceScaleFactor;
+					lodContinuous = clamp(lodContinuous, 0.0, uDistanceLODLevels - 1.0);
+
+					// Get lower and upper LOD levels
+					float lodLower = floor(lodContinuous);
+					float lodUpper = min(lodLower + 1.0, uDistanceLODLevels - 1.0);
+
+					// Blend factor between levels (0 = fully lower, 1 = fully upper)
+					float blend = fract(lodContinuous);
+					// Apply smoothstep for smoother transition
+					blend = smoothstep(0.0, 1.0, blend);
+
+					// Return scales for both LODs and blend factor
+					return vec3(pow(2.0, lodLower), pow(2.0, lodUpper), blend);
 				}
 
 				// Calculate approximate curvature from world position derivatives
@@ -211,6 +214,20 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 					return colX * blend.x + colY * blend.y + colZ * blend.z;
 				}
 
+				// Triplanar with LOD blending - samples at two scales and blends between them
+				vec4 textureTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo) {
+					float scaleLower = baseScale / lodInfo.x;
+					float scaleUpper = baseScale / lodInfo.y;
+					float lodBlend = lodInfo.z;
+
+					// Sample at both LOD scales
+					vec4 colorLower = textureTriplanar(samp, worldPos, worldNormal, scaleLower);
+					vec4 colorUpper = textureTriplanar(samp, worldPos, worldNormal, scaleUpper);
+
+					// Blend between LOD levels
+					return mix(colorLower, colorUpper, lodBlend);
+				}
+
 				// Triplanar normal sampling with proper tangent space blending (UDN method)
 				vec3 normalTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale) {
 					// Calculate blend weights from world normal
@@ -242,6 +259,20 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 					);
 
 					return result;
+				}
+
+				// Triplanar normal with LOD blending
+				vec3 normalTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo) {
+					float scaleLower = baseScale / lodInfo.x;
+					float scaleUpper = baseScale / lodInfo.y;
+					float lodBlend = lodInfo.z;
+
+					// Sample normals at both LOD scales
+					vec3 normalLower = normalTriplanar(samp, worldPos, worldNormal, scaleLower);
+					vec3 normalUpper = normalTriplanar(samp, worldPos, worldNormal, scaleUpper);
+
+					// Blend between LOD levels
+					return normalize(mix(normalLower, normalUpper, lodBlend));
 				}`
 			)
 
@@ -250,12 +281,11 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 				'#include <map_fragment>',
 				`#include <map_fragment>
 
-				// Calculate distance-based scale for cliffs only (larger textures at distance to reduce tiling)
-				distanceScale = getDistanceScale(vWorldPos);
-				float cliffScale = uTextureScale / distanceScale;
+				// Get LOD blend info (lowerScale, upperScale, blendFactor)
+				vec3 lodInfo = getDistanceLODBlend(vWorldPos);
 
-				// Sample cliff texture using triplanar projection to avoid stretching on steep slopes
-				vec4 cliffColor = textureTriplanar(uCliffTexture, vWorldPos, vWorldNormal, cliffScale);
+				// Sample cliff texture using triplanar projection with LOD blending
+				vec4 cliffColor = textureTriplanarLOD(uCliffTexture, vWorldPos, vWorldNormal, uTextureScale, lodInfo);
 
 				// Height factor (0 = low, 1 = high) using absolute world heights
 				float heightFactor = smoothstep(uHeightBlendStart, uHeightBlendEnd, vWorldPos.y);
@@ -294,8 +324,8 @@ const TerrainMaterial = ({ sandTexture, sandNormalMap, cliffTexture, cliffNormal
 					sandNormal.xy *= normalScale;
 					vec3 sandWorldNormal = normalize(tbn * sandNormal);
 
-					// Sample cliff normal using triplanar projection with distance-based scaling
-					vec3 cliffWorldNormal = normalTriplanar(uCliffNormalMap, vWorldPos, vWorldNormal, cliffScale);
+					// Sample cliff normal using triplanar projection with LOD blending
+					vec3 cliffWorldNormal = normalTriplanarLOD(uCliffNormalMap, vWorldPos, vWorldNormal, uTextureScale, lodInfo);
 
 					// Blend world-space normals based on terrain blend factor
 					normal = normalize(mix(sandWorldNormal, cliffWorldNormal, cliffBlend));
