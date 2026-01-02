@@ -1,7 +1,7 @@
 import { useMemo, memo } from 'react'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 
-import { TILE_RESOLUTION, TERRAIN_CONFIG } from '../../../../config/terrain'
+import { TILE_RESOLUTION } from '../../../../config/terrain'
 
 /**
  * TerrainCollider - Generates and renders a physics heightfield collider for a terrain tile.
@@ -14,7 +14,7 @@ import { TILE_RESOLUTION, TERRAIN_CONFIG } from '../../../../config/terrain'
  */
 const TerrainCollider = memo(({ node, terrainHelpers, position, children }) => {
 	const { size, centerX, centerZ } = node
-	const { baseHeightScale } = TERRAIN_CONFIG
+	const { getRawHeight, baseHeightScale } = terrainHelpers
 
 	const colliderArgs = useMemo(() => {
 		const segments = TILE_RESOLUTION
@@ -37,7 +37,7 @@ const TerrainCollider = memo(({ node, terrainHelpers, position, children }) => {
 				const worldZ = centerZ + localZ - size / 2
 
 				// Get normalized height
-				const normalizedHeight = terrainHelpers.getRawHeight(worldX, worldZ)
+				const normalizedHeight = getRawHeight(worldX, worldZ)
 
 				// Store height sample in row-major order for Rapier collider
 				const sampleIndex = i * sampleCount + j
@@ -52,7 +52,7 @@ const TerrainCollider = memo(({ node, terrainHelpers, position, children }) => {
 			heightSamples, // (segments+1)² samples in row-major order
 			{ x: size, y: baseHeightScale, z: size },
 		]
-	}, [size, centerX, centerZ, baseHeightScale, terrainHelpers])
+	}, [size, centerX, centerZ, terrainHelpers])
 
 	return (
 		<RigidBody type='fixed' position={position} colliders={false}>
