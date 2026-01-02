@@ -43,9 +43,8 @@ export const TERRAIN_LAYERS = [
 			albedo: '/assets/images/ground/sand.jpg',
 			normal: '/assets/images/ground/sand_normal.jpg',
 		},
-		// Use built-in mesh UVs (sampled via Three.js map_fragment)
-		useBuiltinUV: true,
-		normalScale: 0.35,
+		textureScale: 0.4,
+		normalScale: 0.5,
 		blend: {
 			type: 'height_slope',
 			height: {
@@ -273,31 +272,18 @@ const generateSamplingCode = (layer, index) => {
 		return `
 	// Layer ${index} (${layer.name}) - triplanar with LOD
 	vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
-	vec4 layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index});
+	vec4 layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true);
 	vec3 layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index});`
 	} else if (layer.triplanar) {
 		return `
 	// Layer ${index} (${layer.name}) - triplanar
-	vec4 layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale);
+	vec4 layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, true);
 	vec3 layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale);`
-	} else if (layer.useBuiltinUV) {
-		// Use Three.js built-in UV sampling (already done in map_fragment for diffuseColor)
-		return `
-	// Layer ${index} (${layer.name}) - uses built-in mesh UVs (from diffuseColor/normalMap)
-	vec4 layer${index}Color = diffuseColor;
-	vec3 layer${index}NormalSample = texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0;
-	layer${index}NormalSample.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
-	// Convert tangent-space normal to world-space using UDN blending for Y-up projection
-	vec3 layer${index}Normal = normalize(vec3(
-		layer${index}NormalSample.x + vWorldNormal.x,
-		abs(layer${index}NormalSample.z) * vWorldNormal.y,
-		layer${index}NormalSample.y + vWorldNormal.z
-	));`
 	} else {
 		return `
 	// Layer ${index} (${layer.name}) - world-space UV mapping with stochastic sampling
 	vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
-	vec4 layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV);
+	vec4 layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV, true);
 	vec3 layer${index}NormalSample = textureNoTile(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
 	layer${index}NormalSample.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
 	// Convert tangent-space normal to world-space using UDN blending for Y-up projection
@@ -431,13 +417,23 @@ const TerrainMaterial = ({ layerTextures }) => {
 				// Blend factors for each layer
 				${TERRAIN_LAYERS.map((_, i) => `float layer${i}Blend;`).join('\n				')}
 
+				// sRGB to linear color space conversion
+				vec3 sRGBToLinear(vec3 srgb) {
+					return pow(srgb, vec3(2.2));
+				}
+
+				vec4 sRGBToLinear(vec4 srgb) {
+					return vec4(pow(srgb.rgb, vec3(2.2)), srgb.a);
+				}
+
 				// Hash function for pseudo-random variation
 				vec2 hash2(vec2 p) {
 					return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
 				}
 
 				// Sample texture - uses stochastic sampling nearby, plain sampling at distance
-				vec4 textureNoTile(sampler2D samp, vec2 uv) {
+				// Set srgb=true for albedo textures to convert to linear space
+				vec4 textureNoTile(sampler2D samp, vec2 uv, bool srgb) {
 					// Compute derivatives for mip-mapping
 					vec2 dx = dFdx(uv);
 					vec2 dy = dFdy(uv);
@@ -446,30 +442,44 @@ const TerrainMaterial = ({ layerTextures }) => {
 					float dist = length(vWorldPos - cameraPosition);
 					float stochasticBlend = 1.0 - smoothstep(150.0, 400.0, dist);
 
+					vec4 result;
+
 					// Early out for distant terrain - just use plain sampling
 					if (stochasticBlend < 0.01) {
-						return textureGrad(samp, uv, dx, dy);
+						result = textureGrad(samp, uv, dx, dy);
+					} else {
+						// Stochastic sampling for nearby terrain
+						float tileScale = 0.08;
+						vec2 scaledUV = uv * tileScale;
+						vec2 tile = floor(scaledUV);
+						vec2 f = fract(scaledUV);
+
+						// Use diagonal blend (2 samples instead of 4)
+						float w = smoothstep(0.0, 1.0, f.x + f.y - 0.5);
+
+						// Use integer offsets to preserve seamless tiling
+						// The offsets shift by whole texture repeats so edges still align
+						vec2 rand0 = hash2(tile);
+						vec2 rand1 = hash2(tile + vec2(1.0, 1.0));
+						vec2 off0 = floor(rand0 * 16.0);
+						vec2 off1 = floor(rand1 * 16.0);
+
+						vec4 col0 = textureGrad(samp, uv + off0, dx, dy);
+						vec4 col1 = textureGrad(samp, uv + off1, dx, dy);
+						vec4 stochasticColor = mix(col0, col1, w);
+
+						// Blend between stochastic (near) and plain (far) sampling
+						vec4 plainColor = textureGrad(samp, uv, dx, dy);
+						result = mix(plainColor, stochasticColor, stochasticBlend);
 					}
 
-					// Stochastic sampling for nearby terrain
-					float tileScale = 0.08;
-					vec2 scaledUV = uv * tileScale;
-					vec2 tile = floor(scaledUV);
-					vec2 f = fract(scaledUV);
+					// Convert sRGB to linear color space for albedo textures
+					return srgb ? sRGBToLinear(result) : result;
+				}
 
-					// Use diagonal blend (2 samples instead of 4)
-					float w = smoothstep(0.0, 1.0, f.x + f.y - 0.5);
-
-					vec2 off0 = hash2(tile);
-					vec2 off1 = hash2(tile + vec2(1.0, 1.0));
-
-					vec4 col0 = textureGrad(samp, uv + off0, dx, dy);
-					vec4 col1 = textureGrad(samp, uv + off1, dx, dy);
-					vec4 stochasticColor = mix(col0, col1, w);
-
-					// Blend between stochastic (near) and plain (far) sampling
-					vec4 plainColor = textureGrad(samp, uv, dx, dy);
-					return mix(plainColor, stochasticColor, stochasticBlend);
+				// Convenience overload for normal maps (no sRGB conversion)
+				vec4 textureNoTile(sampler2D samp, vec2 uv) {
+					return textureNoTile(samp, uv, false);
 				}
 
 				// Calculate LOD blend info - returns vec3(lowerScale, upperScale, blendFactor)
@@ -505,7 +515,8 @@ const TerrainMaterial = ({ layerTextures }) => {
 				}
 
 				// Triplanar texture sampling - projects texture from 3 axes and blends based on normal
-				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale) {
+				// Set srgb=true for albedo textures to convert to linear space
+				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool srgb) {
 					// Calculate blend weights from world normal (sharper falloff for cleaner transitions)
 					vec3 blend = abs(worldNormal);
 					blend = pow(blend, vec3(4.0));
@@ -517,26 +528,37 @@ const TerrainMaterial = ({ layerTextures }) => {
 					vec2 uvZ = worldPos.xy * scale;
 
 					// Sample from each projection with anti-tiling
-					vec4 colX = textureNoTile(samp, uvX);
-					vec4 colY = textureNoTile(samp, uvY);
-					vec4 colZ = textureNoTile(samp, uvZ);
+					vec4 colX = textureNoTile(samp, uvX, srgb);
+					vec4 colY = textureNoTile(samp, uvY, srgb);
+					vec4 colZ = textureNoTile(samp, uvZ, srgb);
 
 					// Blend based on normal direction
 					return colX * blend.x + colY * blend.y + colZ * blend.z;
 				}
 
+				// Convenience overload for normal maps (no sRGB conversion)
+				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale) {
+					return textureTriplanar(samp, worldPos, worldNormal, scale, false);
+				}
+
 				// Triplanar with LOD blending - samples at two scales and blends between them
-				vec4 textureTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo) {
+				// Set srgb=true for albedo textures to convert to linear space
+				vec4 textureTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo, bool srgb) {
 					float scaleLower = baseScale / lodInfo.x;
 					float scaleUpper = baseScale / lodInfo.y;
 					float lodBlend = lodInfo.z;
 
 					// Sample at both LOD scales
-					vec4 colorLower = textureTriplanar(samp, worldPos, worldNormal, scaleLower);
-					vec4 colorUpper = textureTriplanar(samp, worldPos, worldNormal, scaleUpper);
+					vec4 colorLower = textureTriplanar(samp, worldPos, worldNormal, scaleLower, srgb);
+					vec4 colorUpper = textureTriplanar(samp, worldPos, worldNormal, scaleUpper, srgb);
 
 					// Blend between LOD levels
 					return mix(colorLower, colorUpper, lodBlend);
+				}
+
+				// Convenience overload for normal maps (no sRGB conversion)
+				vec4 textureTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo) {
+					return textureTriplanarLOD(samp, worldPos, worldNormal, baseScale, lodInfo, false);
 				}
 
 				// Triplanar normal sampling with proper tangent space blending (UDN method)
@@ -618,18 +640,11 @@ const TerrainMaterial = ({ layerTextures }) => {
 		}
 	}, [layerTextures, shaderCode])
 
-	// Find the layer that uses built-in UVs - this will be passed to the material's map/normalMap
-	const builtinUVLayer = TERRAIN_LAYERS.find((layer) => layer.useBuiltinUV)
-	const builtinTextures = builtinUVLayer ? layerTextures[builtinUVLayer.name] : null
+	// We don't need map/normalMap props since all layers are sampled in custom shader code
+	// But we need a normalMap to trigger USE_NORMALMAP define, so pass the first layer's normal
+	const baseNormal = layerTextures[TERRAIN_LAYERS[0].name]?.normal
 
-	// Apply normal scale via repeat (as original code did)
-	useMemo(() => {
-		if (builtinTextures?.normal && builtinUVLayer?.normalScale) {
-			builtinTextures.normal.repeat.set(builtinUVLayer.normalScale, builtinUVLayer.normalScale)
-		}
-	}, [builtinTextures, builtinUVLayer])
-
-	return <meshStandardMaterial ref={materialRef} map={builtinTextures?.albedo} normalMap={builtinTextures?.normal} onBeforeCompile={onBeforeCompile} />
+	return <meshStandardMaterial ref={materialRef} normalMap={baseNormal} onBeforeCompile={onBeforeCompile} />
 }
 
 export default TerrainMaterial
