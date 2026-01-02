@@ -1,6 +1,3 @@
-// Custom terrain shader material extending MeshStandardMaterial
-// Adds height/slope/curvature-based color blending while preserving standard PBR lighting
-
 import { useMemo, useRef } from 'react'
 import { RepeatWrapping } from 'three'
 
@@ -268,33 +265,75 @@ const generateBlendCode = (layer, index) => {
 // Generate color sampling code for a layer
 const generateSamplingCode = (layer, index) => {
 	const prefix = `uLayer${index}`
+	// For non-base layers, wrap sampling in a conditional to skip when blend is near zero
+	const isBaseLayer = index === 0
 
 	if (layer.triplanar && layer.lod) {
 		const useNoTile = layer.stochastic ? 'true' : 'false'
-		return `
+		const sampling = `
 	// Layer ${index} (${layer.name}) - triplanar with LOD
-	vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
-	vec4 layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true, ${useNoTile});
-	vec3 layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});`
+	vec4 layer${index}Color = vec4(0.0);
+	vec3 layer${index}Normal = vWorldNormal;${
+			isBaseLayer
+				? ''
+				: `
+	if (layer${index}Blend > 0.01) {`
+		}
+		vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+		layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true, ${useNoTile});
+		layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});${
+			isBaseLayer
+				? ''
+				: `
+	}`
+		}`
+		return sampling
 	} else if (layer.triplanar) {
 		const useNoTile = layer.stochastic ? 'true' : 'false'
-		return `
+		const sampling = `
 	// Layer ${index} (${layer.name}) - triplanar
-	vec4 layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, true, ${useNoTile});
-	vec3 layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, ${useNoTile});`
+	vec4 layer${index}Color = vec4(0.0);
+	vec3 layer${index}Normal = vWorldNormal;${
+			isBaseLayer
+				? ''
+				: `
+	if (layer${index}Blend > 0.01) {`
+		}
+		layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, true, ${useNoTile});
+		layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, ${useNoTile});${
+			isBaseLayer
+				? ''
+				: `
+	}`
+		}`
+		return sampling
 	} else {
-		return `
+		// Non-triplanar layers (sand, snow) with stochastic sampling
+		const sampling = `
 	// Layer ${index} (${layer.name}) - world-space UV mapping with stochastic sampling
-	vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
-	vec4 layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV, true);
-	vec3 layer${index}NormalSample = textureNoTile(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
-	layer${index}NormalSample.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
-	// Convert tangent-space normal to world-space using UDN blending for Y-up projection
-	vec3 layer${index}Normal = normalize(vec3(
-		layer${index}NormalSample.x + vWorldNormal.x,
-		abs(layer${index}NormalSample.z) * vWorldNormal.y,
-		layer${index}NormalSample.y + vWorldNormal.z
-	));`
+	vec4 layer${index}Color = vec4(0.0);
+	vec3 layer${index}Normal = vWorldNormal;${
+			isBaseLayer
+				? ''
+				: `
+	if (layer${index}Blend > 0.01) {`
+		}
+		vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
+		layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV, true);
+		vec3 layer${index}NormalSample = textureNoTile(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
+		layer${index}NormalSample.xy *= ${layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'};
+		// Convert tangent-space normal to world-space using UDN blending for Y-up projection
+		layer${index}Normal = normalize(vec3(
+			layer${index}NormalSample.x + vWorldNormal.x,
+			abs(layer${index}NormalSample.z) * vWorldNormal.y,
+			layer${index}NormalSample.y + vWorldNormal.z
+		));${
+			isBaseLayer
+				? ''
+				: `
+	}`
+		}`
+		return sampling
 	}
 }
 
@@ -436,15 +475,8 @@ const TerrainMaterial = ({ layerTextures }) => {
 
 				// Sample texture - uses stochastic sampling nearby, plain sampling at distance
 				// Set srgb=true for albedo textures to convert to linear space
-				vec4 textureNoTile(sampler2D samp, vec2 uv, bool srgb) {
-					// Compute derivatives for mip-mapping
-					vec2 dx = dFdx(uv);
-					vec2 dy = dFdy(uv);
-
-					// Fade out stochastic sampling at distance to avoid seams on large LOD tiles
-					float dist = length(vWorldPos - cameraPosition);
-					float stochasticBlend = 1.0 - smoothstep(150.0, 400.0, dist);
-
+				// Accepts pre-computed derivatives for efficiency
+				vec4 textureNoTileWithDerivs(sampler2D samp, vec2 uv, vec2 dx, vec2 dy, float stochasticBlend, bool srgb) {
 					vec4 result;
 
 					// Early out for distant terrain - just use plain sampling
@@ -457,19 +489,26 @@ const TerrainMaterial = ({ layerTextures }) => {
 						vec2 tile = floor(scaledUV);
 						vec2 f = fract(scaledUV);
 
-						// Use diagonal blend (2 samples instead of 4)
-						float w = smoothstep(0.0, 1.0, f.x + f.y - 0.5);
-
 						// Use integer offsets to preserve seamless tiling
-						// The offsets shift by whole texture repeats so edges still align
 						vec2 rand0 = hash2(tile);
-						vec2 rand1 = hash2(tile + vec2(1.0, 1.0));
 						vec2 off0 = floor(rand0 * 16.0);
-						vec2 off1 = floor(rand1 * 16.0);
 
-						vec4 col0 = textureGrad(samp, uv + off0, dx, dy);
-						vec4 col1 = textureGrad(samp, uv + off1, dx, dy);
-						vec4 stochasticColor = mix(col0, col1, w);
+						vec4 stochasticColor;
+
+						// At medium distance (0.3-0.7 blend), use single sample for performance
+						// At close distance (>0.7 blend), use 2-sample diagonal blend for quality
+						if (stochasticBlend > 0.7) {
+							// Full quality: 2-sample diagonal blend
+							float w = smoothstep(0.0, 1.0, f.x + f.y - 0.5);
+							vec2 rand1 = hash2(tile + vec2(1.0, 1.0));
+							vec2 off1 = floor(rand1 * 16.0);
+							vec4 col0 = textureGrad(samp, uv + off0, dx, dy);
+							vec4 col1 = textureGrad(samp, uv + off1, dx, dy);
+							stochasticColor = mix(col0, col1, w);
+						} else {
+							// Medium distance: single offset sample
+							stochasticColor = textureGrad(samp, uv + off0, dx, dy);
+						}
 
 						// Blend between stochastic (near) and plain (far) sampling
 						vec4 plainColor = textureGrad(samp, uv, dx, dy);
@@ -478,6 +517,15 @@ const TerrainMaterial = ({ layerTextures }) => {
 
 					// Convert sRGB to linear color space for albedo textures
 					return srgb ? sRGBToLinear(result) : result;
+				}
+
+				// Wrapper that computes derivatives and distance blend
+				vec4 textureNoTile(sampler2D samp, vec2 uv, bool srgb) {
+					vec2 dx = dFdx(uv);
+					vec2 dy = dFdy(uv);
+					float dist = length(vWorldPos - cameraPosition);
+					float stochasticBlend = 1.0 - smoothstep(150.0, 400.0, dist);
+					return textureNoTileWithDerivs(samp, uv, dx, dy, stochasticBlend, srgb);
 				}
 
 				// Convenience overload for normal maps (no sRGB conversion)
@@ -520,7 +568,8 @@ const TerrainMaterial = ({ layerTextures }) => {
 				// Triplanar texture sampling - projects texture from 3 axes and blends based on normal
 				// Set srgb=true for albedo textures to convert to linear space
 				// Set useNoTile=true to enable stochastic anti-tiling (more expensive)
-				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool srgb, bool useNoTile) {
+				// stochasticBlend controls the intensity of stochastic sampling (0=off, 1=full)
+				vec4 textureTriplanarWithBlend(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool srgb, float stochasticBlend) {
 					// Calculate blend weights from world normal (sharper falloff for cleaner transitions)
 					vec3 blend = abs(worldNormal);
 					blend = pow(blend, vec3(4.0));
@@ -531,19 +580,21 @@ const TerrainMaterial = ({ layerTextures }) => {
 					vec2 uvY = worldPos.xz * scale;
 					vec2 uvZ = worldPos.xy * scale;
 
+					// Pre-compute derivatives once for all projections
+					vec2 dxX = dFdx(uvX);
+					vec2 dyX = dFdy(uvX);
+					vec2 dxY = dFdx(uvY);
+					vec2 dyY = dFdy(uvY);
+					vec2 dxZ = dFdx(uvZ);
+					vec2 dyZ = dFdy(uvZ);
+
 					// Sample from each projection
 					vec4 colX, colY, colZ;
-					if (useNoTile) {
-						colX = textureNoTile(samp, uvX, srgb);
-						colY = textureNoTile(samp, uvY, srgb);
-						colZ = textureNoTile(samp, uvZ, srgb);
+					if (stochasticBlend > 0.01) {
+						colX = textureNoTileWithDerivs(samp, uvX, dxX, dyX, stochasticBlend, srgb);
+						colY = textureNoTileWithDerivs(samp, uvY, dxY, dyY, stochasticBlend, srgb);
+						colZ = textureNoTileWithDerivs(samp, uvZ, dxZ, dyZ, stochasticBlend, srgb);
 					} else {
-						vec2 dxX = dFdx(uvX);
-						vec2 dyX = dFdy(uvX);
-						vec2 dxY = dFdx(uvY);
-						vec2 dyY = dFdy(uvY);
-						vec2 dxZ = dFdx(uvZ);
-						vec2 dyZ = dFdy(uvZ);
 						colX = textureGrad(samp, uvX, dxX, dyX);
 						colY = textureGrad(samp, uvY, dxY, dyY);
 						colZ = textureGrad(samp, uvZ, dxZ, dyZ);
@@ -556,6 +607,16 @@ const TerrainMaterial = ({ layerTextures }) => {
 
 					// Blend based on normal direction
 					return colX * blend.x + colY * blend.y + colZ * blend.z;
+				}
+
+				// Original wrapper that computes stochastic blend from distance
+				vec4 textureTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool srgb, bool useNoTile) {
+					if (!useNoTile) {
+						return textureTriplanarWithBlend(samp, worldPos, worldNormal, scale, srgb, 0.0);
+					}
+					float dist = length(worldPos - cameraPosition);
+					float stochasticBlend = 1.0 - smoothstep(150.0, 400.0, dist);
+					return textureTriplanarWithBlend(samp, worldPos, worldNormal, scale, srgb, stochasticBlend);
 				}
 
 				// Convenience overload for normal maps (no sRGB conversion)
@@ -571,9 +632,18 @@ const TerrainMaterial = ({ layerTextures }) => {
 					float scaleUpper = baseScale / lodInfo.y;
 					float lodBlend = lodInfo.z;
 
-					// Sample at both LOD scales
-					vec4 colorLower = textureTriplanar(samp, worldPos, worldNormal, scaleLower, srgb, useNoTile);
-					vec4 colorUpper = textureTriplanar(samp, worldPos, worldNormal, scaleUpper, srgb, useNoTile);
+					// Compute stochastic blend based on distance
+					float dist = length(worldPos - cameraPosition);
+					float stochasticBlend = useNoTile ? (1.0 - smoothstep(150.0, 400.0, dist)) : 0.0;
+
+					// For upper LOD (distant), reduce or disable stochastic sampling
+					// This saves texture samples since distant terrain doesn't need anti-tiling
+					float stochasticLower = stochasticBlend;
+					float stochasticUpper = stochasticBlend * (1.0 - lodBlend); // Fade out for upper LOD
+
+					// Sample at both LOD scales with appropriate stochastic intensity
+					vec4 colorLower = textureTriplanarWithBlend(samp, worldPos, worldNormal, scaleLower, srgb, stochasticLower);
+					vec4 colorUpper = textureTriplanarWithBlend(samp, worldPos, worldNormal, scaleUpper, srgb, stochasticUpper);
 
 					// Blend between LOD levels
 					return mix(colorLower, colorUpper, lodBlend);
@@ -585,8 +655,8 @@ const TerrainMaterial = ({ layerTextures }) => {
 				}
 
 				// Triplanar normal sampling with proper tangent space blending (UDN method)
-				// Set useNoTile=true to enable stochastic anti-tiling (more expensive)
-				vec3 normalTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool useNoTile) {
+				// stochasticBlend controls the intensity of stochastic sampling (0=off, 1=full)
+				vec3 normalTriplanarWithBlend(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, float stochasticBlend) {
 					// Calculate blend weights from world normal
 					vec3 blend = abs(worldNormal);
 					blend = pow(blend, vec3(4.0));
@@ -597,19 +667,21 @@ const TerrainMaterial = ({ layerTextures }) => {
 					vec2 uvY = worldPos.xz * scale;
 					vec2 uvZ = worldPos.xy * scale;
 
+					// Pre-compute derivatives once for all projections
+					vec2 dxX = dFdx(uvX);
+					vec2 dyX = dFdy(uvX);
+					vec2 dxY = dFdx(uvY);
+					vec2 dyY = dFdy(uvY);
+					vec2 dxZ = dFdx(uvZ);
+					vec2 dyZ = dFdy(uvZ);
+
 					// Sample normals from each projection
 					vec3 tnormX, tnormY, tnormZ;
-					if (useNoTile) {
-						tnormX = textureNoTile(samp, uvX).xyz * 2.0 - 1.0;
-						tnormY = textureNoTile(samp, uvY).xyz * 2.0 - 1.0;
-						tnormZ = textureNoTile(samp, uvZ).xyz * 2.0 - 1.0;
+					if (stochasticBlend > 0.01) {
+						tnormX = textureNoTileWithDerivs(samp, uvX, dxX, dyX, stochasticBlend, false).xyz * 2.0 - 1.0;
+						tnormY = textureNoTileWithDerivs(samp, uvY, dxY, dyY, stochasticBlend, false).xyz * 2.0 - 1.0;
+						tnormZ = textureNoTileWithDerivs(samp, uvZ, dxZ, dyZ, stochasticBlend, false).xyz * 2.0 - 1.0;
 					} else {
-						vec2 dxX = dFdx(uvX);
-						vec2 dyX = dFdy(uvX);
-						vec2 dxY = dFdx(uvY);
-						vec2 dyY = dFdy(uvY);
-						vec2 dxZ = dFdx(uvZ);
-						vec2 dyZ = dFdy(uvZ);
 						tnormX = textureGrad(samp, uvX, dxX, dyX).xyz * 2.0 - 1.0;
 						tnormY = textureGrad(samp, uvY, dxY, dyY).xyz * 2.0 - 1.0;
 						tnormZ = textureGrad(samp, uvZ, dxZ, dyZ).xyz * 2.0 - 1.0;
@@ -631,6 +703,16 @@ const TerrainMaterial = ({ layerTextures }) => {
 					return result;
 				}
 
+				// Original wrapper that computes stochastic blend from distance
+				vec3 normalTriplanar(sampler2D samp, vec3 worldPos, vec3 worldNormal, float scale, bool useNoTile) {
+					if (!useNoTile) {
+						return normalTriplanarWithBlend(samp, worldPos, worldNormal, scale, 0.0);
+					}
+					float dist = length(worldPos - cameraPosition);
+					float stochasticBlend = 1.0 - smoothstep(150.0, 400.0, dist);
+					return normalTriplanarWithBlend(samp, worldPos, worldNormal, scale, stochasticBlend);
+				}
+
 				// Triplanar normal with LOD blending
 				// Set useNoTile=true to enable stochastic anti-tiling (more expensive)
 				vec3 normalTriplanarLOD(sampler2D samp, vec3 worldPos, vec3 worldNormal, float baseScale, vec3 lodInfo, bool useNoTile) {
@@ -638,9 +720,17 @@ const TerrainMaterial = ({ layerTextures }) => {
 					float scaleUpper = baseScale / lodInfo.y;
 					float lodBlend = lodInfo.z;
 
-					// Sample normals at both LOD scales
-					vec3 normalLower = normalTriplanar(samp, worldPos, worldNormal, scaleLower, useNoTile);
-					vec3 normalUpper = normalTriplanar(samp, worldPos, worldNormal, scaleUpper, useNoTile);
+					// Compute stochastic blend based on distance
+					float dist = length(worldPos - cameraPosition);
+					float stochasticBlend = useNoTile ? (1.0 - smoothstep(150.0, 400.0, dist)) : 0.0;
+
+					// For upper LOD (distant), reduce or disable stochastic sampling
+					float stochasticLower = stochasticBlend;
+					float stochasticUpper = stochasticBlend * (1.0 - lodBlend);
+
+					// Sample normals at both LOD scales with appropriate stochastic intensity
+					vec3 normalLower = normalTriplanarWithBlend(samp, worldPos, worldNormal, scaleLower, stochasticLower);
+					vec3 normalUpper = normalTriplanarWithBlend(samp, worldPos, worldNormal, scaleUpper, stochasticUpper);
 
 					// Blend between LOD levels
 					return normalize(mix(normalLower, normalUpper, lodBlend));
@@ -657,12 +747,12 @@ const TerrainMaterial = ({ layerTextures }) => {
 				// Calculate curvature once for all layers
 				float curvature = getCurvature();
 
-				// Sample all layer textures
-				${shaderCode.samplingCode}
-
-				// Calculate blend factors for each layer
+				// Calculate blend factors FIRST so we can skip sampling when blend is zero
 				layer0Blend = 1.0; // Base layer always fully visible initially
 				${shaderCode.blendCalculations}
+
+				// Sample layer textures (with early-out for layers with zero blend)
+				${shaderCode.samplingCode}
 
 				// Blend colors from all layers
 				${shaderCode.colorBlending}`
