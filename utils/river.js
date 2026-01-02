@@ -1,11 +1,64 @@
-// Flow Map Generator
-// Generates a texture encoding water flow direction for rivers
-// RG channels = flow direction (0.5 = no flow, 0 or 1 = max flow in that axis)
-// B channel = flow strength (0 = ocean/still, 1 = fast river)
-// A channel = river mask (0 = ocean, 1 = river)
-
 import { DataTexture, RGBAFormat, LinearFilter, ClampToEdgeWrapping } from 'three'
-import { RIVER_CONFIG, OCEAN_CONFIG } from '../../../../config/terrain'
+import { RIVER_CONFIG, OCEAN_CONFIG } from '../config/terrain'
+
+/**
+ * Calculate the Z position of the river center at a given X coordinate.
+ * The river meanders using multiple sine waves plus noise for organic variation.
+ */
+export const getRiverCenterZ = (x, noise) => {
+	const { baseZ, primaryFrequency, primaryAmplitude, secondaryFrequency, secondaryAmplitude, tertiaryAmplitude } = RIVER_CONFIG
+	const primary = Math.sin(x * primaryFrequency) * primaryAmplitude
+	const secondary = Math.sin(x * secondaryFrequency + 1.5) * secondaryAmplitude
+	const tertiary = noise ? noise.perlin2(x * 0.003, 0.5) * tertiaryAmplitude : 0
+	return baseZ + primary + secondary + tertiary
+}
+
+/**
+ * Calculate river width at a given X coordinate.
+ * Width varies slightly using noise for natural appearance.
+ */
+export const getRiverWidth = (x, noise) => {
+	const { width, widthVariation } = RIVER_CONFIG
+	const variation = noise ? noise.perlin2(x * 0.005 + 100, 0.5) * widthVariation : 0
+	return width + variation
+}
+
+/**
+ * Calculate distance from a world position to the nearest point on the river.
+ * Returns an object with distance and river geometry info at that X position.
+ */
+export const getDistanceToRiver = (worldX, worldZ, noise) => {
+	const { startX, endX } = RIVER_CONFIG
+	const clampedX = Math.max(startX, Math.min(endX, worldX))
+	const riverZ = getRiverCenterZ(clampedX, noise)
+	const riverWidth = getRiverWidth(clampedX, noise)
+	const distance = Math.abs(worldZ - riverZ)
+	return { distance, riverZ, riverWidth, clampedX }
+}
+
+/**
+ * Calculate how deeply the river should carve into terrain at a given position.
+ * Returns 0-1 where 0 = no carving, 1 = maximum depth at river center.
+ * Uses smooth transitions for banks.
+ */
+export const getRiverDepthFactor = (worldX, worldZ, noise) => {
+	const { bankSlope } = RIVER_CONFIG
+
+	const { distance, riverWidth } = getDistanceToRiver(worldX, worldZ, noise)
+	const halfWidth = riverWidth / 2
+
+	if (distance < halfWidth) {
+		// River bed: full depth in center, transitioning to 20% depth at edges
+		return 1 - (distance / halfWidth) * 0.8
+	} else if (distance < halfWidth + bankSlope) {
+		// Banks: slope from 20% depth up to surface (0)
+		const bankProgress = (distance - halfWidth) / bankSlope
+		const t = bankProgress * bankProgress * (3 - 2 * bankProgress)
+		return 0.2 * (1 - t)
+	}
+
+	return 0
+}
 
 /**
  * Calculate the derivative of river meander (slope of river path)
@@ -20,24 +73,14 @@ const getRiverMeanderDerivative = (x) => {
 }
 
 /**
- * Get river center Z position at given X (simplified version without noise)
- */
-const getRiverCenterZ = (x) => {
-	const { baseZ, primaryFrequency, primaryAmplitude, secondaryFrequency, secondaryAmplitude } = RIVER_CONFIG
-	const primary = Math.sin(x * primaryFrequency) * primaryAmplitude
-	const secondary = Math.sin(x * secondaryFrequency + 1.5) * secondaryAmplitude
-	return baseZ + primary + secondary
-}
-
-/**
- * Get river width at given X (simplified version without noise)
- */
-const getRiverWidth = (x) => {
-	return RIVER_CONFIG.width
-}
-
-/**
- * Generate a flow map texture for the water shader
+ * Generate a flow map texture for the water shader.
+ *
+ * Texture encoding (RGBA):
+ * - R channel: Flow X direction (0.5 = no flow, 0 or 1 = max flow in that axis)
+ * - G channel: Flow Z direction (same as R)
+ * - B channel: Flow speed (0 = ocean/still, 1 = fast river)
+ * - A channel: River mask (0 = ocean, 1 = river)
+ *
  * @param {number} resolution - Texture resolution (power of 2 recommended)
  * @param {number} worldSize - Size of world area to cover (centered on origin)
  * @returns {DataTexture} - Flow map texture
@@ -50,7 +93,7 @@ export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 	// River influence extends beyond the visible water for smooth blending
 	const { bankSlope } = RIVER_CONFIG
 	const blendDistance = bankSlope * 3
-	
+
 	// Ocean transition configuration (imported from config)
 	const oceanEdge = OCEAN_CONFIG.radius - OCEAN_CONFIG.transition / 2
 	const oceanTransitionStart = 4500 // Start transitioning to ocean flow
@@ -64,9 +107,9 @@ export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 			const worldX = (x / resolution) * worldSize - halfSize
 			const worldZ = (y / resolution) * worldSize - halfSize
 
-			// Get river geometry at this X position
-			const riverZ = getRiverCenterZ(worldX)
-			const riverWidth = getRiverWidth(worldX)
+			// Get river geometry at this X position (without noise for flow map - deterministic)
+			const riverZ = getRiverCenterZ(worldX, null)
+			const riverWidth = getRiverWidth(worldX, null)
 			const halfWidth = riverWidth / 2
 
 			// Distance from river center
@@ -82,7 +125,7 @@ export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 				const t = (distFromRiver - halfWidth) / blendDistance
 				riverInfluence = 1 - t * t * (3 - 2 * t) // smoothstep
 			}
-			
+
 			// Apply distance-based ocean transition
 			// As we approach the ocean, gradually reduce river flow
 			const distFromOrigin = Math.abs(worldX)

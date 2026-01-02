@@ -4,9 +4,10 @@ import Sun from './Sun'
 import Sky from './Sky'
 import Hawk from './Hawk'
 import Terrain from './terrain/Terrain'
+import Water from './Water'
+import Grass from './Grass'
 
 // Environment component
-// Uses shared atmosphere config for consistent lighting
 const SceneEnvironment = memo(() => {
 	return (
 		<>
@@ -21,6 +22,12 @@ const SceneEnvironment = memo(() => {
 
 			{/* Terrain with integrated grass */}
 			<Terrain />
+
+			{/* Water plane */}
+			<Water />
+
+			{/* Grass rendering */}
+			<Grass />
 		</>
 	)
 })

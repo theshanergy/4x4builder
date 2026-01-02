@@ -1,7 +1,7 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
-import { generateFlowMap, FLOW_MAP_CONFIG } from '../components/scene/environment/terrain/flowMapGenerator'
+import { generateFlowMap, FLOW_MAP_CONFIG } from '../utils/river'
 import { WATER_LEVEL, BUOYANCY } from '../config/water'
 import { vehicleState } from '../store/gameStore'
 

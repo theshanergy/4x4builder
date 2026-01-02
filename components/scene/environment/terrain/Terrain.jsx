@@ -3,43 +3,22 @@ import { useFrame, useLoader } from '@react-three/fiber'
 import { TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
-import useGameStore, { vehicleState } from '../../../../store/gameStore'
-
-// Import terrain modules
-import { OCEAN_CONFIG, QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, RIVER_CONFIG } from '../../../../config/terrain'
-import { WATER_LOAD_DISTANCE, WATER_UNLOAD_BUFFER } from '../../../../config/water'
-import { QuadtreeNode, getEdgeStitchInfo, DEFAULT_EDGE_STITCH_INFO } from './quadtree'
-import { getDistanceToRiver } from './riverUtils'
-import { createTerrainHelpers } from './heightSampler'
-
+import { vehicleState } from '../../../../store/gameStore'
+import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS } from '../../../../config/terrain'
+import { QuadtreeNode, getEdgeStitchInfo, DEFAULT_EDGE_STITCH_INFO } from '../../../../utils/terrainQuadtree'
+import { createTerrainHelpers } from '../../../../utils/terrainGenerator'
 import TerrainTile from './TerrainTile'
-import Grass from '../Grass'
-import Water from '../Water'
 
 /**
  * Terrain - Main terrain component with quadtree LOD.
- *
- * Features:
- * - Infinite procedural terrain using quadtree subdivision
- * - View-dependent level of detail with smooth transitions
- * - Edge stitching to prevent cracks between LOD levels
- * - Physics colliders on highest-detail tiles near player
- * - Dynamic water loading based on proximity
- * - Grass rendering (disabled on mobile/low performance)
  */
 const Terrain = () => {
 	const [leafTiles, setLeafTiles] = useState([])
-	const [showWater, setShowWater] = useState(false)
 	const lastUpdatePosition = useRef({ x: null, z: null })
 
 	// Quadtree roots - covers the entire terrain area
 	// Multiple roots arranged in a grid for infinite terrain
 	const quadtreeRoots = useRef(new Map())
-
-	// Check if grass should be disabled
-	const isMobile = useGameStore((state) => state.isMobile)
-	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
-	const showGrass = !performanceDegraded && !isMobile
 
 	// Generate noise instance with fixed seed for consistency
 	const noise = useMemo(() => new Noise(1234), [])
@@ -164,24 +143,10 @@ const Terrain = () => {
 
 			return hasChanges ? tilesWithStitching : prevTiles
 		})
-
-		// Check if player is close enough to ocean OR in/near river to show water
-		const distFromOrigin = Math.sqrt(centerPosition.x * centerPosition.x + centerPosition.z * centerPosition.z)
-		const distFromOcean = OCEAN_CONFIG.radius - distFromOrigin
-
-		// Check distance to river
-		const { distance: distToRiver, riverWidth } = getDistanceToRiver(centerPosition.x, centerPosition.z, noise)
-		const nearRiver = distToRiver < riverWidth / 2 + RIVER_CONFIG.bankSlope + 50
-
-		setShowWater((wasShowing) => {
-			const nearOcean = wasShowing ? distFromOcean < WATER_LOAD_DISTANCE + WATER_UNLOAD_BUFFER : distFromOcean < WATER_LOAD_DISTANCE
-			return nearOcean || nearRiver
-		})
 	})
 
 	return (
 		<group name='Terrain'>
-			{showWater && <Water />}
 			{leafTiles.map(({ node, hasCollider, edgeStitchInfo }) => (
 				<TerrainTile
 					key={node.key}
@@ -195,7 +160,6 @@ const Terrain = () => {
 					edgeStitchInfo={edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO}
 				/>
 			))}
-			{showGrass && <Grass />}
 		</group>
 	)
 }

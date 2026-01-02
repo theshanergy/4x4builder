@@ -1,15 +1,8 @@
-// Terrain Tile Component
+import { useMemo, useEffect, useRef, memo } from 'react'
 
-// React component for rendering a single quadtree terrain tile with optional
-// physics collider support.
-
-import { useMemo, useEffect, useCallback, useRef, memo } from 'react'
-import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
-
-import { TILE_RESOLUTION } from '../../../../config/terrain'
-import { createTileGeometry } from './geometry'
-import useTerrainCollider from '../../../../hooks/useTerrainCollider'
+import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
 import TerrainMaterial from './TerrainMaterial'
+import TerrainCollider from './TerrainCollider'
 
 /**
  * Custom comparison for QuadtreeTerrainTile props.
@@ -66,66 +59,14 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props.edgeStitchInfo - Edge stitching configuration
  */
 const TerrainTile = memo(({ node, terrainHelpers, map, normalMap, cliffMap, cliffNormalMap, hasCollider = false, edgeStitchInfo }) => {
-	const { size, centerX, centerZ } = node
+	const { centerX, centerZ } = node
 	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
-
-	// Create height/normal/UV functions for physics collider
-	const getHeight = useCallback(
-		(localX, localZ) => {
-			const worldX = centerX + localX - size / 2
-			const worldZ = centerZ + localZ - size / 2
-			return terrainHelpers.getRawHeight(worldX, worldZ)
-		},
-		[centerX, centerZ, size, terrainHelpers]
-	)
-
-	const getNormal = useCallback(
-		(localX, localZ, target) => {
-			const worldX = centerX + localX - size / 2
-			const worldZ = centerZ + localZ - size / 2
-			return terrainHelpers.getNormal(worldX, worldZ, target)
-		},
-		[centerX, centerZ, size, terrainHelpers]
-	)
-
-	const getUV = useCallback(
-		(localX, localZ) => {
-			const worldX = centerX + localX - size / 2
-			const worldZ = centerZ + localZ - size / 2
-			return [worldX, worldZ]
-		},
-		[centerX, centerZ, size]
-	)
-
-	// Only compute collider data for tiles that need physics (smallest tiles)
-	// This avoids expensive computation for the majority of tiles
-	const colliderData = useTerrainCollider(
-		hasCollider
-			? {
-					segments: TILE_RESOLUTION,
-					size,
-					getHeight,
-					getNormal,
-					getUV,
-			  }
-			: { segments: 1, size: 1, getHeight: () => 0, getNormal: null, getUV: null }
-	)
-
-	// Create a stable key for edge stitch info
-	const edgeStitchKey = useMemo(() => {
-		if (!edgeStitchInfo) return 'none'
-		const { north: n, south: s, east: e, west: w } = edgeStitchInfo
-		return `${n.needsStitch}:${n.neighborStep},${s.needsStitch}:${s.neighborStep},${e.needsStitch}:${e.neighborStep},${w.needsStitch}:${w.neighborStep}`
-	}, [edgeStitchInfo])
 
 	// Track geometry ref for proper disposal
 	const geometryRef = useRef(null)
 
 	// Create geometry
-	const geometry = useMemo(() => {
-		return createTileGeometry(node, terrainHelpers, edgeStitchInfo)
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [node.key, terrainHelpers, edgeStitchKey])
+	const geometry = useTerrainGeometry(node, terrainHelpers, edgeStitchInfo)
 
 	// Dispose old geometry when it changes and on unmount
 	useEffect(() => {
@@ -143,23 +84,22 @@ const TerrainTile = memo(({ node, terrainHelpers, map, normalMap, cliffMap, clif
 		}
 	}, [geometry])
 
-	// Render with or without physics collider
-	if (hasCollider) {
-		return (
-			<RigidBody type='fixed' position={position} colliders={false}>
-				<HeightfieldCollider args={colliderData.colliderArgs} name={`QTTile-${node.key}`} />
-				<mesh geometry={geometry} receiveShadow>
-					<TerrainMaterial sandTexture={map} sandNormalMap={normalMap} cliffTexture={cliffMap} cliffNormalMap={cliffNormalMap} />
-				</mesh>
-			</RigidBody>
-		)
-	}
-
-	return (
-		<mesh geometry={geometry} position={position} receiveShadow>
+	const terrainMesh = (
+		<mesh geometry={geometry} receiveShadow>
 			<TerrainMaterial sandTexture={map} sandNormalMap={normalMap} cliffTexture={cliffMap} cliffNormalMap={cliffNormalMap} />
 		</mesh>
 	)
+
+	// Render with or without physics collider
+	if (hasCollider) {
+		return (
+			<TerrainCollider node={node} terrainHelpers={terrainHelpers} position={position}>
+				{terrainMesh}
+			</TerrainCollider>
+		)
+	}
+
+	return <group position={position}>{terrainMesh}</group>
 }, arePropsEqual)
 
 export default TerrainTile

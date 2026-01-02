@@ -1,13 +1,12 @@
-// Terrain Height Calculation
-
-// Core height sampling logic including noise generation, mountains, ocean,
+// Terrain Generator
+// Core procedural terrain generation including height sampling, mountains, ocean,
 // river carving, and normal calculation.
 
 import { Vector3 } from 'three'
-import { OCEAN_CONFIG, MOUNTAIN_CONFIG, TERRAIN_CONFIG, RIVER_CONFIG, STAGING_AREA } from '../../../../config/terrain'
-import { WATER_LEVEL } from '../../../../config/water'
-import { getRiverDepthFactor } from './riverUtils'
-import useGameStore from '../../../../store/gameStore'
+import { OCEAN_CONFIG, MOUNTAIN_CONFIG, TERRAIN_CONFIG, RIVER_CONFIG, STAGING_AREA } from '../config/terrain'
+import { WATER_LEVEL } from '../config/water'
+import { getRiverDepthFactor } from './river'
+import useGameStore from '../store/gameStore'
 
 // Epsilon for numerical gradient approximation when calculating normals
 const GRADIENT_EPSILON = 0.01

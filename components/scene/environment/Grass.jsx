@@ -330,8 +330,11 @@ const Grass = memo(() => {
 	const getTerrainHeight = useGameStore((state) => state.getTerrainHeight)
 	const getTerrainNormal = useGameStore((state) => state.getTerrainNormal)
 
-	// Don't render if terrain functions aren't ready yet
-	if (!getTerrainHeight || !getTerrainNormal) return null
+	// Check if grass should be disabled
+	const isMobile = useGameStore((state) => state.isMobile)
+	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
+	const showGrass = !performanceDegraded && !isMobile
+
 	const chunkCache = useRef(new Map())
 	const frameCount = useRef(0)
 	// Use useReducer for batch updates instead of useState (more efficient for arrays)
@@ -445,6 +448,9 @@ const Grass = memo(() => {
 			sharedMaterial.dispose()
 		}
 	}, [sharedGeometry, sharedMaterial])
+
+	// Don't render if grass is disabled or terrain functions aren't ready
+	if (!showGrass || !getTerrainHeight || !getTerrainNormal) return null
 
 	return (
 		<group name='Grass'>
