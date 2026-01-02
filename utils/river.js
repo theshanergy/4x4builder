@@ -95,7 +95,6 @@ export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 	const blendDistance = bankSlope * 3
 
 	// Ocean transition configuration (imported from config)
-	const oceanEdge = OCEAN_CONFIG.radius - OCEAN_CONFIG.transition / 2
 	const oceanTransitionStart = 4500 // Start transitioning to ocean flow
 	const oceanTransitionDistance = 800 // Distance over which to blend to ocean
 
@@ -188,4 +187,33 @@ export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 export const FLOW_MAP_CONFIG = {
 	resolution: 512, // Texture resolution
 	worldSize: 12000, // World area covered by the flow map (must cover full river extent)
+}
+
+/**
+ * Cached flow map singleton - generates once and reuses
+ */
+let cachedFlowMap = null
+
+/**
+ * Get the cached flow map texture (generates on first call)
+ * @returns {DataTexture} - Flow map texture
+ */
+export const getFlowMap = () => {
+	if (!cachedFlowMap) {
+		cachedFlowMap = generateFlowMap(FLOW_MAP_CONFIG.resolution, FLOW_MAP_CONFIG.worldSize)
+	}
+	return cachedFlowMap
+}
+
+/**
+ * Get the cached flow map data for CPU-side sampling
+ * @returns {Object} - { data, resolution, worldSize }
+ */
+export const getFlowMapData = () => {
+	const flowMap = getFlowMap()
+	return {
+		data: flowMap.image.data,
+		resolution: FLOW_MAP_CONFIG.resolution,
+		worldSize: FLOW_MAP_CONFIG.worldSize,
+	}
 }

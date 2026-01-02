@@ -1,7 +1,7 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
-import { generateFlowMap, FLOW_MAP_CONFIG } from '../utils/river'
+import { getFlowMapData } from '../utils/river'
 import { WATER_LEVEL, BUOYANCY } from '../config/water'
 import { vehicleState } from '../store/gameStore'
 
@@ -51,15 +51,8 @@ const useBuoyancy = (vehicleRef) => {
 	// Track water intake (0 = dry, 1 = full/sunk)
 	const waterIntake = useRef(0)
 
-	// Generate and cache flow map data
-	const flowMapData = useMemo(() => {
-		const flowMap = generateFlowMap(FLOW_MAP_CONFIG.resolution, FLOW_MAP_CONFIG.worldSize)
-		return {
-			data: flowMap.image.data,
-			resolution: FLOW_MAP_CONFIG.resolution,
-			worldSize: FLOW_MAP_CONFIG.worldSize,
-		}
-	}, [])
+	// Get cached flow map data
+	const flowMapData = getFlowMapData()
 
 	// Reusable vectors
 	const vec = useMemo(() => new Vector3(), [])

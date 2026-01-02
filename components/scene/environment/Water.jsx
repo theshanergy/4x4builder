@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { vehicleState } from '../../../store/gameStore'
 import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
 import { WATER_LEVEL } from '../../../config/water'
-import { generateFlowMap, FLOW_MAP_CONFIG } from '../../../utils/river'
+import { getFlowMap, FLOW_MAP_CONFIG } from '../../../utils/river'
 import waterVertexShader from '../../../shaders/water.vert.glsl'
 import waterFragmentShader from '../../../shaders/water.frag.glsl'
 
@@ -15,10 +15,8 @@ const WATER_RADIUS = 3000
 const Water = () => {
 	const ref = useRef()
 
-	// Generate flow map texture once on mount
-	const flowMap = useMemo(() => {
-		return generateFlowMap(FLOW_MAP_CONFIG.resolution, FLOW_MAP_CONFIG.worldSize)
-	}, [])
+	// Get cached flow map texture
+	const flowMap = getFlowMap()
 
 	// Create large circular geometry once - segments for smooth edges
 	const geom = useMemo(() => new CircleGeometry(WATER_RADIUS, 8), [])
