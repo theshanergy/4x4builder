@@ -6,7 +6,6 @@ import { Vector3 } from 'three'
 import { OCEAN_CONFIG, MOUNTAIN_CONFIG, TERRAIN_CONFIG, RIVER_CONFIG, STAGING_AREA } from '../config/terrain'
 import { WATER_LEVEL } from '../config/water'
 import { getRiverDepthFactor } from './river'
-import useGameStore from '../store/gameStore'
 
 // Epsilon for numerical gradient approximation when calculating normals
 const GRADIENT_EPSILON = 0.01
@@ -223,10 +222,6 @@ export const createTerrainHelpers = (noise) => {
 
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}
-
-	// Register both height and normal functions in the game store for use by other components
-	useGameStore.getState().setTerrainHeightFunction(getHeight)
-	useGameStore.getState().setTerrainNormalFunction(getNormal)
 
 	return { getRawHeight, getHeight, getNormal, baseHeightScale }
 }

@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, memo } from 'react'
 
+import { DEFAULT_EDGE_STITCH_INFO } from '../../../../utils/terrainQuadtree'
 import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
 import TerrainMaterial from './TerrainMaterial'
 import TerrainCollider from './TerrainCollider'
@@ -65,7 +66,7 @@ const TerrainTile = memo(({ node, terrainHelpers, layerTextures, hasCollider = f
 	const geometryRef = useRef(null)
 
 	// Create geometry
-	const geometry = useTerrainGeometry(node, terrainHelpers, edgeStitchInfo)
+	const geometry = useTerrainGeometry(node, terrainHelpers, edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO)
 
 	// Dispose old geometry when it changes and on unmount
 	useEffect(() => {
