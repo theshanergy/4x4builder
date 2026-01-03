@@ -5,7 +5,7 @@ import { PerformanceMonitor } from '@react-three/drei'
 
 import useGameStore from '../../store/gameStore'
 import Environment from './environment/Environment'
-import CameraManager from './managers/CameraManager'
+import CameraManager from './cameras/CameraManager'
 import InputManager from './managers/InputManager'
 import XR from './xr'
 import Loader from '../ui/Loader'
