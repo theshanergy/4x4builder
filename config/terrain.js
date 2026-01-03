@@ -38,46 +38,6 @@ export const MOUNTAIN_CONFIG = {
 	valleyDepth: 0.5,
 }
 
-// Ocean configuration
-export const OCEAN_CONFIG = {
-	radius: 5000,
-	transition: 300, // Width of the beach transition zone
-	depth: 12, // Depth below WATER_LEVEL
-	// Beach profile control point (like a Bezier curve)
-	beachMidpointDepth: 0.2, // Intermediate depth at transition midpoint (0-1 range)
-}
-
-// Helper for accessing ocean boundaries (computed once)
-const OCEAN_BOUNDARY = OCEAN_CONFIG.radius + OCEAN_CONFIG.transition
-
-// River configuration - carves a meandering channel through the valley
-// Water component at Y=-1 fills the carved riverbed
-export const RIVER_CONFIG = {
-	// River path parameters - extends well into the ocean on both ends
-	startX: -OCEAN_BOUNDARY,
-	endX: OCEAN_BOUNDARY,
-	baseZ: 0, // Center line of the river (middle of valley)
-
-	// Meandering parameters
-	primaryFrequency: 0.0015,
-	primaryAmplitude: 180,
-	secondaryFrequency: 0.006,
-	secondaryAmplitude: 50,
-	tertiaryFrequency: 0.02,
-	tertiaryAmplitude: 15,
-
-	// River dimensions
-	width: 75, // Base width of river
-	widthVariation: 15, // Random width variation
-	depth: 2.5, // Depth below WATER_LEVEL
-	bankSlope: 25, // Width of the sloped banks
-
-	// Flow map texture configuration
-	flowMap: {
-		resolution: 512, // Texture resolution
-		worldSize: 12000, // World area covered by the flow map (must cover full river extent)
-	},
-}
 
 /**
  * Terrain Layer Configuration

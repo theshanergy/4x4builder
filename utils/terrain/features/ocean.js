@@ -1,13 +1,12 @@
 // Ocean terrain feature
 // Handles ocean depth blending and beach transitions
 
-import { OCEAN_CONFIG } from '../../../config/terrain'
-import { WATER_LEVEL } from '../../../config/water'
+import { WATER_LEVEL, OCEAN_CONFIG } from '../../../config/water'
 
 /**
  * Blend ocean depth into terrain height at coastline.
  * Creates realistic beach profile with shallow beach section and steeper drop-off.
- * 
+ *
  * @param {number} terrainHeight - Current terrain height (normalized)
  * @param {number} distSq - Squared distance from origin
  * @param {number} baseHeightScale - Terrain height scale factor

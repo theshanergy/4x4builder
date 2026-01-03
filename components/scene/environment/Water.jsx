@@ -4,8 +4,7 @@ import { useFrame } from '@react-three/fiber'
 
 import { vehicleState } from '../../../store/gameStore'
 import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
-import { WATER_LEVEL } from '../../../config/water'
-import { RIVER_CONFIG } from '../../../config/terrain'
+import { WATER_LEVEL, RIVER_CONFIG } from '../../../config/water'
 import { getFlowMap } from '../../../utils/terrain/riverFlowMap'
 
 import waterVertexShader from '../../../shaders/water.vert.glsl'

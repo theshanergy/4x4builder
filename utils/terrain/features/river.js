@@ -1,7 +1,7 @@
 // River terrain feature
 // Handles river carving into terrain for meandering waterway
 
-import { RIVER_CONFIG } from '../../../config/terrain'
+import { RIVER_CONFIG } from '../../../config/water'
 
 /**
  * Calculate the Z position of the river center at a given X coordinate.

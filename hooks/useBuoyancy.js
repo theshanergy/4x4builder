@@ -2,7 +2,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
 import { getFlowMapData } from '../utils/terrain/riverFlowMap'
-import { WATER_LEVEL, BUOYANCY } from '../config/water'
+import { WATER_LEVEL, BUOYANCY_CONFIG } from '../config/water'
 import { vehicleState } from '../store/gameStore'
 
 /**
@@ -71,7 +71,7 @@ const useBuoyancy = (vehicleRef) => {
 			vehicleState.isInWater = true
 
 			// 1. Update water intake (sinking mechanic)
-			waterIntake.current = Math.min(1, waterIntake.current + delta * BUOYANCY.sinkingRate)
+			waterIntake.current = Math.min(1, waterIntake.current + delta * BUOYANCY_CONFIG.sinkingRate)
 
 			// 2. Calculate Buoyancy Force
 			// F_buoyancy = Mass * Gravity * FloatFactor * SubmersionRatio
@@ -80,10 +80,10 @@ const useBuoyancy = (vehicleRef) => {
 
 			// Calculate effective buoyancy capability (decreases as it fills with water)
 			// Interpolate between floatFactor and minBuoyancy based on waterIntake
-			const currentFloatFactor = BUOYANCY.floatFactor * (1 - waterIntake.current) + BUOYANCY.minBuoyancy * waterIntake.current
+			const currentFloatFactor = BUOYANCY_CONFIG.floatFactor * (1 - waterIntake.current) + BUOYANCY_CONFIG.minBuoyancy * waterIntake.current
 
 			// Submersion ratio (0 to 1)
-			const submersionRatio = Math.min(1, submersionDepth / BUOYANCY.maxDepth)
+			const submersionRatio = Math.min(1, submersionDepth / BUOYANCY_CONFIG.maxDepth)
 
 			// Total upward force magnitude
 			const buoyancyForce = mass * gravity * currentFloatFactor * submersionRatio
@@ -100,7 +100,7 @@ const useBuoyancy = (vehicleRef) => {
 			quat.copy(rotation)
 
 			// Calculate offset vector in world space (relative to COM)
-			vec2.set(0, 0, BUOYANCY.buoyancyOffset).applyQuaternion(quat)
+			vec2.set(0, 0, BUOYANCY_CONFIG.buoyancyOffset).applyQuaternion(quat)
 
 			// Calculate torque (Cross product of offset and upward force)
 			// F = (0, buoyancyImpulse, 0)
@@ -113,7 +113,7 @@ const useBuoyancy = (vehicleRef) => {
 			const linvel = vehicle.linvel()
 			// Scale drag by mass so heavy vehicles don't stop instantly, but also by submersion
 			// Using mass ensures consistent behavior regardless of vehicle weight
-			const dragFactor = BUOYANCY.drag * mass * delta * submersionRatio
+			const dragFactor = BUOYANCY_CONFIG.drag * mass * delta * submersionRatio
 
 			vec.set(
 				-linvel.x * dragFactor * 0.5, // X drag
@@ -125,7 +125,7 @@ const useBuoyancy = (vehicleRef) => {
 			// 4. Apply Angular Drag (Rotational Resistance)
 			// Torque = -c * angular_velocity
 			const angvel = vehicle.angvel()
-			const angDragFactor = BUOYANCY.angularDrag * mass * delta * submersionRatio
+			const angDragFactor = BUOYANCY_CONFIG.angularDrag * mass * delta * submersionRatio
 
 			vec.set(-angvel.x * angDragFactor, -angvel.y * angDragFactor, -angvel.z * angDragFactor)
 			vehicle.applyTorqueImpulse(vec, true)
@@ -137,7 +137,7 @@ const useBuoyancy = (vehicleRef) => {
 			if (flow.speed > 0.01 && flow.inRiver > 0.01) {
 				// Calculate flow force magnitude
 				// Force scales with: mass (heavier = more force), submersion, flow speed, and river presence
-				const flowForceMagnitude = mass * BUOYANCY.flowForce * submersionRatio * flow.speed * flow.inRiver * delta
+				const flowForceMagnitude = mass * BUOYANCY_CONFIG.flowForce * submersionRatio * flow.speed * flow.inRiver * delta
 
 				// Apply force in flow direction
 				vec.set(flow.dirX * flowForceMagnitude, 0, flow.dirZ * flowForceMagnitude)

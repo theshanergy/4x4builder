@@ -2,7 +2,8 @@
 // Handles mountain height generation using ridge noise and domain warping
 
 import { getRidgeNoise, getDomainWarp } from '../noise'
-import { MOUNTAIN_CONFIG, OCEAN_CONFIG } from '../../../config/terrain'
+import { MOUNTAIN_CONFIG } from '../../../config/terrain'
+import { OCEAN_CONFIG } from '../../../config/water'
 
 /**
  * Fractal Brownian Motion with ridged noise for mountains.

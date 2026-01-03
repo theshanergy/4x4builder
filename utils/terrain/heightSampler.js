@@ -2,8 +2,8 @@
 // This is the main entry point for terrain height calculation
 
 import { Vector3 } from 'three'
-import { TERRAIN_CONFIG, RIVER_CONFIG } from '../../config/terrain'
-import { WATER_LEVEL } from '../../config/water'
+import { TERRAIN_CONFIG } from '../../config/terrain'
+import { WATER_LEVEL, RIVER_CONFIG } from '../../config/water'
 import { getMountainContribution } from './features/mountains'
 import { blendOceanDepth } from './features/ocean'
 import { getRiverBlendFactor } from './features/river'
