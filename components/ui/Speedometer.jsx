@@ -212,10 +212,8 @@ const Speedometer = memo(() => {
 			<div className='relative w-56 h-56'>
 				{/* Player direction arrows container */}
 				{currentRoom && <div ref={arrowContainerRef} className='absolute inset-0 z-20' />}
-
 				{/* Outer Bezel/Background */}
 				<div className='absolute inset-0 rounded-full bg-black/50 shadow-2xl backdrop-blur-md' />
-
 				{/* Speed arc background */}
 				<svg className='absolute inset-0' viewBox='0 0 100 100'>
 					{/* Background arc */}
@@ -259,10 +257,8 @@ const Speedometer = memo(() => {
 						transform='rotate(135 50 50)'
 					/>
 				</svg>
-
 				{/* Tick marks and Numbers - memoized component */}
 				<TickMarks />
-
 				{/* Needle */}
 				<div
 					ref={needleRef}
@@ -275,13 +271,12 @@ const Speedometer = memo(() => {
 						<path d='M 8 120 L 12 120 L 10 0 Z' fill='#ef4444' />
 					</svg>
 				</div>
-
 				{/* Center cap */}
 				<div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-stone-800 shadow-lg z-10' />
 
 				{/* Gear indicator - R12345 display */}
-				<div className='absolute inset-0 flex items-center justify-center' style={{ marginTop: '-28px' }}>
-					<div className='flex gap-1.5 text-sm font-bold font-mono'>
+				<div className='absolute top-21 left-0 right-0 flex flex-col gap-8 items-center justify-center text-sm font-bold font-mono leading-none'>
+					<div className='flex gap-1.5'>
 						{['R', '1', '2', '3', '4', '5'].map((gear) => {
 							const isActive = (gear === 'R' && displayGear === -1) || (gear !== 'R' && parseInt(gear) === displayGear)
 							return (
@@ -295,10 +290,11 @@ const Speedometer = memo(() => {
 							)
 						})}
 					</div>
+					<div className={`px-1.5 py-1 bg-white/5 rounded transition-all duration-150 ${displayGear === 0 ? 'text-yellow-500  scale-110' : 'text-white/30'}`}>P</div>
 				</div>
 
 				{/* Speed display */}
-				<div className='absolute inset-0 flex flex-col items-center justify-end pb-6'>
+				<div className='absolute inset-0 flex flex-col items-center justify-end pb-4'>
 					<span className='text-4xl font-black text-white tabular-nums tracking-tighter drop-shadow-lg'>{displaySpeed}</span>
 					<span className='text-[9px] font-bold text-white/60 uppercase'>km/h</span>
 				</div>
