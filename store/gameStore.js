@@ -18,7 +18,7 @@ export const vehicleState = {
 	speed: 0,
 	rpm: 850,
 	throttle: 0,
-	gear: 1,
+	gear: 0, // Start in park
 	load: 0.2, // Engine load (0 = no load/airborne, 1 = max load/climbing)
 	position: new Vector3(0, 0, 0), // Vehicle world position (updated every frame)
 	heading: 0, // Vehicle heading/yaw in radians (updated every frame)

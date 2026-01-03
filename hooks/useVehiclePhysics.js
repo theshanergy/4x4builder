@@ -39,7 +39,7 @@ const REAR_WHEEL_FRICTION = 0.85
 
 // Transmission simulation
 const TRANSMISSION = {
-	gearRatios: [0, 3.5, 2.2, 1.4, 1.0, 0.75], // 0 = neutral, 1-5 = gears
+	gearRatios: [0, 3.5, 2.2, 1.4, 1.0, 0.75], // 0 = park/neutral, 1-5 = gears
 	finalDrive: 3.73,
 	wheelRadius: 0.35, // meters (approximate)
 	idleRpm: 850,
@@ -48,6 +48,8 @@ const TRANSMISSION = {
 	shiftUpRpm: 5500,
 	shiftDownRpm: 1800,
 	shiftCooldown: 0.4, // seconds between shifts to prevent gear skipping
+	parkEngageSpeed: 0.05, // Speed threshold (m/s) below which park engages
+	parkEngageDelay: 0.1, // Time (seconds) vehicle must be stopped before park engages
 }
 
 // Engine torque curve - defines torque output at different RPM points
@@ -129,6 +131,10 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Track if reverse can be engaged (set when brake is pressed below speed threshold)
 	const canEngageReverse = useRef(false)
 
+	// Park gear tracking
+	const parkEngageTimer = useRef(0)
+	const isInPark = useRef(false)
+
 	// Get vehicle input processor
 	const getVehicleInput = useVehicleInput()
 
@@ -150,8 +156,10 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		vehicle.setLinvel({ x: 0, y: 0, z: 0 }, true)
 		vehicle.setAngvel({ x: 0, y: 0, z: 0 }, true)
 
-		// Reset gear to first
-		vehicleState.gear = 1
+		// Reset gear to park
+		vehicleState.gear = 0
+		isInPark.current = true
+		parkEngageTimer.current = 0
 	}, [vehicleRef])
 
 	// Setup vehicle physics
@@ -311,12 +319,43 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		// Track time for shift cooldown
 		const currentTime = performance.now() / 1000
 
+		// Park gear logic - automatically engage when stopped
+		// Engages when vehicle is nearly stopped and not actively accelerating (reverse or forward)
+		if (absSpeed < TRANSMISSION.parkEngageSpeed && throttleInput === 0 && currentGear !== -1) {
+			// Vehicle is stopped and not accelerating - start park timer
+			parkEngageTimer.current += delta
+			if (parkEngageTimer.current >= TRANSMISSION.parkEngageDelay && !isInPark.current) {
+				// Engage park
+				vehicleState.gear = 0
+				isInPark.current = true
+				currentGear = 0
+			}
+		} else if (absSpeed >= TRANSMISSION.parkEngageSpeed || throttleInput > 0) {
+			// Reset park timer if moving or accelerating
+			parkEngageTimer.current = 0
+		}
+
+		// Disengage park when throttle is pressed (driver wants to move)
+		if (isInPark.current && throttleInput > 0) {
+			isInPark.current = false
+			vehicleState.gear = 1
+			currentGear = 1
+			parkEngageTimer.current = 0
+		}
+
+		// Disengage park when brake is pressed (allows engaging reverse)
+		if (isInPark.current && brakeInput > 0) {
+			isInPark.current = false
+			// Don't change gear yet - let reverse logic handle it
+			parkEngageTimer.current = 0
+		}
+
 		// Automatic transmission logic (based on current RPM)
 		// Don't shift gears while airborne - maintain current gear until wheels touch ground
 		// Use cooldown to prevent skipping gears (e.g., 1 -> 3 -> 5)
 		const canShift = currentTime - lastShiftTime.current > TRANSMISSION.shiftCooldown
 
-		if (!isAirborne.current && vehicleState.gear !== -1) {
+		if (!isAirborne.current && vehicleState.gear !== -1 && !isInPark.current) {
 			if (canShift && currentRpmFromDrivetrain > TRANSMISSION.shiftUpRpm && currentGear < TRANSMISSION.gearRatios.length - 1 && throttleInput > 0.3) {
 				currentGear++
 				vehicleState.gear = currentGear
@@ -461,12 +500,12 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		}
 
 		// Determine reverse state
-		// Enter reverse: only if brake was just pressed (not held) while nearly stopped
+		// Enter reverse: only if brake was just pressed (not held) while nearly stopped and not in park
 		// Exit reverse: accelerating (throttle pressed)
 		if (throttleInput > 0 && vehicleState.gear === -1) {
 			vehicleState.gear = 1
 			canEngageReverse.current = false
-		} else if (brakeInput > 0 && canEngageReverse.current && vehicleState.gear !== -1) {
+		} else if (brakeInput > 0 && canEngageReverse.current && vehicleState.gear !== -1 && !isInPark.current) {
 			vehicleState.gear = -1
 			canEngageReverse.current = false // Prevent re-triggering while holding
 		}
@@ -475,7 +514,11 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		let engineForce = 0
 		let brakeForce = 0
 
-		if (vehicleState.gear === -1) {
+		// In park, apply strong brake force to prevent movement
+		if (isInPark.current || vehicleState.gear === 0) {
+			engineForce = 0
+			brakeForce = FORCES.brake * 2 // Strong brake force in park
+		} else if (vehicleState.gear === -1) {
 			// In reverse mode: brake input drives backward
 			engineForce = -FORCES.reverse * brakeInput
 			// Throttle acts as brake when reversing
