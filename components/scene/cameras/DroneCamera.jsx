@@ -21,7 +21,9 @@ const DroneCamera = () => {
 	// Camera/drone state
 	const currentPosition = useRef(camera.position.clone())
 	const euler = useRef(new Euler(0, 0, 0, 'YXZ'))
+	const combinedEuler = useRef(new Euler(0, 0, 0, 'YXZ'))
 	const isPointerLocked = useRef(false)
+	const hasLaunched = useRef(false) // Track if we've done the initial launch
 
 	// Movement state
 	const velocity = useRef(new Vector3(0, 0, 0))
@@ -32,7 +34,7 @@ const DroneCamera = () => {
 		// Movement speeds
 		moveSpeed: 20, // Horizontal movement speed
 		verticalSpeed: 10, // Vertical movement speed
-		acceleration: 8, // How fast we lerp to target speed
+		acceleration: 6, // How fast we lerp to target speed
 
 		// Tilt (visual only)
 		maxTiltAngle: 0.5, // Max tilt in radians (~29 degrees)
@@ -69,6 +71,12 @@ const DroneCamera = () => {
 		if (currentPosition.current.distanceTo(vehicleState.position) < 1) {
 			currentPosition.current.set(vehicleState.position.x - 10, vehicleState.position.y + 8, vehicleState.position.z - 10)
 			camera.position.copy(currentPosition.current)
+		}
+
+		// Launch drone upward by 5 meters when first switching to it
+		if (!hasLaunched.current) {
+			velocity.current.y = 10 // Set upward velocity for smooth launch
+			hasLaunched.current = true
 		}
 	}, [camera])
 
@@ -216,11 +224,11 @@ const DroneCamera = () => {
 
 		// Apply rotation to camera - combine look direction with drone tilt for visual effect
 		// Create a combined euler that adds tilt to the look direction
-		const combinedEuler = euler.current.clone()
-		combinedEuler.x -= droneTilt.current.pitch * 0.3 // Subtle pitch effect on camera
-		combinedEuler.x -= elevationTilt // Add downward tilt based on elevation (subtract to tilt down)
-		combinedEuler.z = -droneTilt.current.roll * 0.5 // Roll tilts the horizon
-		camera.quaternion.setFromEuler(combinedEuler)
+		combinedEuler.current.copy(euler.current)
+		combinedEuler.current.x -= droneTilt.current.pitch * 0.3 // Subtle pitch effect on camera
+		combinedEuler.current.x -= elevationTilt // Add downward tilt based on elevation (subtract to tilt down)
+		combinedEuler.current.z = -droneTilt.current.roll * 0.5 // Roll tilts the horizon
+		camera.quaternion.setFromEuler(combinedEuler.current)
 
 		// Smoothly transition FOV
 		const newFov = MathUtils.damp(camera.fov, config.targetFov, 3, dt)
