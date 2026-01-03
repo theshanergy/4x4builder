@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect } from 'react'
 import { Vector3, MathUtils, Euler } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
@@ -16,14 +16,12 @@ import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
 //   Gamepad: Left stick = strafe/altitude, Right stick = look, Triggers = yaw
 const DroneCamera = () => {
 	const camera = useThree((state) => state.camera)
-	const gl = useThree((state) => state.gl)
 
 	// Camera/drone state
 	const currentPosition = useRef(camera.position.clone())
 	const euler = useRef(new Euler(0, 0, 0, 'YXZ'))
 	const defaultPitch = useRef(-0.2) // Default vertical angle to return to (-0.2 radians ≈ -11 degrees)
 	const combinedEuler = useRef(new Euler(0, 0, 0, 'YXZ'))
-	const isPointerLocked = useRef(false)
 	const hasInitialized = useRef(false)
 	const hasLaunched = useRef(false) // Track if we've done the initial launch
 
@@ -86,70 +84,44 @@ const DroneCamera = () => {
 		}
 	}, [camera])
 
-	// Mouse movement handler - controls camera look direction
-	const handleMouseMove = useCallback(
-		(event) => {
-			// Double-check pointer lock state directly from the document
-			// This prevents race conditions when pointer lock is released
-			if (document.pointerLockElement !== gl.domElement) return
-
-			// Only use movementX/Y which are reliable during pointer lock
-			euler.current.y -= event.movementX * config.mouseSensitivity
-			euler.current.x -= event.movementY * config.mouseSensitivity
-
-			// Clamp vertical rotation to prevent flipping
-			euler.current.x = MathUtils.clamp(euler.current.x, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1)
-		},
-		[gl.domElement]
-	)
-
-	// Pointer lock handlers
-	const handlePointerLockChange = useCallback(() => {
-		const wasLocked = isPointerLocked.current
-		isPointerLocked.current = document.pointerLockElement === gl.domElement
-
-		// When pointer lock is released, clear all keys to prevent stuck inputs
-		if (wasLocked && !isPointerLocked.current) {
-			const inputStore = useInputStore.getState()
-			// Clear all keys
-			inputStore.keys.forEach((key) => {
-				inputStore.setKey(key, false)
-			})
-		}
-	}, [gl.domElement])
-
-	const handleClick = useCallback(() => {
-		if (!isPointerLocked.current) {
-			gl.domElement.requestPointerLock()
-		}
-	}, [gl.domElement])
-
-	// Set up event listeners and request pointer lock on mount
+	// Request pointer lock on mount, handle click-to-lock, and exit on unmount
 	useEffect(() => {
-		document.addEventListener('mousemove', handleMouseMove)
-		document.addEventListener('pointerlockchange', handlePointerLockChange)
-		gl.domElement.addEventListener('click', handleClick)
+		const { requestPointerLock, exitPointerLock } = useInputStore.getState()
 
 		// Automatically request pointer lock when entering drone mode
-		gl.domElement.requestPointerLock()
+		requestPointerLock?.()
 
-		return () => {
-			document.removeEventListener('mousemove', handleMouseMove)
-			document.removeEventListener('pointerlockchange', handlePointerLockChange)
-			gl.domElement.removeEventListener('click', handleClick)
-
-			// Exit pointer lock when switching away from drone camera
-			if (document.pointerLockElement === gl.domElement) {
-				document.exitPointerLock()
+		// Click to re-acquire pointer lock
+		const handleClick = () => {
+			const { mouseInput } = useInputStore.getState()
+			if (!mouseInput.isPointerLocked) {
+				requestPointerLock?.()
 			}
 		}
-	}, [gl.domElement, handleMouseMove, handlePointerLockChange, handleClick])
+
+		document.addEventListener('click', handleClick)
+
+		return () => {
+			document.removeEventListener('click', handleClick)
+			// Exit pointer lock when switching away from drone camera
+			exitPointerLock?.()
+		}
+	}, [])
 
 	useFrame((state, delta) => {
 		// Clamp delta to prevent physics explosions on lag spikes
 		const dt = Math.min(delta, 0.1)
 
-		const { keys, input, touchInput } = useInputStore.getState()
+		const { keys, input, touchInput, mouseInput, consumeMouseMovement } = useInputStore.getState()
+		const isPointerLocked = mouseInput.isPointerLocked
+
+		// Handle mouse look input
+		const mouseMovement = consumeMouseMovement()
+		if (isPointerLocked && (mouseMovement.x !== 0 || mouseMovement.y !== 0)) {
+			euler.current.y -= mouseMovement.x * config.mouseSensitivity
+			euler.current.x -= mouseMovement.y * config.mouseSensitivity
+			euler.current.x = MathUtils.clamp(euler.current.x, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1)
+		}
 
 		// Keyboard inputs
 		// WASD: pitch (forward/back tilt) and strafe (left/right)
@@ -201,7 +173,7 @@ const DroneCamera = () => {
 		}
 
 		// When pointer is not locked, smoothly return camera to default vertical angle
-		if (!isPointerLocked.current) {
+		if (!isPointerLocked) {
 			euler.current.x = MathUtils.lerp(euler.current.x, defaultPitch.current, config.rotationReturnSpeed * dt)
 		}
 
