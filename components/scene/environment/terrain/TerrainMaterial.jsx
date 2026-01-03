@@ -5,7 +5,6 @@ import { TERRAIN_LAYERS } from '../../../../config/terrain'
 // Uniform field definitions - maps layer properties to shader uniform names and values
 const UNIFORM_FIELDS = [
 	{ key: 'TextureScale', path: 'textureScale', condition: () => true },
-	{ key: 'DistanceScaleStart', path: 'lod.distanceScaleStart', condition: (layer) => layer.lod },
 	{ key: 'DistanceScaleFactor', path: 'lod.distanceScaleFactor', condition: (layer) => layer.lod },
 	{ key: 'LODLevels', path: 'lod.levels', condition: (layer) => layer.lod },
 	{ key: 'NormalScale', path: 'normalScale', condition: (layer) => layer.normalScale !== undefined },
@@ -173,7 +172,7 @@ const generateSamplingCode = (layer, index) => {
 		// Triplanar projection
 		if (layer.lod) {
 			code += `
-			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
 			layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true, ${useNoTile});
 			layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});`
 		} else {
@@ -185,7 +184,7 @@ const generateSamplingCode = (layer, index) => {
 		// World-space UV mapping
 		if (layer.lod) {
 			code += `
-			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
 			float scaleLower${index} = ${prefix}TextureScale / lodInfo${index}.x;
 			float scaleUpper${index} = ${prefix}TextureScale / lodInfo${index}.y;
 			float lodBlend${index} = lodInfo${index}.z;
@@ -420,10 +419,10 @@ const TerrainMaterial = ({ layerTextures }) => {
 				}
 
 				// Calculate LOD blend info - returns vec3(lowerScale, upperScale, blendFactor)
-				vec3 getDistanceLODBlend(vec3 worldPos, float distanceStart, float distanceFactor, float lodLevels) {
+				vec3 getDistanceLODBlend(vec3 worldPos, float distanceFactor, float lodLevels) {
 					float dist = length(worldPos - cameraPosition);
 					// Calculate continuous LOD level
-					float lodContinuous = (dist - distanceStart) / distanceFactor;
+					float lodContinuous = dist / distanceFactor;
 					lodContinuous = clamp(lodContinuous, 0.0, lodLevels - 1.0);
 
 					// Get lower and upper LOD levels
