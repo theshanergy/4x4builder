@@ -9,15 +9,15 @@ const UNIFORM_FIELDS = [
 	{ key: 'DistanceScaleFactor', path: 'lod.distanceScaleFactor', condition: (layer) => layer.lod },
 	{ key: 'LODLevels', path: 'lod.levels', condition: (layer) => layer.lod },
 	{ key: 'NormalScale', path: 'normalScale', condition: (layer) => layer.normalScale !== undefined },
-	{ key: 'HeightStart', path: 'blend.height.start', condition: (layer) => layer.blend?.height },
-	{ key: 'HeightEnd', path: 'blend.height.end', condition: (layer) => layer.blend?.height },
-	{ key: 'HeightInfluence', path: 'blend.height.influence', condition: (layer) => layer.blend?.height },
-	{ key: 'SlopeStart', path: 'blend.slope.start', condition: (layer) => layer.blend?.slope },
-	{ key: 'SlopeEnd', path: 'blend.slope.end', condition: (layer) => layer.blend?.slope },
-	{ key: 'SlopeInfluence', path: 'blend.slope.influence', condition: (layer) => layer.blend?.slope },
-	{ key: 'CurvatureScale', path: 'blend.curvature.scale', condition: (layer) => layer.blend?.curvature },
-	{ key: 'CurvatureSoftness', path: 'blend.curvature.softness', condition: (layer) => layer.blend?.curvature },
-	{ key: 'RidgeInfluence', path: 'blend.curvature.ridgeInfluence', condition: (layer) => layer.blend?.curvature }
+	{ key: 'HeightMin', path: 'height.min', condition: (layer) => layer.height?.min !== undefined },
+	{ key: 'HeightMax', path: 'height.max', condition: (layer) => layer.height?.max !== undefined },
+	{ key: 'HeightInfluence', path: 'height.influence', condition: (layer) => layer.height },
+	{ key: 'SlopeMin', path: 'slope.min', condition: (layer) => layer.slope?.min !== undefined },
+	{ key: 'SlopeMax', path: 'slope.max', condition: (layer) => layer.slope?.max !== undefined },
+	{ key: 'SlopeInfluence', path: 'slope.influence', condition: (layer) => layer.slope },
+	{ key: 'CurvatureScale', path: 'curvature.scale', condition: (layer) => layer.curvature },
+	{ key: 'CurvatureSoftness', path: 'curvature.softness', condition: (layer) => layer.curvature },
+	{ key: 'RidgeInfluence', path: 'curvature.ridgeInfluence', condition: (layer) => layer.curvature },
 ]
 
 // Get nested property value from object using dot notation
@@ -47,7 +47,7 @@ const generateUniformDeclarations = (layers) => {
 		const prefix = `uLayer${index}`
 		declarations += `uniform sampler2D ${prefix}Texture;\n`
 		declarations += `uniform sampler2D ${prefix}NormalMap;\n`
-		
+
 		UNIFORM_FIELDS.forEach(({ key, condition }) => {
 			if (condition(layer)) {
 				declarations += `uniform float ${prefix}${key};\n`
@@ -60,82 +60,89 @@ const generateUniformDeclarations = (layers) => {
 
 // Generate blend factor calculation for a layer
 const generateBlendCode = (layer, index) => {
-	if (!layer.blend) return ''
+	const hasHeight = layer.height
+	const hasSlope = layer.slope
+	const hasCurvature = layer.curvature
+
+	// Base layer or layer with no blend params - always fully visible
+	if (!hasHeight && !hasSlope && !hasCurvature) {
+		return `
+		// Layer ${index} (${layer.name}) - no blend conditions
+		float layer${index}Blend = 1.0;`
+	}
 
 	const prefix = `uLayer${index}`
 	let code = `
-	// Layer ${index} (${layer.name}) blend calculation
-	float layer${index}Blend = 0.0;
-	{`
+		// Layer ${index} (${layer.name}) blend calculation
+		float layer${index}Blend = 1.0;
+		{
+			float factor;`
 
-	if (layer.blend.type === 'height_slope' || layer.blend.type === 'height') {
-		if (layer.blend.height) {
+	// Height blending
+	if (hasHeight) {
+		const hasMin = layer.height.min !== undefined
+		const hasMax = layer.height.max !== undefined
+
+		if (hasMin && hasMax) {
+			// Range: visible between min and max
 			code += `
-		// Height factor
-		float heightFactor${index} = smoothstep(${prefix}HeightStart, ${prefix}HeightEnd, vWorldPos.y);`
-
-			// For snow-like layers that appear at height (not fade out)
-			if (layer.blend.height.start < layer.blend.height.end && index > 1) {
-				code += `
-		// Layer appears at height (not fading out)`
-			} else {
-				code += `
-		heightFactor${index} = 1.0 - heightFactor${index}; // Invert: visible at low heights`
-			}
+			// Height: visible between min and max
+			factor = smoothstep(${prefix}HeightMin - 20.0, ${prefix}HeightMin, vWorldPos.y);
+			factor *= 1.0 - smoothstep(${prefix}HeightMax, ${prefix}HeightMax + 20.0, vWorldPos.y);
+			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
+		} else if (hasMin) {
+			// Only min: visible above min
+			code += `
+			// Height: visible above min
+			factor = smoothstep(${prefix}HeightMin - 40.0, ${prefix}HeightMin + 40.0, vWorldPos.y);
+			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
+		} else if (hasMax) {
+			// Only max: visible below max
+			code += `
+			// Height: visible below max
+			factor = 1.0 - smoothstep(${prefix}HeightMax - 20.0, ${prefix}HeightMax + 20.0, vWorldPos.y);
+			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
 		}
 	}
 
-	if (layer.blend.type === 'height_slope' || layer.blend.type === 'slope') {
-		if (layer.blend.slope) {
-			code += `
+	// Slope blending (slope value: 0 = flat, 1 = vertical)
+	if (hasSlope) {
+		const hasMin = layer.slope.min !== undefined
+		const hasMax = layer.slope.max !== undefined
+
+		code += `
 		// Slope factor (0 = flat, 1 = steep)
-		float slopeFactor${index} = 1.0 - abs(vWorldNormal.y);
-		slopeFactor${index} = smoothstep(${prefix}SlopeStart, ${prefix}SlopeEnd, slopeFactor${index});`
+		float slope${index} = 1.0 - abs(vWorldNormal.y);`
+
+		if (hasMin && hasMax) {
+			// Range: visible between min and max slope
+			code += `
+			// Slope: visible between min and max
+			factor = smoothstep(${prefix}SlopeMin - 0.1, ${prefix}SlopeMin, slope${index});
+			factor *= 1.0 - smoothstep(${prefix}SlopeMax, ${prefix}SlopeMax + 0.1, slope${index});
+			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
+		} else if (hasMin) {
+			// Only min: visible on steeper slopes (above min)
+			code += `
+			// Slope: visible on steep slopes (above min)
+			factor = smoothstep(${prefix}SlopeMin - 0.1, ${prefix}SlopeMin + 0.1, slope${index});
+			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
+		} else if (hasMax) {
+			// Only max: visible on flatter slopes (below max)
+			code += `
+			// Slope: visible on flat slopes (below max)
+			factor = 1.0 - smoothstep(${prefix}SlopeMax - 0.1, ${prefix}SlopeMax + 0.1, slope${index});
+			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
 		}
 	}
 
-	if (layer.blend.curvature) {
+	// Curvature blending (erosion patterns on ridges/convex areas)
+	if (hasCurvature) {
 		code += `
-		// Curvature for erosion patterns
+		// Curvature: erosion on ridges
 		float ridgeFactor${index} = clamp(curvature * ${prefix}CurvatureScale, 0.0, 1.0);
-		ridgeFactor${index} = ridgeFactor${index} / (${prefix}CurvatureSoftness + ridgeFactor${index});`
-	}
-
-	// Combine factors based on blend type
-	if (layer.blend.type === 'height_slope') {
-		if (layer.blend.height && layer.blend.slope) {
-			// For layers that appear at conditions (like snow at high + flat)
-			if (layer.blend.height.start < layer.blend.height.end && index > 1) {
-				code += `
-		// Combine: layer visible where height AND slope conditions are met
-		layer${index}Blend = heightFactor${index} * ${prefix}HeightInfluence;
-		layer${index}Blend *= (1.0 - slopeFactor${index} * ${prefix}SlopeInfluence);`
-			} else {
-				// For layers that fade at conditions (like sand fading at high/steep)
-				code += `
-		// Rock visibility (inverse = this layer visibility)
-		float rockBlend${index} = max(slopeFactor${index} * ${prefix}SlopeInfluence, (1.0 - heightFactor${index}) * ${prefix}HeightInfluence);`
-
-				if (layer.blend.curvature) {
-					code += `
-		rockBlend${index} = max(rockBlend${index}, ridgeFactor${index} * ${prefix}RidgeInfluence);`
-				}
-
-				code += `
-		rockBlend${index} = clamp(rockBlend${index}, 0.0, 1.0);
-		layer${index}Blend = 1.0 - rockBlend${index};
-
-		// Mask out above height end
-		float heightMask${index} = 1.0 - smoothstep(${prefix}HeightStart, ${prefix}HeightEnd + 2.0, vWorldPos.y);
-		layer${index}Blend *= heightMask${index};`
-			}
-		}
-	} else if (layer.blend.type === 'height') {
-		code += `
-		layer${index}Blend = heightFactor${index} * ${prefix}HeightInfluence;`
-	} else if (layer.blend.type === 'slope') {
-		code += `
-		layer${index}Blend = (1.0 - slopeFactor${index}) * ${prefix}SlopeInfluence;`
+		ridgeFactor${index} = ridgeFactor${index} / (${prefix}CurvatureSoftness + ridgeFactor${index});
+		layer${index}Blend *= 1.0 - ridgeFactor${index} * ${prefix}RidgeInfluence;`
 	}
 
 	code += `
@@ -148,14 +155,14 @@ const generateBlendCode = (layer, index) => {
 // Generate color sampling code for a layer
 const generateSamplingCode = (layer, index) => {
 	const prefix = `uLayer${index}`
-	const isBaseLayer = index === 0
+	const hasBlendConditions = layer.height || layer.slope || layer.curvature
 	const useNoTile = layer.stochastic ? 'true' : 'false'
 	const normalScaleStr = layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'
-	
-	// Conditional wrapper for non-base layers
-	const conditionalStart = isBaseLayer ? '' : `\n	if (layer${index}Blend > 0.01) {`
-	const conditionalEnd = isBaseLayer ? '' : `\n	}`
-	
+
+	// Skip sampling if blend is near zero (optimization for layers with blend conditions)
+	const conditionalStart = hasBlendConditions ? `\n	if (layer${index}Blend > 0.01) {` : ''
+	const conditionalEnd = hasBlendConditions ? `\n	}` : ''
+
 	// Common initialization
 	let code = `
 	// Layer ${index} (${layer.name})${layer.triplanar ? ' - triplanar' : ' - world-space UV'}${layer.lod ? ' with LOD' : ''}
@@ -166,55 +173,55 @@ const generateSamplingCode = (layer, index) => {
 		// Triplanar projection
 		if (layer.lod) {
 			code += `
-		vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
-		layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true, ${useNoTile});
-		layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});`
+			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+			layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true, ${useNoTile});
+			layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});`
 		} else {
 			code += `
-		layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, true, ${useNoTile});
-		layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, ${useNoTile});`
+			layer${index}Color = textureTriplanar(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, true, ${useNoTile});
+			layer${index}Normal = normalTriplanar(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, ${useNoTile});`
 		}
 	} else {
 		// World-space UV mapping
 		if (layer.lod) {
 			code += `
-		vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
-		float scaleLower${index} = ${prefix}TextureScale / lodInfo${index}.x;
-		float scaleUpper${index} = ${prefix}TextureScale / lodInfo${index}.y;
-		float lodBlend${index} = lodInfo${index}.z;
-		
-		vec2 uvLower${index} = vWorldPos.xz * scaleLower${index};
-		vec2 uvUpper${index} = vWorldPos.xz * scaleUpper${index};
-		
-		vec4 colorLower${index} = textureNoTile(${prefix}Texture, uvLower${index}, true);
-		vec4 colorUpper${index} = textureNoTile(${prefix}Texture, uvUpper${index}, true);
-		layer${index}Color = mix(colorLower${index}, colorUpper${index}, lodBlend${index});
-		
-		vec3 normalLower${index} = textureNoTile(${prefix}NormalMap, uvLower${index}).xyz * 2.0 - 1.0;
-		vec3 normalUpper${index} = textureNoTile(${prefix}NormalMap, uvUpper${index}).xyz * 2.0 - 1.0;
-		vec3 normalSample${index} = mix(normalLower${index}, normalUpper${index}, lodBlend${index});
-		normalSample${index}.xy *= ${normalScaleStr};
-		// Convert tangent-space normal to world-space using UDN blending for Y-up projection
-		layer${index}Normal = normalize(vec3(
-			normalSample${index}.x + vWorldNormal.x,
-			abs(normalSample${index}.z) * vWorldNormal.y,
-			normalSample${index}.y + vWorldNormal.z
-		));`
+			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleStart, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+			float scaleLower${index} = ${prefix}TextureScale / lodInfo${index}.x;
+			float scaleUpper${index} = ${prefix}TextureScale / lodInfo${index}.y;
+			float lodBlend${index} = lodInfo${index}.z;
+			
+			vec2 uvLower${index} = vWorldPos.xz * scaleLower${index};
+			vec2 uvUpper${index} = vWorldPos.xz * scaleUpper${index};
+			
+			vec4 colorLower${index} = textureNoTile(${prefix}Texture, uvLower${index}, true);
+			vec4 colorUpper${index} = textureNoTile(${prefix}Texture, uvUpper${index}, true);
+			layer${index}Color = mix(colorLower${index}, colorUpper${index}, lodBlend${index});
+			
+			vec3 normalLower${index} = textureNoTile(${prefix}NormalMap, uvLower${index}).xyz * 2.0 - 1.0;
+			vec3 normalUpper${index} = textureNoTile(${prefix}NormalMap, uvUpper${index}).xyz * 2.0 - 1.0;
+			vec3 normalSample${index} = mix(normalLower${index}, normalUpper${index}, lodBlend${index});
+			normalSample${index}.xy *= ${normalScaleStr};
+			// Convert tangent-space normal to world-space using UDN blending for Y-up projection
+			layer${index}Normal = normalize(vec3(
+				normalSample${index}.x + vWorldNormal.x,
+				abs(normalSample${index}.z) * vWorldNormal.y,
+				normalSample${index}.y + vWorldNormal.z
+			));`
 		} else {
 			code += `
-		vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
-		layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV, true);
-		vec3 layer${index}NormalSample = textureNoTile(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
-		layer${index}NormalSample.xy *= ${normalScaleStr};
-		// Convert tangent-space normal to world-space using UDN blending for Y-up projection
-		layer${index}Normal = normalize(vec3(
-			layer${index}NormalSample.x + vWorldNormal.x,
-			abs(layer${index}NormalSample.z) * vWorldNormal.y,
-			layer${index}NormalSample.y + vWorldNormal.z
-		));`
+			vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
+			layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV, true);
+			vec3 layer${index}NormalSample = textureNoTile(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
+			layer${index}NormalSample.xy *= ${normalScaleStr};
+			// Convert tangent-space normal to world-space using UDN blending for Y-up projection
+			layer${index}Normal = normalize(vec3(
+				layer${index}NormalSample.x + vWorldNormal.x,
+				abs(layer${index}NormalSample.z) * vWorldNormal.y,
+				layer${index}NormalSample.y + vWorldNormal.z
+			));`
 		}
 	}
-	
+
 	code += conditionalEnd
 	return code
 }
@@ -222,21 +229,18 @@ const generateSamplingCode = (layer, index) => {
 // Generate the final color blending code
 const generateColorBlendingCode = (layers) => {
 	let code = `
-	// Start with base layer (layer 0)
+	// Blend all layers (first layer is base)
 	vec3 finalColor = layer0Color.rgb;
-	vec3 finalNormal = layer0Normal;
-	`
+	vec3 finalNormal = layer0Normal;`
 
-	// Blend each subsequent layer on top
+	// Blend each subsequent layer on top using its blend factor
 	for (let i = 1; i < layers.length; i++) {
 		code += `
-	// Blend layer ${i} (${layers[i].name})
-	finalColor = mix(finalColor, layer${i}Color.rgb, layer${i}Blend);
-	finalNormal = normalize(mix(finalNormal, layer${i}Normal, layer${i}Blend));`
+		finalColor = mix(finalColor, layer${i}Color.rgb, layer${i}Blend);
+		finalNormal = normalize(mix(finalNormal, layer${i}Normal, layer${i}Blend));`
 	}
 
 	code += `
-
 	diffuseColor.rgb = finalColor;`
 
 	return code
@@ -250,7 +254,7 @@ const generateNormalBlendingCode = (layers) => {
 
 	for (let i = 1; i < layers.length; i++) {
 		code += `
-	blendedNormal = normalize(mix(blendedNormal, layer${i}Normal, layer${i}Blend));`
+		blendedNormal = normalize(mix(blendedNormal, layer${i}Normal, layer${i}Blend));`
 	}
 
 	code += `
