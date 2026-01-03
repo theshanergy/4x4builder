@@ -21,8 +21,10 @@ const DroneCamera = () => {
 	// Camera/drone state
 	const currentPosition = useRef(camera.position.clone())
 	const euler = useRef(new Euler(0, 0, 0, 'YXZ'))
+	const defaultPitch = useRef(-0.2) // Default vertical angle to return to (-0.2 radians ≈ -11 degrees)
 	const combinedEuler = useRef(new Euler(0, 0, 0, 'YXZ'))
 	const isPointerLocked = useRef(false)
+	const hasInitialized = useRef(false)
 	const hasLaunched = useRef(false) // Track if we've done the initial launch
 
 	// Movement state
@@ -45,6 +47,7 @@ const DroneCamera = () => {
 		yawSpeed: 2, // Rotation speed around vertical axis
 		mouseSensitivity: 0.002,
 		gamepadLookSensitivity: 2.5,
+		rotationReturnSpeed: 2, // Speed at which camera returns to default angle when unlocked
 
 		// Limits
 		minGroundDistance: 1.0,
@@ -65,7 +68,10 @@ const DroneCamera = () => {
 
 	// Initialize camera rotation from current orientation
 	useEffect(() => {
-		euler.current.setFromQuaternion(camera.quaternion)
+		if (!hasInitialized.current) {
+			euler.current.setFromQuaternion(camera.quaternion)
+			hasInitialized.current = true
+		}
 
 		// Position camera above and behind the vehicle if starting fresh
 		if (currentPosition.current.distanceTo(vehicleState.position) < 1) {
@@ -81,19 +87,35 @@ const DroneCamera = () => {
 	}, [camera])
 
 	// Mouse movement handler - controls camera look direction
-	const handleMouseMove = useCallback((event) => {
-		if (!isPointerLocked.current) return
+	const handleMouseMove = useCallback(
+		(event) => {
+			// Double-check pointer lock state directly from the document
+			// This prevents race conditions when pointer lock is released
+			if (document.pointerLockElement !== gl.domElement) return
 
-		euler.current.y -= event.movementX * config.mouseSensitivity
-		euler.current.x -= event.movementY * config.mouseSensitivity
+			// Only use movementX/Y which are reliable during pointer lock
+			euler.current.y -= event.movementX * config.mouseSensitivity
+			euler.current.x -= event.movementY * config.mouseSensitivity
 
-		// Clamp vertical rotation to prevent flipping
-		euler.current.x = MathUtils.clamp(euler.current.x, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1)
-	}, [])
+			// Clamp vertical rotation to prevent flipping
+			euler.current.x = MathUtils.clamp(euler.current.x, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1)
+		},
+		[gl.domElement]
+	)
 
 	// Pointer lock handlers
 	const handlePointerLockChange = useCallback(() => {
+		const wasLocked = isPointerLocked.current
 		isPointerLocked.current = document.pointerLockElement === gl.domElement
+
+		// When pointer lock is released, clear all keys to prevent stuck inputs
+		if (wasLocked && !isPointerLocked.current) {
+			const inputStore = useInputStore.getState()
+			// Clear all keys
+			inputStore.keys.forEach((key) => {
+				inputStore.setKey(key, false)
+			})
+		}
 	}, [gl.domElement])
 
 	const handleClick = useCallback(() => {
@@ -102,11 +124,14 @@ const DroneCamera = () => {
 		}
 	}, [gl.domElement])
 
-	// Set up event listeners
+	// Set up event listeners and request pointer lock on mount
 	useEffect(() => {
 		document.addEventListener('mousemove', handleMouseMove)
 		document.addEventListener('pointerlockchange', handlePointerLockChange)
 		gl.domElement.addEventListener('click', handleClick)
+
+		// Automatically request pointer lock when entering drone mode
+		gl.domElement.requestPointerLock()
 
 		return () => {
 			document.removeEventListener('mousemove', handleMouseMove)
@@ -173,6 +198,11 @@ const DroneCamera = () => {
 			euler.current.y -= gamepadLookX * config.gamepadLookSensitivity * dt
 			euler.current.x -= gamepadLookY * config.gamepadLookSensitivity * dt
 			euler.current.x = MathUtils.clamp(euler.current.x, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1)
+		}
+
+		// When pointer is not locked, smoothly return camera to default vertical angle
+		if (!isPointerLocked.current) {
+			euler.current.x = MathUtils.lerp(euler.current.x, defaultPitch.current, config.rotationReturnSpeed * dt)
 		}
 
 		// Interpolate tilt - use faster recovery speed when input is near zero
