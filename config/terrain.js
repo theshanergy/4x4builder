@@ -48,12 +48,10 @@ export const MOUNTAIN_CONFIG = {
  * - normalScale: Normal map intensity (optional, default 1.0)
  * - triplanar: Use triplanar projection instead of world XZ (optional)
  * - stochastic: Use stochastic sampling to reduce tiling (optional)
- * - lod: LOD configuration { distanceScaleStart, distanceScaleFactor, levels }
+ * - lod: LOD configuration { distanceScaleFactor, levels }
  * - height: Height blending { min, max, influence } - all optional
- * - slope: Slope blending { min, max, influence } - all optional (0=flat, 1=steep)
- * - curvature: Curvature blending { scale, softness, ridgeInfluence } - optional
+ * - slope: Slope blending { min, max, influence, range } - all optional (0=flat, 1=steep)
  *
- * All blend parameters (height, slope, curvature) are optional.
  * Omit any you don't need. Min/max within each are also optional:
  * - Only min: layer appears above that value
  * - Only max: layer appears below that value
@@ -72,7 +70,6 @@ export const TERRAIN_LAYERS = [
 		triplanar: true,
 		stochastic: true,
 		lod: {
-			distanceScaleStart: 100,
 			distanceScaleFactor: 300,
 			levels: 3,
 		},
@@ -87,16 +84,12 @@ export const TERRAIN_LAYERS = [
 		normalScale: 0.5,
 		height: {
 			max: 60,
-			influence: 0.8,
+			influence: 1.0,
 		},
 		slope: {
-			max: 0.3,
+			max: 0.05,
 			influence: 0.9,
-		},
-		curvature: {
-			scale: 50.0,
-			softness: 0.3,
-			ridgeInfluence: 0.5,
+			range: 0.03,
 		},
 	},
 	{
@@ -108,7 +101,7 @@ export const TERRAIN_LAYERS = [
 		textureScale: 0.05,
 		normalScale: 0.5,
 		height: {
-			min: 120,
+			min: 180,
 			influence: 1.0,
 		},
 		slope: {
@@ -116,7 +109,6 @@ export const TERRAIN_LAYERS = [
 			influence: 0.7,
 		},
 		lod: {
-			distanceScaleStart: 100,
 			distanceScaleFactor: 300,
 			levels: 3,
 		},

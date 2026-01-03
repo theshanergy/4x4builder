@@ -14,9 +14,7 @@ const UNIFORM_FIELDS = [
 	{ key: 'SlopeMin', path: 'slope.min', condition: (layer) => layer.slope?.min !== undefined },
 	{ key: 'SlopeMax', path: 'slope.max', condition: (layer) => layer.slope?.max !== undefined },
 	{ key: 'SlopeInfluence', path: 'slope.influence', condition: (layer) => layer.slope },
-	{ key: 'CurvatureScale', path: 'curvature.scale', condition: (layer) => layer.curvature },
-	{ key: 'CurvatureSoftness', path: 'curvature.softness', condition: (layer) => layer.curvature },
-	{ key: 'RidgeInfluence', path: 'curvature.ridgeInfluence', condition: (layer) => layer.curvature },
+	{ key: 'SlopeRange', path: 'slope.range', condition: (layer) => layer.slope, default: 0.1 },
 ]
 
 // Get nested property value from object using dot notation
@@ -61,10 +59,9 @@ const generateUniformDeclarations = (layers) => {
 const generateBlendCode = (layer, index) => {
 	const hasHeight = layer.height
 	const hasSlope = layer.slope
-	const hasCurvature = layer.curvature
 
 	// Base layer or layer with no blend params - always fully visible
-	if (!hasHeight && !hasSlope && !hasCurvature) {
+	if (!hasHeight && !hasSlope) {
 		return `
 		// Layer ${index} (${layer.name}) - no blend conditions
 		float layer${index}Blend = 1.0;`
@@ -117,31 +114,22 @@ const generateBlendCode = (layer, index) => {
 			// Range: visible between min and max slope
 			code += `
 			// Slope: visible between min and max
-			factor = smoothstep(${prefix}SlopeMin - 0.1, ${prefix}SlopeMin, slope${index});
-			factor *= 1.0 - smoothstep(${prefix}SlopeMax, ${prefix}SlopeMax + 0.1, slope${index});
+			factor = smoothstep(${prefix}SlopeMin - ${prefix}SlopeRange, ${prefix}SlopeMin, slope${index});
+			factor *= 1.0 - smoothstep(${prefix}SlopeMax, ${prefix}SlopeMax + ${prefix}SlopeRange, slope${index});
 			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
 		} else if (hasMin) {
 			// Only min: visible on steeper slopes (above min)
 			code += `
 			// Slope: visible on steep slopes (above min)
-			factor = smoothstep(${prefix}SlopeMin - 0.1, ${prefix}SlopeMin + 0.1, slope${index});
+			factor = smoothstep(${prefix}SlopeMin - ${prefix}SlopeRange, ${prefix}SlopeMin + ${prefix}SlopeRange, slope${index});
 			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
 		} else if (hasMax) {
 			// Only max: visible on flatter slopes (below max)
 			code += `
 			// Slope: visible on flat slopes (below max)
-			factor = 1.0 - smoothstep(${prefix}SlopeMax - 0.1, ${prefix}SlopeMax + 0.1, slope${index});
+			factor = 1.0 - smoothstep(${prefix}SlopeMax - ${prefix}SlopeRange, ${prefix}SlopeMax + ${prefix}SlopeRange, slope${index});
 			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
 		}
-	}
-
-	// Curvature blending (erosion patterns on ridges/convex areas)
-	if (hasCurvature) {
-		code += `
-		// Curvature: erosion on ridges
-		float ridgeFactor${index} = clamp(curvature * ${prefix}CurvatureScale, 0.0, 1.0);
-		ridgeFactor${index} = ridgeFactor${index} / (${prefix}CurvatureSoftness + ridgeFactor${index});
-		layer${index}Blend *= 1.0 - ridgeFactor${index} * ${prefix}RidgeInfluence;`
 	}
 
 	code += `
@@ -154,7 +142,7 @@ const generateBlendCode = (layer, index) => {
 // Generate color sampling code for a layer
 const generateSamplingCode = (layer, index) => {
 	const prefix = `uLayer${index}`
-	const hasBlendConditions = layer.height || layer.slope || layer.curvature
+	const hasBlendConditions = layer.height || layer.slope
 	const useNoTile = layer.stochastic ? 'true' : 'false'
 	const normalScaleStr = layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'
 
@@ -438,18 +426,6 @@ const TerrainMaterial = ({ layerTextures }) => {
 					return vec3(pow(2.0, lodLower), pow(2.0, lodUpper), blend);
 				}
 
-				// Calculate approximate curvature from world position derivatives
-				float getCurvature() {
-					vec3 dx = dFdx(vWorldPos);
-					vec3 dy = dFdy(vWorldPos);
-					vec3 ddx = dFdx(vWorldNormal);
-					vec3 ddy = dFdy(vWorldNormal);
-
-					// Mean curvature approximation
-					float curvature = (dot(ddx, dx) + dot(ddy, dy)) * 0.5;
-					return curvature;
-				}
-
 				// Triplanar texture sampling - projects texture from 3 axes and blends based on normal
 				// Set srgb=true for albedo textures to convert to linear space
 				// Set useNoTile=true to enable stochastic anti-tiling (more expensive)
@@ -628,9 +604,6 @@ const TerrainMaterial = ({ layerTextures }) => {
 			shader.fragmentShader = shader.fragmentShader.replace(
 				'#include <map_fragment>',
 				`#include <map_fragment>
-
-				// Calculate curvature once for all layers
-				float curvature = getCurvature();
 
 				// Calculate blend factors FIRST so we can skip sampling when blend is zero
 				layer0Blend = 1.0; // Base layer always fully visible initially
