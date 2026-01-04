@@ -2,7 +2,6 @@ import { useRef, useMemo, useEffect } from 'react'
 import { CircleGeometry, ShaderMaterial, DoubleSide } from 'three'
 import { useFrame } from '@react-three/fiber'
 
-import { vehicleState } from '../../../store/gameStore'
 import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
 import { WATER_LEVEL, RIVER_CONFIG } from '../../../config/water'
 import { getFlowMap } from '../../../utils/terrain/features/river/flowMap'
@@ -63,12 +62,12 @@ const Water = () => {
 		}
 	}, [geom, material, flowMap])
 
-	// Animate water and follow player
-	useFrame((_, delta) => {
+	// Animate water and follow camera
+	useFrame(({ camera }, delta) => {
 		if (ref.current?.material?.uniforms) {
-			// Follow player position at Y=0
-			ref.current.position.x = vehicleState.position.x
-			ref.current.position.z = vehicleState.position.z
+			// Follow camera position at Y=0
+			ref.current.position.x = camera.position.x
+			ref.current.position.z = camera.position.z
 
 			ref.current.material.uniforms.uTime.value += delta
 		}
