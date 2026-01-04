@@ -10,9 +10,10 @@ import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
 // Controls:
 //   W/S: Tilt forward/back (pitch) - moves drone forward/back
 //   A/D: Strafe left/right
-//   Q/E or Shift/Space: Descend/Ascend altitude (throttle)
+//   Q/E: Descend/Ascend altitude (throttle)
 //   Arrow Up/Down: Increase/decrease altitude (throttle)
 //   Arrow Left/Right: Rotate left/right (yaw)
+//   Shift: Speed boost (doubles movement speed)
 //   Mouse: Look around (adjusts drone orientation)
 //   Gamepad: Left stick = strafe/altitude, Right stick = look, Triggers = yaw
 const DroneCamera = () => {
@@ -34,6 +35,7 @@ const DroneCamera = () => {
 	const config = {
 		// Movement speeds
 		moveSpeed: 20, // Horizontal movement speed
+		boostMultiplier: 2.0, // Speed multiplier when boosting
 		verticalSpeed: 10, // Vertical movement speed
 		acceleration: 6, // How fast we lerp to target speed
 
@@ -135,10 +137,13 @@ const DroneCamera = () => {
 		if (keys.has('s')) pitchInput -= 1 // Tilt backward
 		if (keys.has('ArrowLeft')) yawInput += 1 // Rotate left
 		if (keys.has('ArrowRight')) yawInput -= 1 // Rotate right
-		if (keys.has('ArrowUp') || keys.has('e') || keys.has('E') || keys.has(' ')) throttleInput += 1 // Ascend
-		if (keys.has('ArrowDown') || keys.has('q') || keys.has('Q') || keys.has('Shift')) throttleInput -= 1 // Descend
+		if (keys.has('ArrowUp') || keys.has('e') || keys.has('E')) throttleInput += 1 // Ascend
+		if (keys.has('ArrowDown') || keys.has('q') || keys.has('Q')) throttleInput -= 1 // Descend
 		if (keys.has('a')) strafeInput -= 1 // Strafe left
 		if (keys.has('d')) strafeInput += 1 // Strafe right
+
+		// Speed boost
+		const isBoosting = keys.has('Shift')
 
 		// Gamepad inputs
 		// Left stick: strafe (X) and altitude (Y)
@@ -195,10 +200,14 @@ const DroneCamera = () => {
 		const cosYaw = Math.cos(yaw)
 		const sinYaw = Math.sin(yaw)
 
+		// Apply speed boost if shift is held
+		const currentMoveSpeed = isBoosting ? config.moveSpeed * config.boostMultiplier : config.moveSpeed
+		const currentVerticalSpeed = isBoosting ? config.verticalSpeed * config.boostMultiplier : config.verticalSpeed
+
 		// Target horizontal velocity from pitch/strafe inputs
-		const targetVelX = (pitchInput * -sinYaw + strafeInput * cosYaw) * config.moveSpeed
-		const targetVelZ = (pitchInput * -cosYaw + strafeInput * -sinYaw) * config.moveSpeed
-		const targetVelY = throttleInput * config.verticalSpeed
+		const targetVelX = (pitchInput * -sinYaw + strafeInput * cosYaw) * currentMoveSpeed
+		const targetVelZ = (pitchInput * -cosYaw + strafeInput * -sinYaw) * currentMoveSpeed
+		const targetVelY = throttleInput * currentVerticalSpeed
 
 		// Lerp velocity towards target
 		velocity.current.x = MathUtils.lerp(velocity.current.x, targetVelX, config.acceleration * dt)
