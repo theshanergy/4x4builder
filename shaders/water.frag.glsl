@@ -9,6 +9,10 @@ uniform vec3 sunDirection;
 uniform vec3 eye;
 uniform vec3 waterColor;
 
+// Sky shader integration
+uniform vec3 skyColor;
+uniform vec3 skyHorizonColor;
+
 varying vec4 mirrorCoord;
 varying vec4 worldPosition;
 
@@ -32,6 +36,28 @@ void sunLight( const vec3 surfaceNormal, const vec3 eyeDirection, float shiny, f
 	float direction = max( 0.0, dot( eyeDirection, reflection ) );
 	specularColor += pow( direction, shiny ) * sunColor * spec;
 	diffuseColor += max( dot( sunDirection, surfaceNormal ), 0.0 ) * sunColor * diffuse;
+}
+
+// Shared atmospheric sky function
+vec3 GetSkyColour(vec3 vRayDir, vec3 vSunDir, vec3 vSkyColor, vec3 vSkyHorizonColor, vec3 vSunColor) {
+	float elevation = max(0.0, vRayDir.y);
+	float skyBlend = pow(elevation, 0.5);
+	vec3 vSkyColour = mix(vSkyHorizonColor, vSkyColor, skyBlend);
+	
+	// Subtle sun glow near sun position
+	float fSunDotV = max(0.0, dot(vSunDir, vRayDir));
+	float sunGlow = pow(fSunDotV, 8.0) * 0.3;
+	vSkyColour += vSunColor * sunGlow * (1.0 - elevation * 0.5);
+	
+	// Very subtle horizon haze
+	float horizonHaze = pow(1.0 - elevation, 12.0) * 0.15;
+	vSkyColour = mix(vSkyColour, vec3(0.9, 0.92, 0.95), horizonHaze);
+	
+	return vSkyColour;
+}
+
+vec3 FinalColorProcess(vec3 color) {
+	return pow(color, vec3(0.95));
 }
 
 #include <common>
@@ -65,9 +91,19 @@ void main() {
 	float theta = max( dot( eyeDirection, surfaceNormal ), 0.0 );
 	float rf0 = 0.3;
 	float reflectance = rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 );
+	
+	// Use sky color for non-reflected rays
+	vec3 reflectionDir = reflect( -eyeDirection, surfaceNormal );
+	vec3 skyReflection = GetSkyColour( reflectionDir, normalize(sunDirection), skyColor, skyHorizonColor, sunColor );
+	
+	// Blend mirror reflection with sky color for more realistic fallback
+	vec3 finalReflection = mix( skyReflection, reflectionSample, 0.8 );
+	
 	vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * waterColor;
-	vec3 albedo = mix( ( sunColor * diffuseLight * 0.3 + scatter ) * getShadowMask(), ( vec3( 0.1 ) + reflectionSample * 0.9 + reflectionSample * specularLight ), reflectance);
-	vec3 outgoingLight = albedo;
+	vec3 albedo = mix( ( sunColor * diffuseLight * 0.3 + scatter ) * getShadowMask(), ( vec3( 0.1 ) + finalReflection * 0.9 + finalReflection * specularLight ), reflectance);
+	
+	// Apply consistent tone mapping
+	vec3 outgoingLight = FinalColorProcess(albedo);
 	gl_FragColor = vec4( outgoingLight, alpha );
 
 	#include <tonemapping_fragment>

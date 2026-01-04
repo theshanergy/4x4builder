@@ -4,7 +4,7 @@ import { useFrame, extend } from '@react-three/fiber'
 import { Water as StdWater } from 'three-stdlib'
 
 import { WATER_LEVEL } from '../../../config/water'
-import { sunDirection } from '../../../config/environment'
+import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
 
 import vertexShader from '../../../shaders/water.vert.glsl'
 import fragmentShader from '../../../shaders/water.frag.glsl'
@@ -82,7 +82,9 @@ const Water = () => {
 					value: [Math.sin((WAVES[2].direction * Math.PI) / 180), Math.cos((WAVES[2].direction * Math.PI) / 180), WAVES[2].steepness, WAVES[2].wavelength],
 				}
 
-				// Use imported shaders
+				// Add sky shader uniforms for realistic reflections
+				shader.uniforms.skyColor = { value: skyColorZenith.clone() }
+				shader.uniforms.skyHorizonColor = { value: skyColorHorizon.clone() } // Use imported shaders
 				shader.vertexShader = vertexShader
 				shader.fragmentShader = fragmentShader
 
@@ -113,8 +115,8 @@ const Water = () => {
 					textureWidth: 512,
 					textureHeight: 512,
 					waterNormals: waterNormals,
-					sunDirection: new Vector3(sunDirection.x, sunDirection.y, sunDirection.z),
-					sunColor: 0xffffff,
+					sunDirection: sunDirection,
+					sunColor: sunColor,
 					waterColor: 0x001e0f,
 					distortionScale: 8,
 					fog: undefined,
