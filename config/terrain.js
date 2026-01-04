@@ -16,26 +16,60 @@ export const STAGING_AREA = {
 	transitionEnd: 64,
 }
 
-// Mountain configuration
+// Continental noise - determines large-scale land vs water distribution
+export const CONTINENTAL_CONFIG = {
+	// Scale of continental features (smaller = larger features)
+	// At 0.00007, features are roughly 14,000 units across
+	scale: 0.00007,
+	// Threshold below which terrain becomes water (-1 to 1 range)
+	// -0.15 gives roughly 40% water coverage
+	waterThreshold: -0.15,
+	// Width of the beach/shore transition zone
+	beachTransition: 350,
+	// How much continental value affects base terrain height
+	heightInfluence: 0.6,
+	// Secondary detail scale for more interesting coastlines
+	detailScale: 0.0003,
+	detailStrength: 0.3,
+}
+
+// Mountain configuration - now procedural based on noise
 export const MOUNTAIN_CONFIG = {
-	// Distance from origin where mountains start to appear
-	startDistance: 1200,
-	// Distance over which mountains blend in (transition zone)
-	transitionWidth: 800,
 	// Maximum mountain height
-	maxHeight: 380,
+	maxHeight: 400,
+	// Minimum continental value for mountains to appear (keeps them inland)
+	minContinental: 0.2,
 	// Base noise scale for large mountain formations (smaller = more spread out)
-	baseScale: 0.0006,
+	baseScale: 0.0005,
 	// Ridge noise creates sharp mountain ridges (smaller = wider ridges)
-	ridgeScale: 0.0015,
+	ridgeScale: 0.0012,
 	// Detail noise for smaller features
-	detailScale: 0.008,
+	detailScale: 0.006,
 	// Domain warping scale for more natural shapes
-	warpScale: 0.0008,
-	warpStrength: 200,
-	// Valley carving - how much rivers/valleys cut into terrain
-	valleyScale: 0.0012,
-	valleyDepth: 0.5,
+	warpScale: 0.0006,
+	warpStrength: 250,
+	// Mountain range scale - controls how spread out mountain ranges are
+	rangeScale: 0.00015,
+	// Threshold for mountain ranges (higher = less frequent but more defined ranges)
+	rangeThreshold: 0.3,
+}
+
+// Procedural river configuration
+export const RIVER_CONFIG_PROCEDURAL = {
+	// Scale of river channel noise (smaller = wider, more spread out rivers)
+	channelScale: 0.0005,
+	// Threshold for river channels (lower = more rivers, higher = fewer)
+	channelThreshold: 0.5,
+	// River width at full channel strength
+	maxWidth: 100,
+	// River depth below water level
+	depth: 2.5,
+	// Transition width for river banks
+	bankTransition: 60,
+	// Minimum continental value for rivers (they need land to flow through)
+	minContinental: -0.05,
+	// Rivers are more likely near water bodies
+	waterProximityBoost: 0.4,
 }
 
 /**

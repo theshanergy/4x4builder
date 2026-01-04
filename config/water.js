@@ -1,36 +1,21 @@
 // Water level constant
 export const WATER_LEVEL = -1
 
-// Ocean configuration
-export const OCEAN_CONFIG = {
-	radius: 5000,
-	transition: 300, // Width of the beach transition zone
-	depth: 12, // Depth below WATER_LEVEL
-	// Beach profile control point (like a Bezier curve)
-	beachMidpointDepth: 0.2, // Intermediate depth at transition midpoint (0-1 range)
+// Water body configuration (for procedural lakes/seas)
+export const WATER_BODY_CONFIG = {
+	// Maximum depth below WATER_LEVEL for deep water
+	maxDepth: 15,
+	// Shallow water depth near shores
+	shallowDepth: 2,
+	// Beach profile control - how steeply the shore drops off
+	beachSteepness: 2.5,
 }
 
-// Helper for accessing ocean boundaries (computed once)
-const OCEAN_BOUNDARY = OCEAN_CONFIG.radius + OCEAN_CONFIG.transition
-
-// River configuration
-export const RIVER_CONFIG = {
-	// River path parameters - extends well into the ocean on both ends
-	startX: -OCEAN_BOUNDARY,
-	endX: OCEAN_BOUNDARY,
-	baseZ: 0, // Center line of the river (middle of valley)
-
-	// River dimensions
-	width: 60, // Base width of river
-	transition: 40, // Width of bank transition zone (50% above water, 50% below)
-	widthVariation: 15, // Random width variation
-	depth: 2.5, // Base depth below WATER_LEVEL
-
-	// Flow map texture configuration
-	flowMap: {
-		resolution: 512, // Texture resolution
-		worldSize: 12000, // World area covered by the flow map (must cover full river extent)
-	},
+// Flow map texture configuration (for water shader animation)
+// Now covers a larger area for the infinite terrain
+export const FLOW_MAP_CONFIG = {
+	resolution: 512, // Texture resolution
+	worldSize: 12000, // World area covered by the flow map
 }
 
 // Buoyancy configuration

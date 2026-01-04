@@ -1,12 +1,13 @@
 // Terrain orchestrator - coordinates all terrain features to produce final height values
 // This is the main entry point for terrain height calculation
+// Now uses a unified procedural system for infinite terrain generation
 
 import { Vector3 } from 'three'
-import { TERRAIN_CONFIG } from '../../config/terrain'
-import { WATER_LEVEL, RIVER_CONFIG } from '../../config/water'
+import { TERRAIN_CONFIG, CONTINENTAL_CONFIG } from '../../config/terrain'
+import { getContinentalValue, getBeachBlend, isWaterBody } from './features/continental'
+import { blendWaterBodyTerrain } from './features/waterBodies'
 import { getMountainContribution } from './features/mountains'
-import { blendOceanDepth } from './features/ocean'
-import { getRiverBlendFactor } from './features/river/terrain'
+import { applyRiverCarving } from './features/rivers'
 import { getStagingBlend } from './features/staging'
 
 // Epsilon for numerical gradient approximation
@@ -18,14 +19,16 @@ const GRADIENT_EPSILON = 0.01
  * a clean API for the rest of the terrain system.
  *
  * @param {Object} noise - Noise instance from noisejs
- * @returns {Object} Object with getNormalizedHeight, getWorldHeight, and getNormal functions
+ * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and getContinental functions
  */
 export const createTerrainHelpers = (noise) => {
 	const { baseHeightScale, smoothness, regionScale } = TERRAIN_CONFIG
+	const { heightInfluence } = CONTINENTAL_CONFIG
 
 	/**
-	 * Get normalized height value at any world position (0-1 range, can go negative for ocean).
+	 * Get normalized height value at any world position (0-1 range, can go negative for water).
 	 * This is the core terrain generation function that combines all features.
+	 * The terrain is fully procedural and infinite.
 	 *
 	 * @param {number} worldX - World X coordinate
 	 * @param {number} worldZ - World Z coordinate
@@ -34,42 +37,48 @@ export const createTerrainHelpers = (noise) => {
 	const getNormalizedHeight = (worldX, worldZ) => {
 		const distSq = worldX * worldX + worldZ * worldZ
 
-		// Calculate base terrain noise (gentle rolling terrain)
+		// 1. Get continental value - determines land vs water at large scale
+		const continental = getContinentalValue(worldX, worldZ, noise)
+
+		// 2. Get beach blend - how far inland we are from water edges
+		const beachBlend = getBeachBlend(continental)
+
+		// 3. Calculate base terrain noise (gentle rolling terrain)
 		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
 		const normalizedHeight = (noiseValue + 1) / 2
 
-		// Regional height modulation - creates dispersed flatter areas
+		// 4. Regional height modulation - creates dispersed flatter areas
 		const regionNoise = noise.perlin2(worldX / regionScale + 100, worldZ / regionScale + 100)
 		// Map to 0.1-1.0 range: some areas have 10% height (much flatter), others full height
 		const regionModifier = 0.1 + (regionNoise + 1) * 0.45
 
-		// Apply staging area blend - smooth transition from flat spawn to terrain
+		// 5. Continental height influence - terrain is higher further inland
+		// This creates natural elevation gradients from coast to interior
+		const continentalLift = Math.max(0, continental) * heightInfluence
+
+		// 6. Apply staging area blend - smooth transition from flat spawn to terrain
 		const stagingBlend = getStagingBlend(distSq)
-		const baseHeight = normalizedHeight * stagingBlend * regionModifier
 
-		// Add mountain height using parallel bands along the X axis
-		const mountainHeight = getMountainContribution(worldX, worldZ, noise, distSq)
+		// 7. Combine base terrain factors
+		let baseHeight = normalizedHeight * stagingBlend * regionModifier
+		// Add continental lift to raise inland areas
+		baseHeight = baseHeight + continentalLift * stagingBlend
 
-		// Combine base terrain with mountains
+		// 8. Add mountain height - now based on continental value and noise patterns
+		const mountainHeight = getMountainContribution(worldX, worldZ, noise, continental, beachBlend)
+
+		// 9. Combine base terrain with mountains
 		// Base terrain is scaled down in mountain areas to let mountains dominate
 		const mountainInfluence = mountainHeight > 0 ? Math.min(1, mountainHeight * 0.5) : 0
 		let combinedHeight = baseHeight * (1 - mountainInfluence * 0.7) + mountainHeight
 
-		// Apply river carving BEFORE ocean transition so river cuts through beach
-		const riverBlendFactor = getRiverBlendFactor(worldX, worldZ)
-		if (riverBlendFactor > 0) {
-			// Carve river bed into terrain - depth is relative to water level
-			// At river center (blendFactor=1): 95% terrain suppressed, 5% variance
-			// At river edges (blendFactor=0): full terrain height
-			const normalizedRiverDepth = RIVER_CONFIG.depth / baseHeightScale
-			const varianceRetention = 1 - riverBlendFactor * 0.95
-			const carvedHeight = combinedHeight * varianceRetention - riverBlendFactor * normalizedRiverDepth
-			const riverBedFloor = WATER_LEVEL / baseHeightScale - normalizedRiverDepth * 1.1
-			combinedHeight = Math.max(carvedHeight, riverBedFloor)
+		// 10. Apply procedural river carving (only on land)
+		if (!isWaterBody(continental)) {
+			combinedHeight = applyRiverCarving(combinedHeight, worldX, worldZ, noise, continental, baseHeightScale)
 		}
 
-		// Apply ocean blending - creates realistic beach profile and ocean depth
-		combinedHeight = blendOceanDepth(combinedHeight, distSq, baseHeightScale)
+		// 11. Apply water body blending - handles lakes, seas, and beach transitions
+		combinedHeight = blendWaterBodyTerrain(combinedHeight, continental, baseHeightScale, noise, worldX, worldZ)
 
 		return combinedHeight
 	}
@@ -115,5 +124,28 @@ export const createTerrainHelpers = (noise) => {
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}
 
-	return { getNormalizedHeight, getWorldHeight, getNormal, baseHeightScale }
+	/**
+	 * Get the continental value at a position (for water detection, etc.)
+	 *
+	 * @param {number} worldX - World X coordinate
+	 * @param {number} worldZ - World Z coordinate
+	 * @returns {number} Continental value (-1 to 1)
+	 */
+	const getContinental = (worldX, worldZ) => {
+		return getContinentalValue(worldX, worldZ, noise)
+	}
+
+	/**
+	 * Check if a position is in a water body (lake, sea, etc.)
+	 *
+	 * @param {number} worldX - World X coordinate
+	 * @param {number} worldZ - World Z coordinate
+	 * @returns {boolean} True if position is in water
+	 */
+	const isWater = (worldX, worldZ) => {
+		const continental = getContinentalValue(worldX, worldZ, noise)
+		return isWaterBody(continental)
+	}
+
+	return { getNormalizedHeight, getWorldHeight, getNormal, getContinental, isWater, baseHeightScale }
 }
