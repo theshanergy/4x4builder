@@ -35,7 +35,7 @@ const DroneCamera = () => {
 	const config = {
 		// Movement speeds
 		moveSpeed: 20, // Horizontal movement speed
-		boostMultiplier: 2.0, // Speed multiplier when boosting
+		boostMultiplier: 20.0, // Speed multiplier when boosting
 		verticalSpeed: 10, // Vertical movement speed
 		acceleration: 6, // How fast we lerp to target speed
 
@@ -183,31 +183,39 @@ const DroneCamera = () => {
 			euler.current.x = MathUtils.lerp(euler.current.x, defaultPitch.current, config.rotationReturnSpeed * dt)
 		}
 
-		// Interpolate tilt - use faster recovery speed when input is near zero
-		const pitchTarget = Math.abs(pitchInput) > 0.1 ? pitchInput * config.maxTiltAngle : 0
+		// Interpolate tilt - only apply side-to-side (roll) tilt for strafe input
+		droneTilt.current.pitch = 0 // No forward/back tilt
 		const rollTarget = Math.abs(strafeInput) > 0.1 ? strafeInput * config.maxTiltAngle : 0
-		const pitchLerpSpeed = Math.abs(pitchInput) > 0.1 ? config.tiltSpeed : config.tiltRecovery
 		const rollLerpSpeed = Math.abs(strafeInput) > 0.1 ? config.tiltSpeed : config.tiltRecovery
 
-		droneTilt.current.pitch = MathUtils.lerp(droneTilt.current.pitch, pitchTarget, pitchLerpSpeed * dt)
 		droneTilt.current.roll = MathUtils.lerp(droneTilt.current.roll, rollTarget, rollLerpSpeed * dt)
 
 		// Apply yaw rotation (simple lerp to target speed)
 		euler.current.y += yawInput * config.yawSpeed * dt
 
-		// Calculate target velocity based on inputs
-		const yaw = euler.current.y
-		const cosYaw = Math.cos(yaw)
-		const sinYaw = Math.sin(yaw)
-
 		// Apply speed boost if shift is held
 		const currentMoveSpeed = isBoosting ? config.moveSpeed * config.boostMultiplier : config.moveSpeed
 		const currentVerticalSpeed = isBoosting ? config.verticalSpeed * config.boostMultiplier : config.verticalSpeed
 
-		// Target horizontal velocity from pitch/strafe inputs
-		const targetVelX = (pitchInput * -sinYaw + strafeInput * cosYaw) * currentMoveSpeed
-		const targetVelZ = (pitchInput * -cosYaw + strafeInput * -sinYaw) * currentMoveSpeed
-		const targetVelY = throttleInput * currentVerticalSpeed
+		// Calculate forward direction vector from camera's look direction (includes pitch)
+		const pitch = euler.current.x
+		const yaw = euler.current.y
+		
+		// Forward direction (where camera is looking)
+		const forwardX = -Math.sin(yaw) * Math.cos(pitch)
+		const forwardY = Math.sin(pitch)
+		const forwardZ = -Math.cos(yaw) * Math.cos(pitch)
+		
+		// Right direction (perpendicular to forward, on horizontal plane)
+		const rightX = Math.cos(yaw)
+		const rightY = 0
+		const rightZ = -Math.sin(yaw)
+		
+		// Calculate target velocity from inputs
+		// Forward/back moves in look direction, strafe moves perpendicular
+		const targetVelX = (forwardX * pitchInput + rightX * strafeInput) * currentMoveSpeed
+		const targetVelY = (forwardY * pitchInput) * currentMoveSpeed + throttleInput * currentVerticalSpeed
+		const targetVelZ = (forwardZ * pitchInput + rightZ * strafeInput) * currentMoveSpeed
 
 		// Lerp velocity towards target
 		velocity.current.x = MathUtils.lerp(velocity.current.x, targetVelX, config.acceleration * dt)
@@ -237,8 +245,6 @@ const DroneCamera = () => {
 		// Apply rotation to camera - combine look direction with drone tilt for visual effect
 		// Create a combined euler that adds tilt to the look direction
 		combinedEuler.current.copy(euler.current)
-		combinedEuler.current.x -= droneTilt.current.pitch * 0.3 // Subtle pitch effect on camera
-		combinedEuler.current.x -= elevationTilt // Add downward tilt based on elevation (subtract to tilt down)
 		combinedEuler.current.z = -droneTilt.current.roll * 0.5 // Roll tilts the horizon
 		camera.quaternion.setFromEuler(combinedEuler.current)
 
