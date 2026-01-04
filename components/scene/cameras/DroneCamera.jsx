@@ -10,6 +10,7 @@ import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
 // Controls:
 //   W/S: Tilt forward/back (pitch) - moves drone forward/back
 //   A/D: Strafe left/right
+//   Q/E or Shift/Space: Descend/Ascend altitude (throttle)
 //   Arrow Up/Down: Increase/decrease altitude (throttle)
 //   Arrow Left/Right: Rotate left/right (yaw)
 //   Mouse: Look around (adjusts drone orientation)
@@ -134,8 +135,8 @@ const DroneCamera = () => {
 		if (keys.has('s')) pitchInput -= 1 // Tilt backward
 		if (keys.has('ArrowLeft')) yawInput += 1 // Rotate left
 		if (keys.has('ArrowRight')) yawInput -= 1 // Rotate right
-		if (keys.has('ArrowUp')) throttleInput += 1 // Ascend
-		if (keys.has('ArrowDown')) throttleInput -= 1 // Descend
+		if (keys.has('ArrowUp') || keys.has('e') || keys.has('E') || keys.has(' ')) throttleInput += 1 // Ascend
+		if (keys.has('ArrowDown') || keys.has('q') || keys.has('Q') || keys.has('Shift')) throttleInput -= 1 // Descend
 		if (keys.has('a')) strafeInput -= 1 // Strafe left
 		if (keys.has('d')) strafeInput += 1 // Strafe right
 
