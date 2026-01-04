@@ -91,6 +91,9 @@ const Water = () => {
 				// Set the size uniform to 10.0 like the example
 				shader.uniforms.size.value = 10.0
 			}
+
+			// Force material to recompile with the new onBeforeCompile
+			water.material.needsUpdate = true
 		}
 
 		return () => {
