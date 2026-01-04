@@ -5,7 +5,7 @@ import { WATER_LEVEL } from '../../../config/water'
 
 // Configuration values only - no behavior
 const WATER_CONFIG = {
-	maxParticles: 1500,
+	maxParticles: 500,
 	spawnMin: 1,
 	spawnMax: 16,
 	spawnMultiplier: 0.5,
