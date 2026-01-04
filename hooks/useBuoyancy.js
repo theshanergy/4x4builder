@@ -1,46 +1,9 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
-import { getFlowMapData } from '../utils/terrain/riverFlowMap'
-import { WATER_LEVEL, BUOYANCY_CONFIG } from '../config/water'
+import { getRiverSpline } from '../utils/terrain/features/river/spline'
+import { WATER_LEVEL, BUOYANCY_CONFIG, RIVER_CONFIG } from '../config/water'
 import { vehicleState } from '../store/gameStore'
-
-/**
- * Sample flow data from the flow map at a given world position
- * @param {Object} flowMapData - The flow map data object
- * @param {number} worldX - World X position
- * @param {number} worldZ - World Z position
- * @returns {Object} - Flow data { dirX, dirZ, speed, inRiver }
- */
-const sampleFlowMap = (flowMapData, worldX, worldZ) => {
-	if (!flowMapData) {
-		return { dirX: 0, dirZ: 0, speed: 0, inRiver: 0 }
-	}
-
-	const { data, resolution, worldSize } = flowMapData
-	const halfSize = worldSize / 2
-
-	// Convert world coords to texture coords
-	const u = (worldX + halfSize) / worldSize
-	const v = (worldZ + halfSize) / worldSize
-
-	// Clamp to texture bounds
-	const ux = Math.max(0, Math.min(0.999, u))
-	const vx = Math.max(0, Math.min(0.999, v))
-
-	// Get pixel coordinates
-	const px = Math.floor(ux * resolution)
-	const py = Math.floor(vx * resolution)
-	const idx = (py * resolution + px) * 4
-
-	// Decode flow data from texture
-	const flowX = (data[idx + 0] / 255) * 2 - 1 // Convert 0-255 to -1 to 1
-	const flowZ = (data[idx + 1] / 255) * 2 - 1
-	const speed = data[idx + 2] / 255 // 0-1
-	const inRiver = data[idx + 3] / 255 // 0-1
-
-	return { dirX: flowX, dirZ: flowZ, speed, inRiver }
-}
 
 /**
  * Buoyancy hook for vehicle water physics
@@ -51,8 +14,8 @@ const useBuoyancy = (vehicleRef) => {
 	// Track water intake (0 = dry, 1 = full/sunk)
 	const waterIntake = useRef(0)
 
-	// Get cached flow map data
-	const flowMapData = getFlowMapData()
+	// Get river spline (single source of truth)
+	const riverSpline = useMemo(() => getRiverSpline(), [])
 
 	// Reusable vectors
 	const vec = useMemo(() => new Vector3(), [])
@@ -130,20 +93,23 @@ const useBuoyancy = (vehicleRef) => {
 			vec.set(-angvel.x * angDragFactor, -angvel.y * angDragFactor, -angvel.z * angDragFactor)
 			vehicle.applyTorqueImpulse(vec, true)
 
-			// 5. Apply Water Flow Forces
-			// Sample flow map at vehicle position
-			const flow = sampleFlowMap(flowMapData, vehiclePos.x, vehiclePos.z)
+			// 5. Apply Water Flow Forces (using river spline directly)
+			// Get river data at vehicle position
+			const { distance, riverData } = riverSpline.getDistanceToRiver(vehiclePos.x, vehiclePos.z)
 
-			if (flow.speed > 0.01 && flow.inRiver > 0.01) {
+			// Only apply flow forces if we're in the river bounds and underwater
+			const halfWidth = riverData.width / 2
+			const isInRiverBounds = distance < halfWidth
+
+			if (isInRiverBounds && riverData.flowSpeed > 0.01) {
 				// Calculate flow force magnitude
-				// Force scales with: mass (heavier = more force), submersion, flow speed, and river presence
-				const flowForceMagnitude = mass * BUOYANCY_CONFIG.flowForce * submersionRatio * flow.speed * flow.inRiver * delta
-
-				// Apply force in flow direction
-				vec.set(flow.dirX * flowForceMagnitude, 0, flow.dirZ * flowForceMagnitude)
+				// Force scales with: mass, submersion (depth), and flow speed
+				const flowForceMagnitude = mass * BUOYANCY_CONFIG.flowForce * submersionRatio * riverData.flowSpeed * delta // Apply force in flow direction
+				const flowDir = riverData.direction
+				vec.set(flowDir.x * flowForceMagnitude, 0, flowDir.z * flowForceMagnitude)
 				vehicle.applyImpulse(vec, true)
 
-				// Optional: Apply slight torque to align with flow (makes vehicle want to point downstream)
+				// Apply slight torque to align with flow (makes vehicle want to point downstream)
 				const rotation = vehicle.rotation()
 				quat.copy(rotation)
 
@@ -152,11 +118,11 @@ const useBuoyancy = (vehicleRef) => {
 
 				// Calculate cross product between forward direction and flow direction
 				// This creates a torque that rotates the vehicle toward the flow direction
-				const flowDir = new Vector3(flow.dirX, 0, flow.dirZ).normalize()
-				const alignTorque = vec2.clone().cross(flowDir)
+				const flowDirVec = new Vector3(flowDir.x, 0, flowDir.z).normalize()
+				const alignTorque = vec2.clone().cross(flowDirVec)
 
 				// Scale torque by flow strength and apply it
-				const torqueMagnitude = mass * flow.speed * flow.inRiver * 0.5 * delta
+				const torqueMagnitude = mass * riverData.flowSpeed * 0.5 * delta
 				alignTorque.multiplyScalar(torqueMagnitude)
 
 				vec.set(alignTorque.x, alignTorque.y, alignTorque.z)

@@ -1,42 +1,10 @@
 // River flow map texture generation and caching
 // Generates a texture encoding river flow direction, speed, and river mask
+// Uses RiverSpline as single source of truth for all river properties
 
 import { DataTexture, RGBAFormat, LinearFilter, ClampToEdgeWrapping } from 'three'
-import { RIVER_CONFIG } from '../../config/water'
-
-/**
- * Calculate the Z position of the river center at a given X coordinate.
- * The river meanders using multiple sine waves plus noise for organic variation.
- */
-const getRiverCenterZ = (x, noise) => {
-	const { baseZ, primaryFrequency, primaryAmplitude, secondaryFrequency, secondaryAmplitude, tertiaryAmplitude } = RIVER_CONFIG
-	const primary = Math.sin(x * primaryFrequency) * primaryAmplitude
-	const secondary = Math.sin(x * secondaryFrequency + 1.5) * secondaryAmplitude
-	const tertiary = noise ? noise.perlin2(x * 0.003, 0.5) * tertiaryAmplitude : 0
-	return baseZ + primary + secondary + tertiary
-}
-
-/**
- * Calculate river width at a given X coordinate.
- * Width varies slightly using noise for natural appearance.
- */
-const getRiverWidth = (x, noise) => {
-	const { width, widthVariation } = RIVER_CONFIG
-	const variation = noise ? noise.perlin2(x * 0.005 + 100, 0.5) * widthVariation : 0
-	return width + variation
-}
-
-/**
- * Calculate the derivative of river meander (slope of river path)
- * This tells us the flow direction at any X position
- */
-const getRiverMeanderDerivative = (x) => {
-	const { primaryFrequency, primaryAmplitude, secondaryFrequency, secondaryAmplitude } = RIVER_CONFIG
-	// Derivative of sin(x * freq) * amp = cos(x * freq) * freq * amp
-	const primaryDeriv = Math.cos(x * primaryFrequency) * primaryFrequency * primaryAmplitude
-	const secondaryDeriv = Math.cos(x * secondaryFrequency + 1.5) * secondaryFrequency * secondaryAmplitude
-	return primaryDeriv + secondaryDeriv
-}
+import { RIVER_CONFIG } from '../../../../config/water'
+import { getRiverSpline } from './spline'
 
 /**
  * Generate a flow map texture for the water shader.
@@ -54,11 +22,12 @@ const getRiverMeanderDerivative = (x) => {
 export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 	const data = new Uint8Array(resolution * resolution * 4)
 	const halfSize = worldSize / 2
-	const pixelSize = worldSize / resolution
+
+	// Get the river spline (single source of truth)
+	const riverSpline = getRiverSpline()
 
 	// River influence extends beyond the visible water for smooth blending
-	const { bankSlope } = RIVER_CONFIG
-	const blendDistance = bankSlope * 3
+	const blendDistance = RIVER_CONFIG.transition * 3
 
 	// Ocean transition configuration (imported from config)
 	const oceanTransitionStart = 4500 // Start transitioning to ocean flow
@@ -72,9 +41,10 @@ export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 			const worldX = (x / resolution) * worldSize - halfSize
 			const worldZ = (y / resolution) * worldSize - halfSize
 
-			// Get river geometry at this X position (without noise for flow map - deterministic)
-			const riverZ = getRiverCenterZ(worldX, null)
-			const riverWidth = getRiverWidth(worldX, null)
+			// Get river geometry at this X position from spline
+			const riverData = riverSpline.getRiverDataAt(worldX)
+			const riverZ = riverData.z
+			const riverWidth = riverData.width
 			const halfWidth = riverWidth / 2
 
 			// Distance from river center
@@ -101,24 +71,15 @@ export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 				riverInfluence *= oceanFade
 			}
 
-			// Calculate flow direction (tangent to river path)
-			// River flows in +X direction, with Z deviation based on meander
-			const meanderSlope = getRiverMeanderDerivative(worldX)
-			let flowX = 1
-			let flowZ = meanderSlope
+			// Get flow direction from spline (tangent to river path)
+			const direction = riverData.direction
+			let flowX = direction.x
+			let flowZ = direction.z
 
-			// Normalize flow direction
-			const flowLen = Math.sqrt(flowX * flowX + flowZ * flowZ)
-			flowX /= flowLen
-			flowZ /= flowLen
-
-			// Flow speed varies - faster in center, slower at edges
-			// Also add some variation based on river curves (faster on outside of bends)
+			// Flow speed varies - use spline's base speed, modified by position
+			// Faster in center, slower at edges
 			const centerFactor = distFromRiver < halfWidth ? 1 - (distFromRiver / halfWidth) * 0.3 : 0.7
-			const flowSpeed = riverInfluence * centerFactor
-
-			// Add slight acceleration on outer bends
-			const bendFactor = 1 + Math.abs(meanderSlope) * 0.2
+			const flowSpeed = riverInfluence * centerFactor * riverData.flowSpeed
 
 			// Encode to texture:
 			// R = flow X direction (0.5 = none, 0 = -1, 1 = +1)
@@ -127,7 +88,7 @@ export const generateFlowMap = (resolution = 512, worldSize = 4000) => {
 			// A = river mask (0 = ocean, 1 = river)
 			const encodedFlowX = Math.floor(((flowX * riverInfluence) * 0.5 + 0.5) * 255)
 			const encodedFlowZ = Math.floor(((flowZ * riverInfluence) * 0.5 + 0.5) * 255)
-			const encodedSpeed = Math.floor(flowSpeed * bendFactor * 255)
+			const encodedSpeed = Math.floor(flowSpeed * 255)
 			const encodedMask = Math.floor(riverInfluence * 255)
 
 			data[idx + 0] = encodedFlowX

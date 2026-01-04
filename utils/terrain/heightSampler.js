@@ -6,7 +6,7 @@ import { TERRAIN_CONFIG } from '../../config/terrain'
 import { WATER_LEVEL, RIVER_CONFIG } from '../../config/water'
 import { getMountainContribution } from './features/mountains'
 import { blendOceanDepth } from './features/ocean'
-import { getRiverBlendFactor } from './features/river'
+import { getRiverBlendFactor } from './features/river/terrain'
 import { getStagingBlend } from './features/staging'
 
 // Epsilon for numerical gradient approximation
@@ -56,7 +56,7 @@ export const createTerrainHelpers = (noise) => {
 		let combinedHeight = baseHeight * (1 - mountainInfluence * 0.7) + mountainHeight
 
 		// Apply river carving BEFORE ocean transition so river cuts through beach
-		const riverBlendFactor = getRiverBlendFactor(worldX, worldZ, noise)
+		const riverBlendFactor = getRiverBlendFactor(worldX, worldZ)
 		if (riverBlendFactor > 0) {
 			// Carve river bed into terrain - depth is relative to water level
 			// At river center (blendFactor=1): 95% terrain suppressed, 5% variance

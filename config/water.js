@@ -20,19 +20,11 @@ export const RIVER_CONFIG = {
 	endX: OCEAN_BOUNDARY,
 	baseZ: 0, // Center line of the river (middle of valley)
 
-	// Meandering parameters
-	primaryFrequency: 0.0015,
-	primaryAmplitude: 180,
-	secondaryFrequency: 0.006,
-	secondaryAmplitude: 50,
-	tertiaryFrequency: 0.02,
-	tertiaryAmplitude: 15,
-
 	// River dimensions
-	width: 75, // Base width of river
+	width: 60, // Base width of river
+	transition: 40, // Width of bank transition zone (50% above water, 50% below)
 	widthVariation: 15, // Random width variation
-	depth: 2.5, // Depth below WATER_LEVEL
-	bankSlope: 25, // Width of the sloped banks
+	depth: 2.5, // Base depth below WATER_LEVEL
 
 	// Flow map texture configuration
 	flowMap: {
