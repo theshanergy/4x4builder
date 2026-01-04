@@ -5,16 +5,18 @@ import { TERRAIN_LAYERS } from '../../../../config/terrain'
 // Uniform field definitions - maps layer properties to shader uniform names and values
 const UNIFORM_FIELDS = [
 	{ key: 'TextureScale', path: 'textureScale', condition: () => true },
-	{ key: 'DistanceScaleFactor', path: 'lod.distanceScaleFactor', condition: (layer) => layer.lod },
-	{ key: 'LODLevels', path: 'lod.levels', condition: (layer) => layer.lod },
 	{ key: 'NormalScale', path: 'normalScale', condition: (layer) => layer.normalScale !== undefined },
+	{ key: 'LODDistance', path: 'lod.distance', condition: (layer) => layer.lod },
+	{ key: 'LODLevels', path: 'lod.levels', condition: (layer) => layer.lod },
 	{ key: 'HeightMin', path: 'height.min', condition: (layer) => layer.height?.min !== undefined },
 	{ key: 'HeightMax', path: 'height.max', condition: (layer) => layer.height?.max !== undefined },
+	{ key: 'HeightTransitionMin', path: 'height.transitionMin', condition: (layer) => layer.height?.min !== undefined, default: 20.0 },
+	{ key: 'HeightTransitionMax', path: 'height.transitionMax', condition: (layer) => layer.height?.max !== undefined, default: 20.0 },
 	{ key: 'HeightInfluence', path: 'height.influence', condition: (layer) => layer.height },
 	{ key: 'SlopeMin', path: 'slope.min', condition: (layer) => layer.slope?.min !== undefined },
 	{ key: 'SlopeMax', path: 'slope.max', condition: (layer) => layer.slope?.max !== undefined },
 	{ key: 'SlopeInfluence', path: 'slope.influence', condition: (layer) => layer.slope },
-	{ key: 'SlopeRange', path: 'slope.range', condition: (layer) => layer.slope, default: 0.1 },
+	{ key: 'SlopeTransition', path: 'slope.transition', condition: (layer) => layer.slope, default: 0.1 },
 ]
 
 // Get nested property value from object using dot notation
@@ -83,20 +85,20 @@ const generateBlendCode = (layer, index) => {
 			// Range: visible between min and max
 			code += `
 			// Height: visible between min and max
-			factor = smoothstep(${prefix}HeightMin - 20.0, ${prefix}HeightMin, vWorldPos.y);
-			factor *= 1.0 - smoothstep(${prefix}HeightMax, ${prefix}HeightMax + 20.0, vWorldPos.y);
+			factor = smoothstep(${prefix}HeightMin - ${prefix}HeightTransitionMin, ${prefix}HeightMin, vWorldPos.y);
+			factor *= 1.0 - smoothstep(${prefix}HeightMax, ${prefix}HeightMax + ${prefix}HeightTransitionMax, vWorldPos.y);
 			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
 		} else if (hasMin) {
 			// Only min: visible above min
 			code += `
 			// Height: visible above min
-			factor = smoothstep(${prefix}HeightMin - 40.0, ${prefix}HeightMin + 40.0, vWorldPos.y);
+			factor = smoothstep(${prefix}HeightMin - ${prefix}HeightTransitionMin, ${prefix}HeightMin + ${prefix}HeightTransitionMin, vWorldPos.y);
 			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
 		} else if (hasMax) {
 			// Only max: visible below max
 			code += `
 			// Height: visible below max
-			factor = 1.0 - smoothstep(${prefix}HeightMax - 20.0, ${prefix}HeightMax + 20.0, vWorldPos.y);
+			factor = 1.0 - smoothstep(${prefix}HeightMax - ${prefix}HeightTransitionMax, ${prefix}HeightMax + ${prefix}HeightTransitionMax, vWorldPos.y);
 			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
 		}
 	}
@@ -114,20 +116,20 @@ const generateBlendCode = (layer, index) => {
 			// Range: visible between min and max slope
 			code += `
 			// Slope: visible between min and max
-			factor = smoothstep(${prefix}SlopeMin - ${prefix}SlopeRange, ${prefix}SlopeMin, slope${index});
-			factor *= 1.0 - smoothstep(${prefix}SlopeMax, ${prefix}SlopeMax + ${prefix}SlopeRange, slope${index});
+			factor = smoothstep(${prefix}SlopeMin - ${prefix}SlopeTransition, ${prefix}SlopeMin, slope${index});
+			factor *= 1.0 - smoothstep(${prefix}SlopeMax, ${prefix}SlopeMax + ${prefix}SlopeTransition, slope${index});
 			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
 		} else if (hasMin) {
 			// Only min: visible on steeper slopes (above min)
 			code += `
 			// Slope: visible on steep slopes (above min)
-			factor = smoothstep(${prefix}SlopeMin - ${prefix}SlopeRange, ${prefix}SlopeMin + ${prefix}SlopeRange, slope${index});
+			factor = smoothstep(${prefix}SlopeMin - ${prefix}SlopeTransition, ${prefix}SlopeMin + ${prefix}SlopeTransition, slope${index});
 			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
 		} else if (hasMax) {
 			// Only max: visible on flatter slopes (below max)
 			code += `
 			// Slope: visible on flat slopes (below max)
-			factor = 1.0 - smoothstep(${prefix}SlopeMax - ${prefix}SlopeRange, ${prefix}SlopeMax + ${prefix}SlopeRange, slope${index});
+			factor = 1.0 - smoothstep(${prefix}SlopeMax - ${prefix}SlopeTransition, ${prefix}SlopeMax + ${prefix}SlopeTransition, slope${index});
 			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
 		}
 	}
@@ -160,7 +162,7 @@ const generateSamplingCode = (layer, index) => {
 		// Triplanar projection
 		if (layer.lod) {
 			code += `
-			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}LODDistance, ${prefix}LODLevels);
 			layer${index}Color = textureTriplanarLOD(${prefix}Texture, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, true, ${useNoTile});
 			layer${index}Normal = normalTriplanarLOD(${prefix}NormalMap, vWorldPos, vWorldNormal, ${prefix}TextureScale, lodInfo${index}, ${useNoTile});`
 		} else {
@@ -172,7 +174,7 @@ const generateSamplingCode = (layer, index) => {
 		// World-space UV mapping
 		if (layer.lod) {
 			code += `
-			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}DistanceScaleFactor, ${prefix}LODLevels);
+			vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}LODDistance, ${prefix}LODLevels);
 			float scaleLower${index} = ${prefix}TextureScale / lodInfo${index}.x;
 			float scaleUpper${index} = ${prefix}TextureScale / lodInfo${index}.y;
 			float lodBlend${index} = lodInfo${index}.z;
@@ -245,7 +247,8 @@ const generateNormalBlendingCode = (layers) => {
 	}
 
 	code += `
-	normal = blendedNormal;`
+	// Transform world-space normal to view space for lighting calculations
+	normal = normalize((viewMatrix * vec4(blendedNormal, 0.0)).xyz);`
 
 	return code
 }
