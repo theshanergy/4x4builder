@@ -2,7 +2,7 @@ import { useRef, useMemo, memo, useEffect, useReducer } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion, CatmullRomCurve3, DoubleSide, Color, BufferGeometry, BufferAttribute, Object3D, InstancedMesh, ShaderMaterial } from 'three'
 
-import useGameStore, { vehicleState } from '../../../store/gameStore'
+import useGameStore from '../../../store/gameStore'
 import { sunDirection, sunColor } from '../../../config/environment'
 import grassVertexShader from '../../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../../shaders/grass.frag.glsl'
@@ -378,8 +378,8 @@ const Grass = memo(() => {
 		frameCount.current++
 		if (frameCount.current % 10 !== 0) return
 
-		// Update active chunks based on vehicle position
-		const targetPos = vehicleState.position
+		// Update active chunks based on camera position
+		const targetPos = state.camera.position
 		const currentChunkX = Math.floor(targetPos.x / GRASS_CHUNK_SIZE)
 		const currentChunkZ = Math.floor(targetPos.z / GRASS_CHUNK_SIZE)
 
