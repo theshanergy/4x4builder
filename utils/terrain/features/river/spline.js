@@ -79,6 +79,12 @@ export class RiverSpline {
 		let currentZ = RIVER_CONFIG.baseZ
 		let lastAngle = 0 // Track direction for smooth curves
 
+		// Spawn point avoidance parameters
+		const spawnX = 0
+		const spawnZ = 0
+		const avoidanceRadius = 400 // Distance to push river away from spawn
+		const avoidanceStrength = 250 // How far to push the river
+
 		for (let i = 0; i < numPoints; i++) {
 			const t = i / (numPoints - 1) // 0 to 1
 			const x = this.startX + t * totalDistance
@@ -93,6 +99,17 @@ export class RiverSpline {
 			if (distFromCenter > oceanStart) {
 				const oceanT = Math.min(1, (distFromCenter - oceanStart) / oceanTransition)
 				interiorFactor = 1 - oceanT * oceanT * (3 - 2 * oceanT) // smoothstep
+			}
+
+			// Calculate spawn point avoidance
+			const distToSpawnX = Math.abs(x - spawnX)
+			let spawnAvoidanceOffset = 0
+			if (distToSpawnX < avoidanceRadius) {
+				// Smooth falloff using smoothstep
+				const falloff = 1 - (distToSpawnX / avoidanceRadius)
+				const smoothFalloff = falloff * falloff * (3 - 2 * falloff)
+				// Push river to positive Z side of spawn
+				spawnAvoidanceOffset = smoothFalloff * avoidanceStrength
 			}
 
 			// Generate meandering Z offset using multiple frequencies
@@ -114,7 +131,10 @@ export class RiverSpline {
 				lastAngle = lastAngle * 0.7 + targetAngle * 0.3
 				const zOffset = noise1 + noise2 + noise3
 
-				currentZ = RIVER_CONFIG.baseZ + zOffset
+				currentZ = RIVER_CONFIG.baseZ + zOffset + spawnAvoidanceOffset
+			} else {
+				// Apply spawn avoidance to start/end points too
+				currentZ = RIVER_CONFIG.baseZ + spawnAvoidanceOffset
 			}
 
 			// Width varies along river (wider in some sections, narrower in others)
