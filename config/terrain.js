@@ -24,13 +24,28 @@ export const CONTINENTAL_CONFIG = {
 	// Threshold below which terrain becomes water (-1 to 1 range)
 	// -0.15 gives roughly 40% water coverage
 	waterThreshold: -0.15,
-	// Width of the beach/shore transition zone
-	beachTransition: 350,
+	// Beach width in world units - distance from water's edge where beach extends inland
+	beachWidth: 150,
+	// Beach slope - how much the terrain rises per unit of distance from water's edge
+	// 0.02 = gentle slope (2 units up per 100 units from water)
+	// 0.05 = moderate slope (5 units up per 100 units from water)
+	// 0.1 = steep slope (10 units up per 100 units from water)
+	beachSlope: 0.03,
+	// Beach transition smoothness - controls how gradually the beach blends with terrain
+	// 1 = linear transition (hard edge)
+	// 2 = quadratic (smooth)
+	// 3 = cubic (very smooth)
+	beachSmoothness: 2,
+	// Underwater slope - how much the terrain drops per unit of distance into water
+	// Similar scale to beachSlope
+	underwaterSlope: 0.02,
+	// Maximum underwater depth
+	maxDepth: 12,
 	// How much continental value affects base terrain height
 	heightInfluence: 0.6,
 	// Secondary detail scale for more interesting coastlines
 	detailScale: 0.0003,
-	detailStrength: 0.3,
+	detailStrength: 0.5,
 }
 
 // Mountain configuration - now procedural based on noise

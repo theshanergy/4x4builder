@@ -66,78 +66,31 @@ export const getContinentalValue = (worldX, worldZ, noise) => {
 }
 
 /**
- * Get the distance to the nearest water edge (continental threshold).
- * Positive = on land, negative = in water.
- * The magnitude indicates how far from the shore.
- *
- * @param {number} continentalValue - The continental noise value at this position
- * @returns {number} Signed distance to shore (positive = land, negative = water)
- */
-export const getShoreDistance = (continentalValue) => {
-	const { waterThreshold, beachTransition } = CONTINENTAL_CONFIG
-
-	// Distance from threshold, scaled by beach transition width
-	// This gives an approximate "distance to shore" in world units
-	const normalizedDistance = continentalValue - waterThreshold
-
-	// Scale to approximate world units (rough estimation)
-	// Continental noise changes by ~2 over its full scale, so:
-	// distance in noise space * (1/scale) * 0.5 ≈ world distance
-	return normalizedDistance * beachTransition * 3
-}
-
-/**
  * Get the beach blend factor for terrain near water edges.
- * Returns 0 at water edge, 1 when fully inland.
- * Used to flatten terrain near shores and create sandy beaches.
+ * Returns 0 at water edge, 1 when fully inland beyond beach zone.
+ * Used to suppress mountains near shores.
  *
  * @param {number} continentalValue - The continental noise value at this position
  * @returns {number} Beach blend factor (0 = at shore, 1 = inland)
  */
 export const getBeachBlend = (continentalValue) => {
-	const { waterThreshold, beachTransition } = CONTINENTAL_CONFIG
+	const { waterThreshold, beachWidth, scale } = CONTINENTAL_CONFIG
 
-	// How far above the water threshold (in noise units)
-	const aboveWater = continentalValue - waterThreshold
+	// Calculate approximate distance from water's edge in world units
+	const continentalDifference = continentalValue - waterThreshold
+	const approxDistance = continentalDifference / scale / 0.4
 
-	// Beach zone extends from threshold to threshold + beachZone
-	// beachTransition is in world units, convert to approximate noise units
-	const beachZoneNoise = beachTransition * CONTINENTAL_CONFIG.scale * 2
-
-	if (aboveWater <= 0) {
+	if (approxDistance <= 0) {
 		return 0 // In water or at edge
 	}
 
-	if (aboveWater >= beachZoneNoise) {
-		return 1 // Fully inland
+	if (approxDistance >= beachWidth) {
+		return 1 // Fully inland beyond beach
 	}
 
 	// Smooth transition using smoothstep
-	const t = aboveWater / beachZoneNoise
+	const t = approxDistance / beachWidth
 	return t * t * (3 - 2 * t)
-}
-
-/**
- * Get the water depth factor for positions below the continental threshold.
- * Returns 0 at shore, increasing toward 1 for deeper water.
- *
- * @param {number} continentalValue - The continental noise value at this position
- * @returns {number} Water depth factor (0 = shore, 1 = deep water)
- */
-export const getWaterDepthFactor = (continentalValue) => {
-	const { waterThreshold } = CONTINENTAL_CONFIG
-
-	// How far below the water threshold
-	const belowWater = waterThreshold - continentalValue
-
-	if (belowWater <= 0) {
-		return 0 // On land
-	}
-
-	// Depth increases with distance from shore
-	// Cap at 1.0 for very deep water (continental value around -0.5 or lower)
-	const depthRange = 0.4 // Continental range over which depth goes from 0 to 1
-	return Math.min(1, belowWater / depthRange)
 }
 
 /**
