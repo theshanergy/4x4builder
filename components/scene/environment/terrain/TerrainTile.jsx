@@ -3,7 +3,6 @@ import { useMemo, useEffect, useRef, memo } from 'react'
 import { TILE_RESOLUTION } from '../../../../config/terrain'
 import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
 import TerrainMaterial from './TerrainMaterial'
-import TerrainCollider from './TerrainCollider'
 
 // Default edge stitch info (no stitching needed)
 const DEFAULT_EDGE_STITCH_INFO = {
@@ -23,8 +22,7 @@ const arePropsEqual = (prevProps, nextProps) => {
 		prevProps.node.key !== nextProps.node.key ||
 		prevProps.node.size !== nextProps.node.size ||
 		prevProps.node.centerX !== nextProps.node.centerX ||
-		prevProps.node.centerZ !== nextProps.node.centerZ ||
-		prevProps.hasCollider !== nextProps.hasCollider
+		prevProps.node.centerZ !== nextProps.node.centerZ
 	) {
 		return false
 	}
@@ -63,10 +61,9 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
  * @param {Object} props.terrainHelpers - Height/normal sampling functions
  * @param {Object} props.layerTextures - Textures for each terrain layer { layerName: { albedo, normal } }
- * @param {boolean} props.hasCollider - Whether to include physics collider
  * @param {Object} props.edgeStitchInfo - Edge stitching configuration
  */
-const TerrainTile = memo(({ node, terrainHelpers, layerTextures, hasCollider = false, edgeStitchInfo }) => {
+const TerrainTile = memo(({ node, terrainHelpers, layerTextures, edgeStitchInfo }) => {
 	const { centerX, centerZ } = node
 	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
 
@@ -92,22 +89,13 @@ const TerrainTile = memo(({ node, terrainHelpers, layerTextures, hasCollider = f
 		}
 	}, [geometry])
 
-	const terrainMesh = (
-		<mesh geometry={geometry} receiveShadow>
-			<TerrainMaterial layerTextures={layerTextures} />
-		</mesh>
+	return (
+		<group position={position}>
+			<mesh geometry={geometry} receiveShadow>
+				<TerrainMaterial layerTextures={layerTextures} />
+			</mesh>
+		</group>
 	)
-
-	// Render with or without physics collider
-	if (hasCollider) {
-		return (
-			<TerrainCollider node={node} terrainHelpers={terrainHelpers} position={position}>
-				{terrainMesh}
-			</TerrainCollider>
-		)
-	}
-
-	return <group position={position}>{terrainMesh}</group>
 }, arePropsEqual)
 
 export default TerrainTile

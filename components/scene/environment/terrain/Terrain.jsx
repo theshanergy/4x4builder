@@ -7,6 +7,7 @@ import { TERRAIN_LAYERS } from '../../../../config/terrain'
 import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
 import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
 import useGameStore from '../../../../store/gameStore'
+import TerrainCollider from './TerrainCollider'
 import TerrainTile from './TerrainTile'
 
 // Main terrain component
@@ -46,8 +47,9 @@ const Terrain = () => {
 
 	return (
 		<group name='Terrain'>
-			{leafTiles.map(({ node, hasCollider, edgeStitchInfo }) => (
-				<TerrainTile key={node.key} node={node} terrainHelpers={terrainHelpers} layerTextures={layerTextures} hasCollider={hasCollider} edgeStitchInfo={edgeStitchInfo} />
+			<TerrainCollider terrainHelpers={terrainHelpers} />
+			{leafTiles.map(({ node, edgeStitchInfo }) => (
+				<TerrainTile key={node.key} node={node} terrainHelpers={terrainHelpers} layerTextures={layerTextures} edgeStitchInfo={edgeStitchInfo} />
 			))}
 		</group>
 	)

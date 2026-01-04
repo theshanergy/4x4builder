@@ -1,24 +1,24 @@
 import { useState, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import { vehicleState } from '../store/gameStore'
 import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS } from '../config/terrain'
 import { QuadtreeNode, getEdgeStitchInfo } from '../utils/terrain/quadtree'
 
 /**
  * Custom hook to manage quadtree LOD system
  * Handles root creation, updates, leaf collection, and edge stitching
- * 
- * @returns {Array} Array of leaf tiles with node data, collider flag, and edge stitch info
+ * LOD follows camera position (for drone camera, etc.)
+ *
+ * @returns {Array} Array of leaf tiles with node data and edge stitch info
  */
 const useTerrainQuadtree = () => {
 	const [leafTiles, setLeafTiles] = useState([])
 	const lastUpdatePosition = useRef({ x: null, z: null })
 	const quadtreeRoots = useRef(new Map())
 
-	// Update quadtree based on vehicle position each frame
-	useFrame(() => {
-		const centerPosition = vehicleState.position
+	// Update quadtree based on camera position each frame
+	useFrame(({ camera }) => {
+		const centerPosition = camera.position
 
 		// Use a smaller threshold for updates
 		const updateThreshold = QUADTREE_MIN_SIZE / 2
@@ -83,7 +83,6 @@ const useTerrainQuadtree = () => {
 		const tilesWithStitching = allLeaves.map((node) => ({
 			node,
 			edgeStitchInfo: getEdgeStitchInfo(node, allNodes, QUADTREE_MIN_SIZE),
-			hasCollider: node.size === QUADTREE_MIN_SIZE, // Only smallest tiles get physics
 		}))
 
 		// Update state only if tiles actually changed
