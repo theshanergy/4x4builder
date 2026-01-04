@@ -82,8 +82,8 @@ export class RiverSpline {
 		// Spawn point avoidance parameters
 		const spawnX = 0
 		const spawnZ = 0
-		const avoidanceRadius = 400 // Distance to push river away from spawn
-		const avoidanceStrength = 250 // How far to push the river
+		const avoidanceRadius = 200 // Distance to push river away from spawn
+		const avoidanceStrength = 50 // How far to push the river
 
 		for (let i = 0; i < numPoints; i++) {
 			const t = i / (numPoints - 1) // 0 to 1
