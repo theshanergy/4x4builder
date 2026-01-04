@@ -1,6 +1,6 @@
 import { useRef, useMemo, memo, useEffect, useReducer } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Vector3, Quaternion, CatmullRomCurve3, DoubleSide, Color, BufferGeometry, BufferAttribute, Object3D, InstancedMesh, ShaderMaterial } from 'three'
+import { Vector3, Quaternion, CatmullRomCurve3, DoubleSide, Color, BufferGeometry, BufferAttribute, Object3D, InstancedMesh, ShaderMaterial, Frustum, Matrix4 } from 'three'
 
 import useGameStore from '../../../store/gameStore'
 import { sunDirection, sunColor } from '../../../config/environment'
@@ -49,6 +49,7 @@ const BLADE_CONFIG = {
 const GRASS_CHUNK_SIZE = 16
 const GRASS_VIEW_DISTANCE = 60
 const GRASS_LOD_DISTANCE = 35 // Distance at which to reduce blade count
+const GRASS_FRUSTUM_BUFFER = 1.3 // Multiplier to extend frustum (prevents pop-in)
 
 const GRASS_CONFIG = {
 	patchesPerChunk: { min: 4, max: 7 },
@@ -337,6 +338,10 @@ const Grass = memo(() => {
 
 	const chunkCache = useRef(new Map())
 	const frameCount = useRef(0)
+	const frustum = useRef(new Frustum())
+	const projScreenMatrix = useRef(new Matrix4())
+	// Pre-allocate scratch vector for frustum checks
+	const chunkCenterScratch = useRef(new Vector3())
 	// Use useReducer for batch updates instead of useState (more efficient for arrays)
 	const [activeChunks, updateChunks] = useReducer((_, chunks) => chunks, [])
 
@@ -374,12 +379,27 @@ const Grass = memo(() => {
 	useFrame((state) => {
 		sharedMaterial.uniforms.uTime.value = state.clock.elapsedTime
 
-		// Throttle chunk updates to every 10 frames
+		// Throttle chunk updates to every 5 frames (was 10, reduced for faster movement response)
 		frameCount.current++
-		if (frameCount.current % 10 !== 0) return
+		if (frameCount.current % 5 !== 0) return
 
-		// Update active chunks based on camera position
-		const targetPos = state.camera.position
+		// Update frustum with buffer zone to prevent pop-in
+		const camera = state.camera
+
+		// Create an expanded frustum by temporarily modifying camera far plane
+		const originalFar = camera.far
+		camera.far *= GRASS_FRUSTUM_BUFFER
+		camera.updateProjectionMatrix()
+
+		projScreenMatrix.current.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+		frustum.current.setFromProjectionMatrix(projScreenMatrix.current)
+
+		// Restore original camera settings
+		camera.far = originalFar
+		camera.updateProjectionMatrix()
+
+		// Update active chunks based on camera position and frustum
+		const targetPos = camera.position
 		const currentChunkX = Math.floor(targetPos.x / GRASS_CHUNK_SIZE)
 		const currentChunkZ = Math.floor(targetPos.z / GRASS_CHUNK_SIZE)
 
@@ -387,6 +407,10 @@ const Grass = memo(() => {
 		const newActiveChunkKeys = new Set()
 		const viewDistSq = GRASS_VIEW_DISTANCE * GRASS_VIEW_DISTANCE
 		const lodDistSq = GRASS_LOD_DISTANCE * GRASS_LOD_DISTANCE
+
+		// Use pre-allocated scratch vector for frustum checks
+		const chunkCenter = chunkCenterScratch.current
+		const chunkRadius = GRASS_CHUNK_SIZE * 0.866 // sqrt(0.5^2 + 0.5^2) * chunkSize
 
 		let hasChanges = false
 
@@ -403,27 +427,34 @@ const Grass = memo(() => {
 				const dz = targetPos.z - chunkCenterZ
 				const distSq = dx * dx + dz * dz
 
-				if (distSq <= viewDistSq) {
-					newActiveChunkKeys.add(chunkKey)
+				// Skip if beyond view distance
+				if (distSq > viewDistSq) continue
 
-					// Calculate LOD factor based on distance
-					const lodFactor = distSq <= lodDistSq ? 1.0 : 0.5
+				// Check if chunk is in expanded frustum (frustum culling with extra tolerance)
+				chunkCenter.set(chunkCenterX, 0, chunkCenterZ)
+				// Use a larger radius for frustum culling to be more lenient during fast movement
+				const cullingRadius = chunkRadius * 1.5
+				if (!frustum.current.intersectsSphere({ center: chunkCenter, radius: cullingRadius })) continue
 
-					let chunkData = chunkCache.current.get(chunkKey)
-					if (!chunkData) {
-						chunkData = {
-							key: chunkKey,
-							position: [chunkX * GRASS_CHUNK_SIZE, 0, chunkZ * GRASS_CHUNK_SIZE],
-							lodFactor,
-						}
-						chunkCache.current.set(chunkKey, chunkData)
-						hasChanges = true
-					} else if (chunkData.lodFactor !== lodFactor) {
-						// Update LOD if changed
-						chunkData = { ...chunkData, lodFactor }
-						chunkCache.current.set(chunkKey, chunkData)
-						hasChanges = true
+				newActiveChunkKeys.add(chunkKey)
+
+				// Calculate LOD factor based on distance
+				const lodFactor = distSq <= lodDistSq ? 1.0 : 0.5
+
+				let chunkData = chunkCache.current.get(chunkKey)
+				if (!chunkData) {
+					chunkData = {
+						key: chunkKey,
+						position: [chunkX * GRASS_CHUNK_SIZE, 0, chunkZ * GRASS_CHUNK_SIZE],
+						lodFactor,
 					}
+					chunkCache.current.set(chunkKey, chunkData)
+					hasChanges = true
+				} else if (chunkData.lodFactor !== lodFactor) {
+					// Update LOD if changed
+					chunkData = { ...chunkData, lodFactor }
+					chunkCache.current.set(chunkKey, chunkData)
+					hasChanges = true
 				}
 			}
 		}
