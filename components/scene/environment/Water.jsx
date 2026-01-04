@@ -1,103 +1,129 @@
 import { useRef, useMemo, useEffect } from 'react'
-import { CircleGeometry, ShaderMaterial, DoubleSide, DataTexture, RGBAFormat, FloatType } from 'three'
-import { useFrame } from '@react-three/fiber'
+import { Vector3, Vector2, PlaneGeometry, TextureLoader, RepeatWrapping } from 'three'
+import { useFrame, extend } from '@react-three/fiber'
+import { Water as StdWater } from 'three-stdlib'
 
-import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
-import { WATER_LEVEL, FLOW_MAP_CONFIG } from '../../../config/water'
+import { WATER_LEVEL } from '../../../config/water'
+import { sunDirection } from '../../../config/environment'
 
-import waterVertexShader from '../../../shaders/water.vert.glsl'
-import waterFragmentShader from '../../../shaders/water.frag.glsl'
+import vertexShader from '../../../shaders/water.vert.glsl'
+import fragmentShader from '../../../shaders/water.frag.glsl'
+
+extend({ Water: StdWater })
 
 // Water plane size - large enough to cover visible area plus buffer
-const WATER_RADIUS = 3000
+const WATER_SIZE = 4096
 
-/**
- * Create a simple procedural flow map for calm water.
- * In the infinite terrain system, water bodies are calm lakes/seas
- * without strong directional flow, so we use a neutral flow map.
- */
-const createCalmFlowMap = () => {
-	const resolution = FLOW_MAP_CONFIG.resolution
-	const data = new Float32Array(resolution * resolution * 4)
+// Gerstner wave configuration - matching the example exactly
+const WAVES = [
+	{ direction: 0, steepness: 0.15, wavelength: 100 },
+	{ direction: 30, steepness: 0.15, wavelength: 50 },
+	{ direction: 60, steepness: 0.15, wavelength: 25 },
+]
 
-	// Fill with neutral flow (0.5, 0.5 = no flow in normalized space)
-	// Add very subtle variation for visual interest
-	for (let i = 0; i < resolution * resolution; i++) {
-		const idx = i * 4
-		// Slight random variation for natural look
-		data[idx] = 0.5 + (Math.random() - 0.5) * 0.05 // R: flow X
-		data[idx + 1] = 0.5 + (Math.random() - 0.5) * 0.05 // G: flow Z
-		data[idx + 2] = 1.0 // B: flow speed (calm)
-		data[idx + 3] = 1.0 // A: unused
-	}
+// Gerstner Wave calculation for buoyancy
+export const getWaveInfo = (x, z, time) => {
+	const pos = new Vector3()
+	const tangent = new Vector3(1, 0, 0)
+	const binormal = new Vector3(0, 0, 1)
 
-	const texture = new DataTexture(data, resolution, resolution, RGBAFormat, FloatType)
-	texture.needsUpdate = true
-	return texture
+	WAVES.forEach((w) => {
+		const k = (Math.PI * 2.0) / w.wavelength
+		const c = Math.sqrt(9.8 / k)
+		const d = new Vector2(Math.sin((w.direction * Math.PI) / 180), -Math.cos((w.direction * Math.PI) / 180))
+		const f = k * (d.dot(new Vector2(x, z)) - c * time)
+		const a = w.steepness / k
+
+		pos.x += d.x * (a * Math.cos(f))
+		pos.y += a * Math.sin(f)
+		pos.z += d.y * (a * Math.cos(f))
+
+		tangent.x += -d.x * d.x * (w.steepness * Math.sin(f))
+		tangent.y += d.x * (w.steepness * Math.cos(f))
+		tangent.z += -d.x * d.y * (w.steepness * Math.sin(f))
+
+		binormal.x += -d.x * d.y * (w.steepness * Math.sin(f))
+		binormal.y += d.y * (w.steepness * Math.cos(f))
+		binormal.z += -d.y * d.y * (w.steepness * Math.sin(f))
+	})
+
+	const normal = binormal.cross(tangent).normalize()
+	return { position: pos, normal: normal }
 }
 
-// Procedural Water component
 const Water = () => {
 	const ref = useRef()
 
-	// Create calm flow map for procedural water bodies
-	const flowMap = useMemo(() => createCalmFlowMap(), [])
+	// Create geometry and load water normals texture
+	const waterGeometry = useMemo(() => new PlaneGeometry(WATER_SIZE, WATER_SIZE, 256, 256), [])
+	const waterNormals = useMemo(() => {
+		const textureLoader = new TextureLoader()
+		const texture = textureLoader.load('/assets/images/ground/water_normal.jpg')
+		texture.wrapS = texture.wrapT = RepeatWrapping
+		return texture
+	}, [])
 
-	// Create large circular geometry once - segments for smooth edges
-	const geom = useMemo(() => new CircleGeometry(WATER_RADIUS, 8), [])
-
-	// Create shader material with shared atmosphere uniforms
-	const material = useMemo(() => {
-		const mat = new ShaderMaterial({
-			uniforms: {
-				uTime: { value: 0 },
-				// Shared atmosphere uniforms
-				uSunDirection: { value: sunDirection },
-				uSunColor: { value: sunColor },
-				uSkyColor: { value: skyColorZenith },
-				uSkyHorizonColor: { value: skyColorHorizon },
-				// Flow map for water movement
-				uFlowMap: { value: flowMap },
-				uFlowMapSize: { value: FLOW_MAP_CONFIG.worldSize },
-				// Water-specific parameters
-				uDistortionScale: { value: 1.5 },
-				uFlowSpeed: { value: 0.3 }, // Reduced for calmer water
-				uWaveSpeed: { value: 0.03 },
-				uWaveScale: { value: 0.08 },
-				uNormalStrength: { value: 0.12 },
-				uOpacity: { value: 1 },
-				uNearFade: { value: 20.0 },
-				uFarFade: { value: 80.0 },
-			},
-			vertexShader: waterVertexShader,
-			fragmentShader: waterFragmentShader,
-			transparent: true,
-			side: DoubleSide,
-		})
-		return mat
-	}, [flowMap])
-
-	// Dispose geometry, material, and flow map when component unmounts
 	useEffect(() => {
-		return () => {
-			geom.dispose()
-			material.dispose()
-			flowMap.dispose()
+		if (ref.current) {
+			const water = ref.current
+
+			// Configure shader with Gerstner waves - matching the example exactly
+			water.material.onBeforeCompile = (shader) => {
+				// Add custom uniforms for Gerstner waves and infinite water
+				shader.uniforms.offsetX = { value: 0 }
+				shader.uniforms.offsetZ = { value: 0 }
+				shader.uniforms.waveA = {
+					value: [Math.sin((WAVES[0].direction * Math.PI) / 180), Math.cos((WAVES[0].direction * Math.PI) / 180), WAVES[0].steepness, WAVES[0].wavelength],
+				}
+				shader.uniforms.waveB = {
+					value: [Math.sin((WAVES[1].direction * Math.PI) / 180), Math.cos((WAVES[1].direction * Math.PI) / 180), WAVES[1].steepness, WAVES[1].wavelength],
+				}
+				shader.uniforms.waveC = {
+					value: [Math.sin((WAVES[2].direction * Math.PI) / 180), Math.cos((WAVES[2].direction * Math.PI) / 180), WAVES[2].steepness, WAVES[2].wavelength],
+				}
+
+				// Use imported shaders
+				shader.vertexShader = vertexShader
+				shader.fragmentShader = fragmentShader
+
+				// Set the size uniform to 10.0 like the example
+				shader.uniforms.size.value = 10.0
+			}
 		}
-	}, [geom, material, flowMap])
 
-	// Animate water and follow camera
-	useFrame(({ camera }, delta) => {
-		if (ref.current?.material?.uniforms) {
-			// Follow camera position at Y=0
-			ref.current.position.x = camera.position.x
-			ref.current.position.z = camera.position.z
+		return () => {
+			waterGeometry.dispose()
+			waterNormals.dispose()
+		}
+	}, [waterGeometry, waterNormals])
 
-			ref.current.material.uniforms.uTime.value += delta
+	// Animate water
+	useFrame((_, delta) => {
+		if (ref.current) {
+			ref.current.material.uniforms.time.value += delta
 		}
 	})
 
-	return <mesh ref={ref} geometry={geom} material={material} rotation-x={-Math.PI / 2} position={[0, WATER_LEVEL, 0]} />
+	return (
+		<water
+			ref={ref}
+			args={[
+				waterGeometry,
+				{
+					textureWidth: 512,
+					textureHeight: 512,
+					waterNormals: waterNormals,
+					sunDirection: new Vector3(sunDirection.x, sunDirection.y, sunDirection.z),
+					sunColor: 0xffffff,
+					waterColor: 0x001e0f,
+					distortionScale: 8,
+					fog: undefined,
+				},
+			]}
+			rotation-x={-Math.PI / 2}
+			position={[0, WATER_LEVEL, 0]}
+		/>
+	)
 }
 
 export default Water
