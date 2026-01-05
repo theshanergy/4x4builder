@@ -14,7 +14,6 @@ uniform vec3 skyColor;
 uniform vec3 skyHorizonColor;
 
 // Depth-based visual effects
-uniform vec3 shallowWaterColor;
 uniform float maxVisibleDepth;
 
 varying vec4 mirrorCoord;
@@ -105,9 +104,10 @@ void main() {
 	// Blend mirror reflection with sky color for more realistic fallback
 	vec3 finalReflection = mix( skyReflection, reflectionSample, 0.8 );
 
-	// Depth-based color blending: shallow = turquoise, deep = original water color
+	// Depth-based color: shallow water appears brighter/more transparent
 	float depthFactor = smoothstep(0.0, maxVisibleDepth, vDepth);
-	vec3 depthBlendedColor = mix(shallowWaterColor, waterColor, depthFactor);
+	// Lighten water color in shallow areas for turquoise appearance
+	vec3 depthBlendedColor = mix(waterColor * 2.5, waterColor, depthFactor);
 
 	// Use depth-blended color for scatter
 	vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * depthBlendedColor;

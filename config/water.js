@@ -19,7 +19,7 @@ export const WATER_DEPTH_CONFIG = {
 
 	// Visual depth effects
 	maxVisibleDepth: 8.0, // Depth at which water reaches full opacity/color
-	shallowWaterColor: [0.2, 0.6, 0.6], // Turquoise tint for shallow water (RGB 0-1)
+	waterColor: [0.0, 0.12, 0.06], // Base water color (RGB 0-1), appears lighter/turquoise in shallow areas
 }
 
 // Flow map texture configuration (for water shader animation)

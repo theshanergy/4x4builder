@@ -48,7 +48,13 @@ const createWaterMaterial = (waterNormals, renderTarget, textureMatrix) => {
 				sunColor: { value: sunColor.clone() },
 				sunDirection: { value: sunDirection.clone() },
 				eye: { value: new Vector3() },
-				waterColor: { value: new Color(0x001e0f) },
+				waterColor: { 
+					value: new Color(
+						WATER_DEPTH_CONFIG.waterColor[0],
+						WATER_DEPTH_CONFIG.waterColor[1],
+						WATER_DEPTH_CONFIG.waterColor[2]
+					)
+				},
 
 				// Sky colors for reflection fallback
 				skyColor: { value: skyColorZenith.clone() },
@@ -66,9 +72,6 @@ const createWaterMaterial = (waterNormals, renderTarget, textureMatrix) => {
 				shallowDepthThreshold: { value: WATER_DEPTH_CONFIG.shallowDepthThreshold },
 
 				// Depth-based visual effects
-				shallowWaterColor: {
-					value: new Color(WATER_DEPTH_CONFIG.shallowWaterColor[0], WATER_DEPTH_CONFIG.shallowWaterColor[1], WATER_DEPTH_CONFIG.shallowWaterColor[2]),
-				},
 				maxVisibleDepth: { value: WATER_DEPTH_CONFIG.maxVisibleDepth },
 			},
 		]),
