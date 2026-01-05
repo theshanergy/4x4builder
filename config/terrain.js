@@ -1,72 +1,42 @@
-// Default Terrain Parameters
+// Unified Terrain Configuration
+// Single config object controls all terrain generation parameters
+
 export const TERRAIN_CONFIG = {
-	// Base terrain noise smoothness (higher = smoother, lower = more jagged)
-	smoothness: 25,
-	// Height scale for base/valley terrain (mountains use their own scale)
+	// === Height Scaling ===
+	// Final world height = normalized height × baseHeightScale
 	baseHeightScale: 4,
-	// Regional height modulation scale (size of flat/hilly regions)
-	regionScale: 240,
+
+	// === Noise Scales ===
+	// Continental scale - very large features (land/water distribution)
+	// Smaller values = larger features. 0.00007 ≈ 14,000 unit features
+	continentScale: 0.00007,
+
+	// Base terrain scale - medium rolling hills
+	// 0.04 = hills roughly 25 units across
+	noiseScale: 0.04,
+
+	// Mountain scale - ridge and peak features
+	// 0.001 = mountain features roughly 1000 units across
+	mountainScale: 0.001,
+
+	// === Height Limits ===
+	// Maximum mountain height in world units
+	maxMountainHeight: 400,
+
+	// === Spawn Protection ===
+	// Radius of guaranteed land around origin
+	spawnProtectionRadius: 400,
+
+	// Width of transition zone from protected to natural terrain
+	spawnTransitionWidth: 300,
 }
 
 // Staging Area Configuration (flat spawn area)
 export const STAGING_AREA = {
 	// Radius of completely flat area around origin
-	flatRadius: 16,
+	flatRadius: 160,
 	// Distance where terrain reaches full height (smooth blend zone)
-	transitionEnd: 64,
-}
-
-// Continental noise - determines large-scale land vs water distribution
-export const CONTINENTAL_CONFIG = {
-	// Scale of continental features (smaller = larger features)
-	// At 0.00007, features are roughly 14,000 units across
-	scale: 0.00007,
-	// Threshold below which terrain becomes water (-1 to 1 range)
-	// -0.15 gives roughly 40% water coverage
-	waterThreshold: -0.15,
-	// Beach width in world units - distance from water's edge where beach extends inland
-	beachWidth: 150,
-	// Beach slope - how much the terrain rises per unit of distance from water's edge
-	// 0.02 = gentle slope (2 units up per 100 units from water)
-	// 0.05 = moderate slope (5 units up per 100 units from water)
-	// 0.1 = steep slope (10 units up per 100 units from water)
-	beachSlope: 0.03,
-	// Beach transition smoothness - controls how gradually the beach blends with terrain
-	// 1 = linear transition (hard edge)
-	// 2 = quadratic (smooth)
-	// 3 = cubic (very smooth)
-	beachSmoothness: 2,
-	// Underwater slope - how much the terrain drops per unit of distance into water
-	// Similar scale to beachSlope
-	underwaterSlope: 0.02,
-	// Maximum underwater depth
-	maxDepth: 12,
-	// How much continental value affects base terrain height
-	heightInfluence: 0.6,
-	// Secondary detail scale for more interesting coastlines
-	detailScale: 0.0003,
-	detailStrength: 0.5,
-}
-
-// Mountain configuration - now procedural based on noise
-export const MOUNTAIN_CONFIG = {
-	// Maximum mountain height
-	maxHeight: 400,
-	// Minimum continental value for mountains to appear (keeps them inland)
-	minContinental: 0.2,
-	// Base noise scale for large mountain formations (smaller = more spread out)
-	baseScale: 0.0005,
-	// Ridge noise creates sharp mountain ridges (smaller = wider ridges)
-	ridgeScale: 0.0012,
-	// Detail noise for smaller features
-	detailScale: 0.006,
-	// Domain warping scale for more natural shapes
-	warpScale: 0.0006,
-	warpStrength: 250,
-	// Mountain range scale - controls how spread out mountain ranges are
-	rangeScale: 0.00015,
-	// Threshold for mountain ranges (higher = less frequent but more defined ranges)
-	rangeThreshold: 0.3,
+	transitionEnd: 820,
 }
 
 /**
@@ -82,11 +52,6 @@ export const MOUNTAIN_CONFIG = {
  * - lod: LOD configuration { distance, levels }
  * - height: Height blending { min, max, influence } - all optional
  * - slope: Slope blending { min, max, influence, range } - all optional (0=flat, 1=steep)
- *
- * Omit any you don't need. Min/max within each are also optional:
- * - Only min: layer appears above that value
- * - Only max: layer appears below that value
- * - Both: layer appears within that range
  *
  * Layers are rendered bottom-to-top (first layer is base)
  */

@@ -1,145 +1,195 @@
-// Terrain orchestrator - coordinates all terrain features to produce final height values
-// This is the main entry point for terrain height calculation
-// Now uses a unified procedural system for infinite terrain generation
+// Unified terrain height sampler
+// Single coherent noise function produces all terrain features:
+// continents, mountains, valleys - without separate "feature" systems
+// Water is simply wherever terrain height < water level (no special casing)
 
 import { Vector3 } from 'three'
-import { TERRAIN_CONFIG, CONTINENTAL_CONFIG } from '../../config/terrain'
-import { getContinentalValue, getBeachBlend, isWaterBody } from './features/continental'
-import { blendWaterBodyTerrain } from './features/waterBodies'
-import { getMountainContribution } from './features/mountains'
-import { getStagingBlend } from './features/staging'
+import { TERRAIN_CONFIG, STAGING_AREA } from '../../config/terrain'
+import { WATER_LEVEL, WATER_BODY_CONFIG } from '../../config/water'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
 
 /**
  * Creates terrain helper functions for height and normal sampling.
- * These helpers encapsulate all the terrain generation logic and provide
- * a clean API for the rest of the terrain system.
+ * Uses a unified noise approach - one coherent function produces all terrain features.
  *
  * @param {Object} noise - Noise instance from noisejs
- * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and getContinental functions
+ * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and isWater functions
  */
 export const createTerrainHelpers = (noise) => {
-	const { baseHeightScale, smoothness, regionScale } = TERRAIN_CONFIG
-	const { heightInfluence } = CONTINENTAL_CONFIG
+	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnProtectionRadius, spawnTransitionWidth } = TERRAIN_CONFIG
+
+	const { flatRadius, transitionEnd } = STAGING_AREA
+	const flatRadiusSq = flatRadius * flatRadius
+	const transitionEndSq = transitionEnd * transitionEnd
 
 	/**
-	 * Get normalized height value at any world position (0-1 range, can go negative for water).
-	 * This is the core terrain generation function that combines all features.
-	 * The terrain is fully procedural and infinite.
-	 *
-	 * @param {number} worldX - World X coordinate
-	 * @param {number} worldZ - World Z coordinate
-	 * @returns {number} Normalized height value (will be multiplied by baseHeightScale for world units)
+	 * Smoothstep interpolation (cubic hermite)
 	 */
-	const getNormalizedHeight = (worldX, worldZ) => {
-		const distSq = worldX * worldX + worldZ * worldZ
-
-		// 1. Get continental value - determines land vs water at large scale
-		const continental = getContinentalValue(worldX, worldZ, noise)
-
-		// 2. Get beach blend - how far inland we are from water edges
-		const beachBlend = getBeachBlend(continental)
-
-		// 3. Calculate base terrain noise (gentle rolling terrain)
-		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
-		const normalizedHeight = (noiseValue + 1) / 2
-
-		// 4. Regional height modulation - creates dispersed flatter areas
-		const regionNoise = noise.perlin2(worldX / regionScale + 100, worldZ / regionScale + 100)
-		// Map to 0.1-1.0 range: some areas have 10% height (much flatter), others full height
-		const regionModifier = 0.1 + (regionNoise + 1) * 0.45
-
-		// 5. Continental height influence - terrain is higher further inland
-		// This creates natural elevation gradients from coast to interior
-		const continentalLift = Math.max(0, continental) * heightInfluence
-
-		// 6. Apply staging area blend - smooth transition from flat spawn to terrain
-		const stagingBlend = getStagingBlend(distSq)
-
-		// 7. Combine base terrain factors
-		let baseHeight = normalizedHeight * stagingBlend * regionModifier
-		// Add continental lift to raise inland areas
-		baseHeight = baseHeight + continentalLift * stagingBlend
-
-		// 8. Add mountain height - now based on continental value and noise patterns
-		const mountainHeight = getMountainContribution(worldX, worldZ, noise, continental, beachBlend)
-
-		// 9. Combine base terrain with mountains
-		// Base terrain is scaled down in mountain areas to let mountains dominate
-		const mountainInfluence = mountainHeight > 0 ? Math.min(1, mountainHeight * 0.5) : 0
-		let combinedHeight = baseHeight * (1 - mountainInfluence * 0.7) + mountainHeight
-
-		// 10. Apply water body blending - handles lakes, seas, and beach transitions
-		combinedHeight = blendWaterBodyTerrain(combinedHeight, continental, baseHeightScale, noise, worldX, worldZ)
-
-		return combinedHeight
+	const smoothstep = (t) => {
+		const c = Math.max(0, Math.min(1, t))
+		return c * c * (3 - 2 * c)
 	}
 
 	/**
-	 * Get terrain height at any world position (in world units).
-	 * This is a convenience wrapper around getNormalizedHeight.
+	 * Get unified terrain height at any world position.
 	 *
-	 * @param {number} worldX - World X coordinate
-	 * @param {number} worldZ - World Z coordinate
-	 * @returns {number} Height in world units
+	 * Single continuous function - no land/water branching.
+	 * Water is simply wherever terrain height < water level.
+	 * This eliminates shoreline artifacts from discontinuous functions.
+	 *
+	 * @param {number} x - World X coordinate
+	 * @param {number} z - World Z coordinate
+	 * @returns {number} Normalized height value
 	 */
-	const getWorldHeight = (worldX, worldZ) => {
-		return getNormalizedHeight(worldX, worldZ) * baseHeightScale
+	const getNormalizedHeight = (x, z) => {
+		const distSq = x * x + z * z
+		const dist = Math.sqrt(distSq)
+
+		// === STAGING AREA: Flat spawn zone (check first for early return) ===
+		if (distSq < flatRadiusSq) {
+			return 0
+		}
+
+		// === LAYER 1: Continental shape (very large scale) ===
+		// Domain warp for organic coastlines
+		const warpX = noise.perlin2(x * continentScale * 0.7 + 50, z * continentScale * 0.7 + 50) * 800
+		const warpZ = noise.perlin2(x * continentScale * 0.7 + 150, z * continentScale * 0.7 + 150) * 800
+		const wx = x + warpX
+		const wz = z + warpZ
+
+		// Continental noise - this is the primary driver of elevation
+		// Ranges roughly -1 to 1, centered around 0
+		let continental = noise.perlin2(wx * continentScale, wz * continentScale) * 0.7 + noise.perlin2(wx * continentScale * 2.5, wz * continentScale * 2.5) * 0.3
+
+		// Bias terrain upward to reduce lake coverage (shift from ~50% water to ~20% water)
+		continental += 0.1
+
+		// Vary shoreline sharpness along the coast using continental noise
+		// This creates organic variation - some areas have sharp cliffs, others gentle slopes
+		const shorelineVariation = noise.perlin2(x * continentScale * 0.4 + 500, z * continentScale * 0.4 + 500)
+		const shorelineSharpness = 1.85 + shorelineVariation * 5.0 // Range (gentler to sharper)
+		continental = Math.sign(continental) * Math.pow(Math.abs(continental), 1.0 / shorelineSharpness)
+
+		// Spawn protection - lift terrain near origin to guarantee land
+		if (dist < spawnProtectionRadius) {
+			continental = Math.max(continental, 0.3)
+		} else if (dist < spawnProtectionRadius + spawnTransitionWidth) {
+			const t = (dist - spawnProtectionRadius) / spawnTransitionWidth
+			const blend = smoothstep(t)
+			continental = Math.max(continental, 0.3 * (1 - blend))
+		}
+
+		// === LAYER 2: Base terrain variation ===
+		const baseNoise =
+			noise.perlin2(x * noiseScale, z * noiseScale) * 0.6 +
+			noise.perlin2(x * noiseScale * 2.2, z * noiseScale * 2.2) * 0.3 +
+			noise.perlin2(x * noiseScale * 4.5, z * noiseScale * 4.5) * 0.1
+
+		// === LAYER 3: Mountains (only where continental is high) ===
+		const inlandFactor = smoothstep(continental / 0.6)
+
+		const ridge1 = 1 - Math.abs(noise.perlin2(x * mountainScale, z * mountainScale))
+		const ridge2 = 1 - Math.abs(noise.perlin2(x * mountainScale * 1.8 + 100, z * mountainScale * 1.8 + 100))
+		const ridgeNoise = ridge1 * ridge1 * 0.6 + ridge2 * ridge2 * 0.4
+
+		const mountainMask = noise.perlin2(x * mountainScale * 0.3 + 500, z * mountainScale * 0.3 + 500)
+		const mountainFactor = smoothstep((mountainMask + 0.3) / 0.8) * inlandFactor
+
+		const mountainHeight = ridgeNoise * mountainFactor * (maxMountainHeight / baseHeightScale)
+
+		// === COMBINE: Continental drives overall elevation ===
+		// Continental value directly sets base elevation (can go negative for lakes)
+		// Only add base noise variation when we're safely above water (prevents tiny lakes)
+		// Base noise adds rolling hills on land, mountains add peaks on high ground
+		// Continental multiplier calculated from desired max depth:
+		// maxDepth (in world units) / baseHeightScale gives normalized depth needed
+		const continentalMultiplier = (WATER_BODY_CONFIG.maxDepth + Math.abs(WATER_LEVEL)) / baseHeightScale
+		const baseHeight = continental * continentalMultiplier
+		let height = baseHeight
+
+		// Only apply fine-grained terrain variation well above water level
+		// Use a smooth fade so terrain doesn't suddenly become flat near water
+		// Water level is -1 (scaled by baseHeightScale=4, so -0.25 in normalized space)
+		// We want base terrain to be at least 0.2 above water before adding variation
+		const waterThreshold = -0.25 // WATER_LEVEL / baseHeightScale
+		const safetyMargin = 0.5 // Extra margin to prevent noise from creating tiny lakes
+		const minSafeHeight = waterThreshold + safetyMargin // -0.25 + 0.5 = 0.25
+
+		if (baseHeight > minSafeHeight) {
+			// Safely above water - apply full noise variation
+			height += baseNoise * 0.5
+		} else if (baseHeight > waterThreshold) {
+			// Near water - fade out noise to prevent creating tiny lakes
+			const fadeFactor = (baseHeight - waterThreshold) / safetyMargin
+			height += Math.max(0, baseNoise) * 0.5 * fadeFactor // Only additive noise near water
+		}
+		// Below water threshold: no noise, lakes stay smooth
+
+		height += mountainHeight
+
+		// === STAGING AREA: Smooth transition ===
+		if (distSq < transitionEndSq) {
+			const t = (dist - flatRadius) / (transitionEnd - flatRadius)
+			const blend = t * t * t * (t * (t * 6 - 15) + 10)
+			height *= blend
+		}
+
+		return height
 	}
 
 	/**
-	 * Get terrain normal at any world position using numerical gradient.
-	 * Uses central differences to approximate the terrain slope in X and Z directions.
-	 *
-	 * @param {number} worldX - World X coordinate
-	 * @param {number} worldZ - World Z coordinate
-	 * @param {Vector3} target - Optional target vector to store result
-	 * @returns {Vector3} Normalized surface normal
+	 * Get terrain height in world units.
 	 */
-	const getNormal = (worldX, worldZ, target = new Vector3()) => {
-		// Use larger epsilon for distant terrain to avoid noise artifacts
-		const dist = Math.sqrt(worldX * worldX + worldZ * worldZ)
+	const getWorldHeight = (x, z) => {
+		return getNormalizedHeight(x, z) * baseHeightScale
+	}
+
+	/**
+	 * Get terrain normal using numerical gradient.
+	 */
+	const getNormal = (x, z, target = new Vector3()) => {
+		const dist = Math.sqrt(x * x + z * z)
 		const epsilon = dist > 500 ? GRADIENT_EPSILON * 4 : GRADIENT_EPSILON
 
-		// Sample height at four neighboring points
-		const hL = getNormalizedHeight(worldX - epsilon, worldZ) * baseHeightScale
-		const hR = getNormalizedHeight(worldX + epsilon, worldZ) * baseHeightScale
-		const hD = getNormalizedHeight(worldX, worldZ - epsilon) * baseHeightScale
-		const hU = getNormalizedHeight(worldX, worldZ + epsilon) * baseHeightScale
+		const hL = getNormalizedHeight(x - epsilon, z) * baseHeightScale
+		const hR = getNormalizedHeight(x + epsilon, z) * baseHeightScale
+		const hD = getNormalizedHeight(x, z - epsilon) * baseHeightScale
+		const hU = getNormalizedHeight(x, z + epsilon) * baseHeightScale
 
-		// Calculate partial derivatives using central differences
 		const dhdx = (hR - hL) / (2 * epsilon)
 		const dhdz = (hU - hD) / (2 * epsilon)
 
-		// Normal is perpendicular to the tangent plane
-		// Cross product of tangent vectors gives normal: (-dhdx, 1, -dhdz)
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}
 
 	/**
-	 * Get the continental value at a position (for water detection, etc.)
-	 *
-	 * @param {number} worldX - World X coordinate
-	 * @param {number} worldZ - World Z coordinate
-	 * @returns {number} Continental value (-1 to 1)
+	 * Check if a position is in water (terrain below water level).
 	 */
-	const getContinental = (worldX, worldZ) => {
-		return getContinentalValue(worldX, worldZ, noise)
+	const isWater = (x, z) => {
+		return getWorldHeight(x, z) < WATER_LEVEL
 	}
 
 	/**
-	 * Check if a position is in a water body (lake, sea, etc.)
-	 *
-	 * @param {number} worldX - World X coordinate
-	 * @param {number} worldZ - World Z coordinate
-	 * @returns {boolean} True if position is in water
+	 * Get continental value (for external use).
+	 * This is just the large-scale noise that drives land/water distribution.
 	 */
-	const isWater = (worldX, worldZ) => {
-		const continental = getContinentalValue(worldX, worldZ, noise)
-		return isWaterBody(continental)
+	const getContinental = (x, z) => {
+		const warpX = noise.perlin2(x * continentScale * 0.7 + 50, z * continentScale * 0.7 + 50) * 800
+		const warpZ = noise.perlin2(x * continentScale * 0.7 + 150, z * continentScale * 0.7 + 150) * 800
+		const wx = x + warpX
+		const wz = z + warpZ
+
+		return noise.perlin2(wx * continentScale, wz * continentScale) * 0.7 + noise.perlin2(wx * continentScale * 2.5, wz * continentScale * 2.5) * 0.3
 	}
 
-	return { getNormalizedHeight, getWorldHeight, getNormal, getContinental, isWater, baseHeightScale }
+	return {
+		getNormalizedHeight,
+		getWorldHeight,
+		getNormal,
+		getContinental,
+		isWater,
+		baseHeightScale,
+	}
 }

@@ -4,11 +4,7 @@ export const WATER_LEVEL = -1
 // Water body configuration (for procedural lakes/seas)
 export const WATER_BODY_CONFIG = {
 	// Maximum depth below WATER_LEVEL for deep water
-	maxDepth: 15,
-	// Shallow water depth near shores
-	shallowDepth: 2,
-	// Beach profile control - how steeply the shore drops off
-	beachSteepness: 2.5,
+	maxDepth: 50,
 }
 
 // Per-tile water depth configuration
@@ -21,13 +17,6 @@ export const WATER_DEPTH_CONFIG = {
 	maxVisibleDepth: 8.0, // Depth at which water reaches full opacity/color
 	edgeFadeDistance: 0.1, // Distance over which water fades to transparent at edges (prevents sawtoothing)
 	waterColor: [0.0, 0.12, 0.06], // Base water color (RGB 0-1), appears lighter/turquoise in shallow areas
-}
-
-// Flow map texture configuration (for water shader animation)
-// Now covers a larger area for the infinite terrain
-export const FLOW_MAP_CONFIG = {
-	resolution: 512, // Texture resolution
-	worldSize: 12000, // World area covered by the flow map
 }
 
 // Buoyancy configuration
