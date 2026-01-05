@@ -92,11 +92,17 @@ const useTerrainQuadtree = () => {
 				return tilesWithStitching
 			}
 
+			// Build a Map from previous tiles for O(1) lookup instead of O(n) .find()
+			const prevTileMap = new Map()
+			for (let i = 0; i < prevTiles.length; i++) {
+				prevTileMap.set(prevTiles[i].node.key, prevTiles[i])
+			}
+
 			// Check if any keys changed or edge stitching changed
 			let hasChanges = false
 			for (let i = 0; i < tilesWithStitching.length; i++) {
 				const newTile = tilesWithStitching[i]
-				const oldTile = prevTiles.find((t) => t.node.key === newTile.node.key)
+				const oldTile = prevTileMap.get(newTile.node.key)
 
 				if (!oldTile) {
 					hasChanges = true

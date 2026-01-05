@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { BufferGeometry, BufferAttribute, Vector3 } from 'three'
+import { BufferGeometry, BufferAttribute } from 'three'
 import { TILE_RESOLUTION } from '../config/terrain'
 import { WATER_LEVEL } from '../config/water'
 
@@ -34,8 +34,13 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		const depths = new Float32Array(totalSamples)
 		let hasWater = false
 
-		// Reuse Vector3 for all normal calculations
-		const normalVec = new Vector3()
+		// Cache for height samples - avoids recomputing for normal calculation
+		// Layout: heightCache[j * sampleCount + i] = normalized height at grid position (i, j)
+		const heightCache = new Float32Array(totalSamples)
+
+		// Pre-allocate water arrays (cheaper than lazy allocation with backfill)
+		const waterSnappedX = new Float32Array(totalSamples)
+		const waterSnappedZ = new Float32Array(totalSamples)
 
 		// Pre-check edge stitch conditions to avoid repeated property access
 		const westNeedsStitch = edgeStitchInfo.west.needsStitch
@@ -81,46 +86,59 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			return Math.round(coord / neighborStep) * neighborStep
 		}
 
-		// Track water stitch info per vertex for later water geometry creation
-		// Stores snapped world coordinates for stitched edge vertices
-		const waterSnappedX = new Float32Array(totalSamples)
-		const waterSnappedZ = new Float32Array(totalSamples)
+		// Pre-compute stitch decisions for all edge vertices to avoid redundant checks
+		// This caches which vertices need stitching and what parameters to use
+		const stitchCache = new Map()
+		for (let j = 0; j < sampleCount; j++) {
+			const onSouthEdge = j === 0
+			const onNorthEdge = j === segments
+			for (let i = 0; i < sampleCount; i++) {
+				const onWestEdge = i === 0
+				const onEastEdge = i === segments
+				
+				// Only cache edge vertices that need stitching
+				if (onWestEdge && westNeedsStitch) {
+					stitchCache.set(j * sampleCount + i, { step: westStep, axis: 'z' })
+				} else if (onEastEdge && eastNeedsStitch) {
+					stitchCache.set(j * sampleCount + i, { step: eastStep, axis: 'z' })
+				} else if (onSouthEdge && southNeedsStitch) {
+					stitchCache.set(j * sampleCount + i, { step: southStep, axis: 'x' })
+				} else if (onNorthEdge && northNeedsStitch) {
+					stitchCache.set(j * sampleCount + i, { step: northStep, axis: 'x' })
+				}
+			}
+		}
 
-		// Generate vertices
+		// First pass: sample heights and cache them
 		let vertIndex = 0
 		for (let j = 0; j < sampleCount; j++) {
 			const localZ = j * step
 			const worldZ = originZ + localZ
-			const onSouthEdge = j === 0
-			const onNorthEdge = j === segments
 
 			for (let i = 0; i < sampleCount; i++) {
 				const localX = i * step
 				const worldX = originX + localX
-				const onWestEdge = i === 0
-				const onEastEdge = i === segments
 
 				let height
-				// For water: snapped world coordinates that match coarse grid
 				let snappedWorldX = worldX
 				let snappedWorldZ = worldZ
 
-				// Apply edge stitching - check edges in priority order
-				// Height is interpolated for terrain; coordinates are snapped for water
-				if (onWestEdge && westNeedsStitch) {
-					height = getStitchedHeight(worldX, worldZ, westStep, 'z')
-					snappedWorldZ = snapToCoarseGrid(worldZ, westStep)
-				} else if (onEastEdge && eastNeedsStitch) {
-					height = getStitchedHeight(worldX, worldZ, eastStep, 'z')
-					snappedWorldZ = snapToCoarseGrid(worldZ, eastStep)
-				} else if (onSouthEdge && southNeedsStitch) {
-					height = getStitchedHeight(worldX, worldZ, southStep, 'x')
-					snappedWorldX = snapToCoarseGrid(worldX, southStep)
-				} else if (onNorthEdge && northNeedsStitch) {
-					height = getStitchedHeight(worldX, worldZ, northStep, 'x')
-					snappedWorldX = snapToCoarseGrid(worldX, northStep)
+				// Check stitch cache for this vertex
+				const stitchInfo = stitchCache.get(vertIndex)
+				if (stitchInfo) {
+					// Apply cached stitch parameters
+					height = getStitchedHeight(worldX, worldZ, stitchInfo.step, stitchInfo.axis)
+					if (stitchInfo.axis === 'z') {
+						snappedWorldZ = snapToCoarseGrid(worldZ, stitchInfo.step)
+					} else {
+						snappedWorldX = snapToCoarseGrid(worldX, stitchInfo.step)
+					}
+					heightCache[vertIndex] = height / baseHeightScale
 				} else {
-					height = terrainHelpers.getNormalizedHeight(worldX, worldZ) * baseHeightScale
+					// No stitching needed - sample directly
+					const normalizedHeight = terrainHelpers.getNormalizedHeight(worldX, worldZ)
+					heightCache[vertIndex] = normalizedHeight
+					height = normalizedHeight * baseHeightScale
 				}
 
 				const posIndex = vertIndex * 3
@@ -132,27 +150,63 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				positions[posIndex + 1] = height
 				positions[posIndex + 2] = localZ - halfSize
 
-				// Normal
-				terrainHelpers.getNormal(worldX, worldZ, normalVec)
-				normals[posIndex] = normalVec.x
-				normals[posIndex + 1] = normalVec.y
-				normals[posIndex + 2] = normalVec.z
-
 				// TERRAIN UVs - use original world coordinates
 				uvs[uvIndex] = worldX
 				uvs[uvIndex + 1] = worldZ
 
-				// Store snapped coordinates for water geometry
-				waterSnappedX[vertIndex] = snappedWorldX
-				waterSnappedZ[vertIndex] = snappedWorldZ
-
-				// Calculate water depth
+				// Calculate water depth and populate water arrays
 				if (height < WATER_LEVEL) {
 					depths[vertIndex] = WATER_LEVEL - height
 					hasWater = true
 				} else {
 					depths[vertIndex] = 0
 				}
+				
+				// Always populate water coordinate arrays (pre-allocated)
+				waterSnappedX[vertIndex] = snappedWorldX
+				waterSnappedZ[vertIndex] = snappedWorldZ
+
+				vertIndex++
+			}
+		}
+
+		// Second pass: compute normals using cached heights (finite differences)
+		// This avoids redundant getNormalizedHeight calls for normal computation
+		vertIndex = 0
+		for (let j = 0; j < sampleCount; j++) {
+			const rowOffset = j * sampleCount
+			// Pre-compute clamped row indices to reduce repeated clamping
+			const jD = Math.max(0, j - 1)
+			const jU = Math.min(segments, j + 1)
+			const dz = (jU - jD) * step
+			
+			for (let i = 0; i < sampleCount; i++) {
+				const posIndex = vertIndex * 3
+
+				// Use cached heights for finite difference normal calculation
+				// Get neighboring heights from cache, clamping to grid boundaries
+				const iL = Math.max(0, i - 1)
+				const iR = Math.min(segments, i + 1)
+
+				const hL = heightCache[rowOffset + iL] * baseHeightScale
+				const hR = heightCache[rowOffset + iR] * baseHeightScale
+				const hD = heightCache[jD * sampleCount + i] * baseHeightScale
+				const hU = heightCache[jU * sampleCount + i] * baseHeightScale
+
+				// Calculate partial derivatives using central/forward/backward differences
+				const dx = (iR - iL) * step
+				const dhdx = (hR - hL) / dx
+				const dhdz = (hU - hD) / dz
+
+				// Normal is perpendicular to the tangent plane: (-dhdx, 1, -dhdz) normalized
+				const nx = -dhdx
+				const ny = 1
+				const nz = -dhdz
+				const invLen = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz)
+
+				normals[posIndex] = nx * invLen
+				normals[posIndex + 1] = ny * invLen
+				normals[posIndex + 2] = nz * invLen
 
 				vertIndex++
 			}
