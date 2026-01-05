@@ -73,7 +73,31 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			}
 		}
 
+		/**
+		 * Get wave stitch info for edge vertices.
+		 * Returns [coarseCoord0, coarseCoord1, blendFactor] for interpolation.
+		 * For non-stitched or on-grid vertices, blend factor is -1 (use actual UV).
+		 */
+		const getWaveStitchInfo = (coord, neighborStep) => {
+			const grid = coord / neighborStep
+			const gridFloor = Math.floor(grid)
+			const c0 = gridFloor * neighborStep
+			const c1 = c0 + neighborStep
+			const t = grid - gridFloor  // 0 to 1, how far between c0 and c1
+			
+			// If very close to a grid point (within epsilon), no interpolation needed
+			const epsilon = 0.001
+			if (t < epsilon || t > 1 - epsilon) {
+				return { c0: coord, c1: coord, t: -1 }  // -1 means "use actual coord"
+			}
+			return { c0, c1, t }
+		}
+
 		// Generate vertices
+		// waveStitch stores [c0, c1, t, axis] per vertex for wave interpolation
+		// axis: 0 = no stitch, 1 = stitch along X (south/north edge), 2 = stitch along Z (west/east edge)
+		const waveStitch = new Float32Array(totalSamples * 4)
+		
 		let vertIndex = 0
 		for (let j = 0; j < sampleCount; j++) {
 			const localZ = j * step
@@ -88,22 +112,34 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				const onEastEdge = i === segments
 
 				let height
+				// Wave stitch info for this vertex
+				let stitchInfo = { c0: 0, c1: 0, t: -1 }
+				let stitchAxis = 0  // 0 = none, 1 = X, 2 = Z
 
 				// Apply edge stitching - check edges in priority order
 				if (onWestEdge && westNeedsStitch) {
 					height = getStitchedHeight(worldX, worldZ, westStep, 'z')
+					stitchInfo = getWaveStitchInfo(worldZ, westStep)
+					stitchAxis = 2  // Z axis
 				} else if (onEastEdge && eastNeedsStitch) {
 					height = getStitchedHeight(worldX, worldZ, eastStep, 'z')
+					stitchInfo = getWaveStitchInfo(worldZ, eastStep)
+					stitchAxis = 2  // Z axis
 				} else if (onSouthEdge && southNeedsStitch) {
 					height = getStitchedHeight(worldX, worldZ, southStep, 'x')
+					stitchInfo = getWaveStitchInfo(worldX, southStep)
+					stitchAxis = 1  // X axis
 				} else if (onNorthEdge && northNeedsStitch) {
 					height = getStitchedHeight(worldX, worldZ, northStep, 'x')
+					stitchInfo = getWaveStitchInfo(worldX, northStep)
+					stitchAxis = 1  // X axis
 				} else {
 					height = terrainHelpers.getNormalizedHeight(worldX, worldZ) * baseHeightScale
 				}
 
 				const posIndex = vertIndex * 3
 				const uvIndex = vertIndex * 2
+				const stitchIndex = vertIndex * 4
 
 				// Position centered on node
 				positions[posIndex] = localX - halfSize
@@ -116,9 +152,15 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				normals[posIndex + 1] = normalVec.y
 				normals[posIndex + 2] = normalVec.z
 
-				// UVs in world space for seamless texturing
+				// UVs in world space (unstitched - shader will handle interpolation)
 				uvs[uvIndex] = worldX
 				uvs[uvIndex + 1] = worldZ
+				
+				// Wave stitch data: [c0, c1, t, axis]
+				waveStitch[stitchIndex] = stitchInfo.c0
+				waveStitch[stitchIndex + 1] = stitchInfo.c1
+				waveStitch[stitchIndex + 2] = stitchInfo.t
+				waveStitch[stitchIndex + 3] = stitchAxis
 
 				// Calculate water depth
 				if (height < WATER_LEVEL) {
@@ -224,6 +266,8 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				waterGeom.setAttribute('normal', new BufferAttribute(waterNormals, 3))
 				waterGeom.setAttribute('uv', new BufferAttribute(waterUvs, 2))
 				waterGeom.setAttribute('depth', new BufferAttribute(depths, 1))
+				// Wave stitch data for seamless LOD boundaries: [c0, c1, t, axis]
+				waterGeom.setAttribute('waveStitch', new BufferAttribute(waveStitch, 4))
 				// Use slice to trim to actual size used
 				waterGeom.setIndex(new BufferAttribute(waterIndicesArray.slice(0, waterIdx), 1))
 			}

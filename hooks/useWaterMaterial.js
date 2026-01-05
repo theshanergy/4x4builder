@@ -1,20 +1,6 @@
 import { useMemo, useRef, useEffect } from 'react'
 import { useLoader, useFrame, useThree } from '@react-three/fiber'
-import {
-	TextureLoader,
-	RepeatWrapping,
-	ShaderMaterial,
-	Color,
-	Vector3,
-	Matrix4,
-	Plane,
-	Vector4,
-	PerspectiveCamera,
-	WebGLRenderTarget,
-	UniformsLib,
-	UniformsUtils,
-	FrontSide,
-} from 'three'
+import { TextureLoader, RepeatWrapping, ShaderMaterial, Color, Vector3, Matrix4, Plane, Vector4, PerspectiveCamera, WebGLRenderTarget, FrontSide } from 'three'
 
 import { WATER_LEVEL, WATER_DEPTH_CONFIG } from '../config/water'
 import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../config/environment'
@@ -33,48 +19,45 @@ const createWaterMaterial = (waterNormals, renderTarget, textureMatrix) => {
 	const material = new ShaderMaterial({
 		vertexShader: waterVertexShader,
 		fragmentShader: waterFragmentShader,
-		uniforms: UniformsUtils.merge([
-			UniformsLib['fog'],
-			UniformsLib['lights'],
-			{
-				// Existing water uniforms
-				normalSampler: { value: waterNormals },
-				mirrorSampler: { value: renderTarget.texture },
-				textureMatrix: { value: textureMatrix },
-				alpha: { value: 1.0 },
-				time: { value: 0 },
-				size: { value: 10.0 },
-				distortionScale: { value: 8.0 },
-				sunColor: { value: sunColor.clone() },
-				sunDirection: { value: sunDirection.clone() },
-				eye: { value: new Vector3() },
-				waterColor: {
-					value: new Color(WATER_DEPTH_CONFIG.waterColor[0], WATER_DEPTH_CONFIG.waterColor[1], WATER_DEPTH_CONFIG.waterColor[2]),
-				},
-
-				// Sky colors for reflection fallback
-				skyColor: { value: skyColorZenith.clone() },
-				skyHorizonColor: { value: skyColorHorizon.clone() },
-
-				// Wave uniforms
-				waveA: { value: waveUniforms.waveA },
-				waveB: { value: waveUniforms.waveB },
-				waveC: { value: waveUniforms.waveC },
-				offsetX: { value: 0 },
-				offsetZ: { value: 0 },
-
-				// Depth-based wave modulation
-				shorelineDepthThreshold: { value: WATER_DEPTH_CONFIG.shorelineDepthThreshold },
-				shallowDepthThreshold: { value: WATER_DEPTH_CONFIG.shallowDepthThreshold },
-
-				// Depth-based visual effects
-				maxVisibleDepth: { value: WATER_DEPTH_CONFIG.maxVisibleDepth },
+		uniforms: {
+			// Water rendering uniforms
+			normalSampler: { value: waterNormals },
+			mirrorSampler: { value: renderTarget.texture },
+			textureMatrix: { value: textureMatrix },
+			alpha: { value: 1.0 },
+			time: { value: 0 },
+			size: { value: 10.0 },
+			distortionScale: { value: 8.0 },
+			sunColor: { value: sunColor.clone() },
+			sunDirection: { value: sunDirection.clone() },
+			eye: { value: new Vector3() },
+			waterColor: {
+				value: new Color(WATER_DEPTH_CONFIG.waterColor[0], WATER_DEPTH_CONFIG.waterColor[1], WATER_DEPTH_CONFIG.waterColor[2]),
 			},
-		]),
-		lights: true,
-		fog: true,
+
+			// Sky colors for reflection fallback
+			skyColor: { value: skyColorZenith.clone() },
+			skyHorizonColor: { value: skyColorHorizon.clone() },
+
+			// Wave uniforms
+			waveA: { value: waveUniforms.waveA },
+			waveB: { value: waveUniforms.waveB },
+			waveC: { value: waveUniforms.waveC },
+			offsetX: { value: 0 },
+			offsetZ: { value: 0 },
+
+			// Depth-based wave modulation
+			shorelineDepthThreshold: { value: WATER_DEPTH_CONFIG.shorelineDepthThreshold },
+			shallowDepthThreshold: { value: WATER_DEPTH_CONFIG.shallowDepthThreshold },
+
+			// Depth-based visual effects
+			maxVisibleDepth: { value: WATER_DEPTH_CONFIG.maxVisibleDepth },
+		},
+		lights: false,
+		fog: false,
 		side: FrontSide,
 		transparent: true,
+		depthWrite: false,
 	})
 
 	return material

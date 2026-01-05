@@ -19,9 +19,7 @@ uniform float maxVisibleDepth;
 varying vec4 mirrorCoord;
 varying vec4 worldPosition;
 varying float vDepth;
-
-uniform float offsetX;
-uniform float offsetZ;
+varying vec2 vWorldXZ; // Original world XZ from UVs for seamless noise
 
 vec4 getNoise( vec2 uv ) {
 	vec2 uv0 = ( uv / 103.0 ) + vec2(time / 17.0, time / 29.0);
@@ -65,20 +63,12 @@ vec3 FinalColorProcess(vec3 color) {
 }
 
 #include <common>
-#include <packing>
-#include <bsdfs>
-#include <fog_pars_fragment>
-#include <logdepthbuf_pars_fragment>
-#include <lights_pars_begin>
-#include <shadowmap_pars_fragment>
-#include <shadowmask_pars_fragment>
 
 void main() {
 
-	#include <logdepthbuf_fragment>
-
-	// Use world position for seamless noise across tiles
-	vec4 noise = getNoise( worldPosition.xz * size );
+	// Use original world XZ (from UVs) for seamless noise across tiles
+	// This ensures consistent noise calculation at LOD boundaries
+	vec4 noise = getNoise( vWorldXZ * size );
 	vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );
 
 	vec3 diffuseLight = vec3(0.0);
@@ -111,7 +101,7 @@ void main() {
 
 	// Use depth-blended color for scatter
 	vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * depthBlendedColor;
-	vec3 albedo = mix( ( sunColor * diffuseLight * 0.3 + scatter ) * getShadowMask(), ( vec3( 0.1 ) + finalReflection * 0.9 + finalReflection * specularLight ), reflectance);
+	vec3 albedo = mix( ( sunColor * diffuseLight * 0.3 + scatter ), ( vec3( 0.1 ) + finalReflection * 0.9 + finalReflection * specularLight ), reflectance);
 
 	// Apply consistent tone mapping
 	vec3 outgoingLight = FinalColorProcess(albedo);
@@ -121,5 +111,4 @@ void main() {
 	gl_FragColor = vec4( outgoingLight, depthAlpha );
 
 	#include <tonemapping_fragment>
-	#include <fog_fragment>
 }
