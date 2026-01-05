@@ -38,9 +38,10 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		// Layout: heightCache[j * sampleCount + i] = normalized height at grid position (i, j)
 		const heightCache = new Float32Array(totalSamples)
 
-		// Pre-allocate water arrays (cheaper than lazy allocation with backfill)
-		const waterSnappedX = new Float32Array(totalSamples)
-		const waterSnappedZ = new Float32Array(totalSamples)
+		// Track interpolated world coordinates for UVs
+		// At LOD boundaries, these are snapped to match coarse neighbor
+		const worldXForUV = new Float32Array(totalSamples)
+		const worldZForUV = new Float32Array(totalSamples)
 
 		// Pre-check edge stitch conditions to avoid repeated property access
 		const westNeedsStitch = edgeStitchInfo.west.needsStitch
@@ -78,14 +79,6 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			}
 		}
 
-		/**
-		 * Snap a coordinate to the nearest coarse grid position.
-		 * Used for water geometry to collapse edge vertices to match coarse neighbor's grid.
-		 */
-		const snapToCoarseGrid = (coord, neighborStep) => {
-			return Math.round(coord / neighborStep) * neighborStep
-		}
-
 		// Pre-compute stitch decisions for all edge vertices to avoid redundant checks
 		// This caches which vertices need stitching and what parameters to use
 		const stitchCache = new Map()
@@ -95,7 +88,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			for (let i = 0; i < sampleCount; i++) {
 				const onWestEdge = i === 0
 				const onEastEdge = i === segments
-				
+
 				// Only cache edge vertices that need stitching
 				if (onWestEdge && westNeedsStitch) {
 					stitchCache.set(j * sampleCount + i, { step: westStep, axis: 'z' })
@@ -120,81 +113,117 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				const worldX = originX + localX
 
 				let height
-				let snappedWorldX = worldX
-				let snappedWorldZ = worldZ
+				let uvWorldX = worldX
+				let uvWorldZ = worldZ
 
 				// Check stitch cache for this vertex
 				const stitchInfo = stitchCache.get(vertIndex)
 				if (stitchInfo) {
 					// Apply cached stitch parameters
 					height = getStitchedHeight(worldX, worldZ, stitchInfo.step, stitchInfo.axis)
-					if (stitchInfo.axis === 'z') {
-						snappedWorldZ = snapToCoarseGrid(worldZ, stitchInfo.step)
-					} else {
-						snappedWorldX = snapToCoarseGrid(worldX, stitchInfo.step)
-					}
 					heightCache[vertIndex] = height / baseHeightScale
+
+					// Snap UVs to coarse neighbor's grid points
+					// Water shader uses UVs for wave calculations
+					if (stitchInfo.axis === 'z') {
+						uvWorldZ = Math.round(worldZ / stitchInfo.step) * stitchInfo.step
+					} else {
+						uvWorldX = Math.round(worldX / stitchInfo.step) * stitchInfo.step
+					}
 				} else {
 					// No stitching needed - sample directly
 					const normalizedHeight = terrainHelpers.getNormalizedHeight(worldX, worldZ)
 					heightCache[vertIndex] = normalizedHeight
 					height = normalizedHeight * baseHeightScale
 				}
-
 				const posIndex = vertIndex * 3
 				const uvIndex = vertIndex * 2
 
-				// TERRAIN position - use original local coordinates (not snapped)
-				// Height stitching handles the LOD boundary for terrain
+				// Position - use original local coordinates
+				// Height interpolation at LOD boundaries handles seamless stitching
 				positions[posIndex] = localX - halfSize
 				positions[posIndex + 1] = height
 				positions[posIndex + 2] = localZ - halfSize
 
-				// TERRAIN UVs - use original world coordinates
-				uvs[uvIndex] = worldX
-				uvs[uvIndex + 1] = worldZ
+				// UVs - use snapped world coordinates at LOD boundaries
+				// Terrain shader uses vWorldPos.xz (not UVs) for texturing
+				// Water shader uses UVs for wave calculations - snapping ensures seamless waves
+				uvs[uvIndex] = uvWorldX
+				uvs[uvIndex + 1] = uvWorldZ
 
-				// Calculate water depth and populate water arrays
+				// Store for water geometry construction
+				worldXForUV[vertIndex] = uvWorldX
+				worldZForUV[vertIndex] = uvWorldZ
+
+				// Calculate water depth
 				if (height < WATER_LEVEL) {
 					depths[vertIndex] = WATER_LEVEL - height
 					hasWater = true
 				} else {
 					depths[vertIndex] = 0
 				}
-				
-				// Always populate water coordinate arrays (pre-allocated)
-				waterSnappedX[vertIndex] = snappedWorldX
-				waterSnappedZ[vertIndex] = snappedWorldZ
-
 				vertIndex++
 			}
 		}
 
 		// Second pass: compute normals using cached heights (finite differences)
-		// This avoids redundant getNormalizedHeight calls for normal computation
+		// For interior vertices, use cached heights. For edge vertices, sample across
+		// tile boundaries to ensure consistent normals between adjacent tiles.
 		vertIndex = 0
 		for (let j = 0; j < sampleCount; j++) {
+			const localZ = j * step
+			const worldZ = originZ + localZ
+			const onSouthEdge = j === 0
+			const onNorthEdge = j === segments
 			const rowOffset = j * sampleCount
-			// Pre-compute clamped row indices to reduce repeated clamping
-			const jD = Math.max(0, j - 1)
-			const jU = Math.min(segments, j + 1)
-			const dz = (jU - jD) * step
-			
+
 			for (let i = 0; i < sampleCount; i++) {
+				const localX = i * step
+				const worldX = originX + localX
+				const onWestEdge = i === 0
+				const onEastEdge = i === segments
 				const posIndex = vertIndex * 3
 
-				// Use cached heights for finite difference normal calculation
-				// Get neighboring heights from cache, clamping to grid boundaries
-				const iL = Math.max(0, i - 1)
-				const iR = Math.min(segments, i + 1)
+				let hL, hR, hD, hU
+				let dx, dz
 
-				const hL = heightCache[rowOffset + iL] * baseHeightScale
-				const hR = heightCache[rowOffset + iR] * baseHeightScale
-				const hD = heightCache[jD * sampleCount + i] * baseHeightScale
-				const hU = heightCache[jU * sampleCount + i] * baseHeightScale
+				// For edge vertices, sample heights across tile boundaries to ensure
+				// normals match between adjacent tiles. Interior uses cached heights.
+				if (onWestEdge) {
+					// Sample one step outside tile boundary to the west
+					hL = terrainHelpers.getNormalizedHeight(worldX - step, worldZ) * baseHeightScale
+					hR = heightCache[rowOffset + 1] * baseHeightScale
+					dx = 2 * step
+				} else if (onEastEdge) {
+					// Sample one step outside tile boundary to the east
+					hL = heightCache[rowOffset + segments - 1] * baseHeightScale
+					hR = terrainHelpers.getNormalizedHeight(worldX + step, worldZ) * baseHeightScale
+					dx = 2 * step
+				} else {
+					// Interior vertex - use cached heights
+					hL = heightCache[rowOffset + i - 1] * baseHeightScale
+					hR = heightCache[rowOffset + i + 1] * baseHeightScale
+					dx = 2 * step
+				}
 
-				// Calculate partial derivatives using central/forward/backward differences
-				const dx = (iR - iL) * step
+				if (onSouthEdge) {
+					// Sample one step outside tile boundary to the south
+					hD = terrainHelpers.getNormalizedHeight(worldX, worldZ - step) * baseHeightScale
+					hU = heightCache[sampleCount + i] * baseHeightScale
+					dz = 2 * step
+				} else if (onNorthEdge) {
+					// Sample one step outside tile boundary to the north
+					hD = heightCache[(segments - 1) * sampleCount + i] * baseHeightScale
+					hU = terrainHelpers.getNormalizedHeight(worldX, worldZ + step) * baseHeightScale
+					dz = 2 * step
+				} else {
+					// Interior vertex - use cached heights
+					hD = heightCache[(j - 1) * sampleCount + i] * baseHeightScale
+					hU = heightCache[(j + 1) * sampleCount + i] * baseHeightScale
+					dz = 2 * step
+				}
+
+				// Calculate partial derivatives
 				const dhdx = (hR - hL) / dx
 				const dhdz = (hU - hD) / dz
 
@@ -245,30 +274,29 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		// Build water geometry if there's water in this tile
 		let waterGeom = null
 		if (hasWater) {
-			// Create water positions at WATER_LEVEL with snapped coordinates for LOD boundaries
+			// Create water positions and normals (reuse terrain UVs)
 			const waterPositions = new Float32Array(totalSamples * 3)
 			const waterNormals = new Float32Array(totalSamples * 3)
-			const waterUvs = new Float32Array(totalSamples * 2)
 
-			// Build water geometry with snapped positions for seamless LOD boundaries
+			// Build water geometry with snapped positions at LOD boundaries
+			// Both positions AND UVs need to match for seamless rendering
 			for (let i = 0; i < totalSamples; i++) {
 				const posIndex = i * 3
 				const uvIndex = i * 2
 
-				// WATER position - use snapped coordinates (creates degenerate tris at boundaries)
-				// This ensures edge vertices have identical world positions as the coarse neighbor
-				waterPositions[posIndex] = waterSnappedX[i] - originX - halfSize
+				// Water position - use snapped UV coords (world space) converted to local
+				// This ensures edge vertices have identical positions as coarse neighbor
+				const localX = worldXForUV[i] - originX - halfSize
+				const localZ = worldZForUV[i] - originZ - halfSize
+
+				waterPositions[posIndex] = localX
 				waterPositions[posIndex + 1] = WATER_LEVEL
-				waterPositions[posIndex + 2] = waterSnappedZ[i] - originZ - halfSize
+				waterPositions[posIndex + 2] = localZ
 
 				// Normal pointing up (waves added in shader)
 				waterNormals[posIndex] = 0
 				waterNormals[posIndex + 1] = 1
 				waterNormals[posIndex + 2] = 0
-
-				// WATER UVs - use snapped world coordinates for seamless wave calculation
-				waterUvs[uvIndex] = waterSnappedX[i]
-				waterUvs[uvIndex + 1] = waterSnappedZ[i]
 			}
 
 			// Build water indices - only create triangles where at least one vertex is underwater
@@ -303,7 +331,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				waterGeom = new BufferGeometry()
 				waterGeom.setAttribute('position', new BufferAttribute(waterPositions, 3))
 				waterGeom.setAttribute('normal', new BufferAttribute(waterNormals, 3))
-				waterGeom.setAttribute('uv', new BufferAttribute(waterUvs, 2))
+				waterGeom.setAttribute('uv', new BufferAttribute(uvs, 2)) // Reuse terrain UVs
 				waterGeom.setAttribute('depth', new BufferAttribute(depths, 1))
 				// Use slice to trim to actual size used
 				waterGeom.setIndex(new BufferAttribute(waterIndicesArray.slice(0, waterIdx), 1))

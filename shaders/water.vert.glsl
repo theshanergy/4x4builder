@@ -43,8 +43,9 @@ void main() {
 	float waveScale = smoothstep(shorelineDepthThreshold, shallowDepthThreshold, depth);
 	waveScale = waveScale * waveScale * (3.0 - 2.0 * waveScale);
 
-	// UV coordinates are in world space, snapped to coarse grid at LOD boundaries
-	// This ensures seamless waves - edge vertices have identical UVs as neighbors
+	// UV coordinates are in world space
+	// At LOD boundaries, these match the coarse neighbor due to interpolation
+	// This ensures seamless wave calculations across tiles
 	vec3 worldSpacePos = vec3(uv.x, 0.0, uv.y);
 	
 	// Pass to fragment shader for noise calculation
