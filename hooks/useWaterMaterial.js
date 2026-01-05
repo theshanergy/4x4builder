@@ -52,6 +52,7 @@ const createWaterMaterial = (waterNormals, renderTarget, textureMatrix) => {
 
 			// Depth-based visual effects
 			maxVisibleDepth: { value: WATER_DEPTH_CONFIG.maxVisibleDepth },
+			edgeFadeDistance: { value: WATER_DEPTH_CONFIG.edgeFadeDistance },
 		},
 		lights: false,
 		fog: false,

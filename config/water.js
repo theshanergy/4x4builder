@@ -14,11 +14,12 @@ export const WATER_BODY_CONFIG = {
 // Per-tile water depth configuration
 export const WATER_DEPTH_CONFIG = {
 	// Depth thresholds for wave modulation (in world units)
-	shorelineDepthThreshold: 0.5, // Waves nearly flat below this depth
-	shallowDepthThreshold: 3.0, // Full wave amplitude above this depth
+	shorelineDepthThreshold: 2.5, // Waves nearly flat below this depth
+	shallowDepthThreshold: 20.0, // Full wave amplitude above this depth
 
 	// Visual depth effects
 	maxVisibleDepth: 8.0, // Depth at which water reaches full opacity/color
+	edgeFadeDistance: 0.1, // Distance over which water fades to transparent at edges (prevents sawtoothing)
 	waterColor: [0.0, 0.12, 0.06], // Base water color (RGB 0-1), appears lighter/turquoise in shallow areas
 }
 

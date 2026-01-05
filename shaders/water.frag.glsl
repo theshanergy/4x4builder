@@ -15,6 +15,7 @@ uniform vec3 skyHorizonColor;
 
 // Depth-based visual effects
 uniform float maxVisibleDepth;
+uniform float edgeFadeDistance;
 
 varying vec4 mirrorCoord;
 varying vec4 worldPosition;
@@ -106,8 +107,10 @@ void main() {
 	// Apply consistent tone mapping
 	vec3 outgoingLight = FinalColorProcess(albedo);
 
-	// Depth-based alpha: shallow water more transparent
-	float depthAlpha = mix(0.6, alpha, depthFactor);
+	// Depth-based alpha: blend out completely as depth reaches 0 to prevent sawtoothing
+	// Use a smoother fade near the edges for antialiasing
+	float edgeFade = smoothstep(0.0, edgeFadeDistance, vDepth);
+	float depthAlpha = mix(0.6, alpha, depthFactor) * edgeFade;
 	gl_FragColor = vec4( outgoingLight, depthAlpha );
 
 	#include <tonemapping_fragment>
