@@ -48,12 +48,8 @@ const createWaterMaterial = (waterNormals, renderTarget, textureMatrix) => {
 				sunColor: { value: sunColor.clone() },
 				sunDirection: { value: sunDirection.clone() },
 				eye: { value: new Vector3() },
-				waterColor: { 
-					value: new Color(
-						WATER_DEPTH_CONFIG.waterColor[0],
-						WATER_DEPTH_CONFIG.waterColor[1],
-						WATER_DEPTH_CONFIG.waterColor[2]
-					)
+				waterColor: {
+					value: new Color(WATER_DEPTH_CONFIG.waterColor[0], WATER_DEPTH_CONFIG.waterColor[1], WATER_DEPTH_CONFIG.waterColor[2]),
 				},
 
 				// Sky colors for reflection fallback
@@ -135,6 +131,13 @@ const useWaterMaterial = () => {
 	const waterMaterialRef = useRef(waterMaterial)
 	waterMaterialRef.current = waterMaterial
 
+	// Throttle reflection updates (update every N frames)
+	const frameCounter = useRef(0)
+	const REFLECTION_UPDATE_INTERVAL = 2 // Update every 2 frames
+
+	// Cache previous camera parameters to detect changes
+	const prevCameraParams = useRef({ fov: 0, aspect: 0, near: 0, far: 0 })
+
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
@@ -153,28 +156,22 @@ const useWaterMaterial = () => {
 		if (!waterMaterial) return
 
 		const refs = reflectionRefs.current
-		const {
-			renderTarget,
-			mirrorCamera,
-			textureMatrix,
-			mirrorWorldPosition,
-			cameraWorldPosition,
-			normal,
-			view,
-			target,
-			lookAtPosition,
-			rotationMatrix,
-			mirrorPlane,
-			clipPlane,
-			q,
-		} = refs
 
-		// Update time uniform
+		// Update time uniform (always needed for wave animation)
 		waterMaterial.uniforms.time.value += delta
 
 		// Update eye position
+		const cameraWorldPosition = refs.cameraWorldPosition
 		cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld)
 		waterMaterial.uniforms.eye.value.copy(cameraWorldPosition)
+
+		// Throttle reflection rendering
+		frameCounter.current++
+		if (frameCounter.current % REFLECTION_UPDATE_INTERVAL !== 0) {
+			return
+		}
+
+		const { renderTarget, mirrorCamera, textureMatrix, mirrorWorldPosition, normal, view, target, lookAtPosition, rotationMatrix, mirrorPlane, clipPlane, q } = refs
 
 		// Water surface is at Y = WATER_LEVEL, facing up
 		mirrorWorldPosition.set(cameraWorldPosition.x, WATER_LEVEL, cameraWorldPosition.z)
@@ -206,12 +203,26 @@ const useWaterMaterial = () => {
 		mirrorCamera.up.applyMatrix4(rotationMatrix)
 		mirrorCamera.up.reflect(normal)
 		mirrorCamera.lookAt(target)
-		mirrorCamera.far = camera.far
-		mirrorCamera.near = camera.near
-		mirrorCamera.fov = camera.fov
-		mirrorCamera.aspect = camera.aspect
+
+		// Only update projection if camera params changed
+		const prev = prevCameraParams.current
+		const paramsChanged = prev.fov !== camera.fov || prev.aspect !== camera.aspect || prev.near !== camera.near || prev.far !== camera.far
+
+		if (paramsChanged) {
+			mirrorCamera.far = camera.far
+			mirrorCamera.near = camera.near
+			mirrorCamera.fov = camera.fov
+			mirrorCamera.aspect = camera.aspect
+			prev.fov = camera.fov
+			prev.aspect = camera.aspect
+			prev.near = camera.near
+			prev.far = camera.far
+		}
+
 		mirrorCamera.updateMatrixWorld()
-		mirrorCamera.updateProjectionMatrix()
+		if (paramsChanged) {
+			mirrorCamera.updateProjectionMatrix()
+		}
 
 		// Calculate texture matrix
 		textureMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1)
