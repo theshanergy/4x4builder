@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 
-import useGameStore from '../../../store/gameStore'
+import useGameStore, { sceneState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
 
 import OrbitCamera from './OrbitCamera'
@@ -47,6 +47,7 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 	const setCameraMode = useGameStore((state) => state.setCameraMode)
 	const infoMode = useGameStore((state) => state.infoMode)
 	const prevInfoMode = useRef(infoMode)
+	const camera = useThree((state) => state.camera)
 
 	// Get target object for cameras to follow
 	const target = useVehicleGroup()
@@ -75,6 +76,9 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 			cycleCameraMode()
 		}
 		keyPressedLastFrame.current = switchPressed
+
+		// Apply sceneState.cameraPosition to actual camera
+		camera.position.copy(sceneState.cameraPosition)
 	})
 
 	// Handle info mode

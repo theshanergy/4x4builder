@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Vector3, MathUtils, Quaternion } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
+import { sceneState } from '../../../store/gameStore'
 import { dampVector3 } from '../../../utils/dampVector3'
 import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
 
@@ -61,7 +62,10 @@ const ChaseCamera = ({ target }) => {
 		// Ground avoidance logic using shared hook
 		checkGroundAvoidance()
 
-		camera.position.copy(currentPosition.current)
+		// Update sceneState with computed camera position (for Sky and other consumers)
+		sceneState.cameraPosition.copy(currentPosition.current)
+
+		// Apply lookAt to camera
 		camera.lookAt(currentLookAt.current)
 	})
 

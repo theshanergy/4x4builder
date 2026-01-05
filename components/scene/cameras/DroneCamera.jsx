@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react'
 import { Vector3, MathUtils, Euler } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
-import { vehicleState } from '../../../store/gameStore'
+import { vehicleState, sceneState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
 import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
 
@@ -234,8 +234,8 @@ const DroneCamera = () => {
 			velocity.current.y = 0
 		}
 
-		// Apply position to camera
-		camera.position.copy(currentPosition.current)
+		// Apply position to sceneState (for Sky and other consumers)
+		sceneState.cameraPosition.copy(currentPosition.current)
 
 		// Calculate elevation-based downward tilt
 		// At ground level (baseElevation), tilt is 0. As we go higher, tilt increases
