@@ -36,11 +36,9 @@ const AtmosphericSky = () => {
 
 	return (
 		<group ref={groupRef}>
-			<Environment files='assets/images/envmap/qwantani_1k.hdr' environmentIntensity={0.3} />
+			<Environment files='assets/images/envmap/rustig_koppie_puresky_1k.hdr' environmentIntensity={0.3} />
 
-			<hemisphereLight args={[skyColorZenith, skyColorHorizon, 0.8]} />
-
-			<ambientLight intensity={0.4} />
+			<ambientLight intensity={2.0} color={skyColorZenith} />
 
 			<mesh scale={[1, 1, 1]}>
 				<sphereGeometry args={[500, 16, 16]} />
