@@ -106,7 +106,7 @@ const useWaterMaterial = () => {
 	useMemo(() => {
 		const refs = reflectionRefs.current
 		// Start with a reasonable size, will be resized to match screen
-		refs.renderTarget = new WebGLRenderTarget(512, 512)
+		refs.renderTarget = new WebGLRenderTarget(1024, 1024)
 		refs.mirrorCamera = new PerspectiveCamera()
 		refs.textureMatrix = new Matrix4()
 	}, [])
