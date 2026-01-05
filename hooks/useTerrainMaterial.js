@@ -23,39 +23,28 @@ const UNIFORM_FIELDS = [
 // Get nested property value from object using dot notation
 const getNestedValue = (obj, path) => path.split('.').reduce((acc, key) => acc?.[key], obj)
 
-// Generate shader uniforms from layer config
-const generateLayerUniforms = (layers) => {
+// Generate shader uniforms and declarations from layer config (single pass)
+const generateLayerUniformsAndDeclarations = (layers) => {
 	const uniforms = {}
-
-	layers.forEach((layer, index) => {
-		const prefix = `uLayer${index}`
-		UNIFORM_FIELDS.forEach(({ key, path, condition }) => {
-			if (condition(layer)) {
-				uniforms[`${prefix}${key}`] = getNestedValue(layer, path)
-			}
-		})
-	})
-
-	return uniforms
-}
-
-// Generate uniform declarations for fragment shader
-const generateUniformDeclarations = (layers) => {
 	let declarations = ''
 
 	layers.forEach((layer, index) => {
 		const prefix = `uLayer${index}`
+
+		// Add texture declarations
 		declarations += `uniform sampler2D ${prefix}Texture;\n`
 		declarations += `uniform sampler2D ${prefix}NormalMap;\n`
 
-		UNIFORM_FIELDS.forEach(({ key, condition }) => {
+		// Process uniform fields
+		UNIFORM_FIELDS.forEach(({ key, path, condition }) => {
 			if (condition(layer)) {
+				uniforms[`${prefix}${key}`] = getNestedValue(layer, path)
 				declarations += `uniform float ${prefix}${key};\n`
 			}
 		})
 	})
 
-	return declarations
+	return { uniforms, declarations }
 }
 
 // Generate blend factor calculation for a layer
@@ -274,40 +263,31 @@ const useTerrainMaterial = () => {
 	// Load all layer textures
 	const loadedTextures = useLoader(TextureLoader, texturePaths)
 
-	// Layer textures mapped by layer name
+	// Layer textures mapped by layer name, with wrapping configured
 	const layerTextures = useMemo(() => {
 		const result = {}
 		TERRAIN_LAYERS.forEach((layer, index) => {
-			result[layer.name] = {
-				albedo: loadedTextures[index * 2],
-				normal: loadedTextures[index * 2 + 1],
-			}
+			const albedo = loadedTextures[index * 2]
+			const normal = loadedTextures[index * 2 + 1]
+
+			// Configure wrapping
+			if (albedo) albedo.wrapS = albedo.wrapT = RepeatWrapping
+			if (normal) normal.wrapS = normal.wrapT = RepeatWrapping
+
+			result[layer.name] = { albedo, normal }
 		})
 		return result
 	}, [loadedTextures])
 
-	// Configure textures for proper wrapping
-	useMemo(() => {
-		if (!layerTextures) return
-		Object.values(layerTextures).forEach((textures) => {
-			if (textures.albedo) {
-				textures.albedo.wrapS = textures.albedo.wrapT = RepeatWrapping
-			}
-			if (textures.normal) {
-				textures.normal.wrapS = textures.normal.wrapT = RepeatWrapping
-			}
-		})
-	}, [layerTextures])
-
 	// Pre-generate shader code from config
 	const shaderCode = useMemo(() => {
-		const uniformDeclarations = generateUniformDeclarations(TERRAIN_LAYERS)
+		const { uniforms, declarations } = generateLayerUniformsAndDeclarations(TERRAIN_LAYERS)
 		const blendCalculations = TERRAIN_LAYERS.map((layer, i) => generateBlendCode(layer, i)).join('\n')
 		const samplingCode = TERRAIN_LAYERS.map((layer, i) => generateSamplingCode(layer, i)).join('\n')
 		const colorBlending = generateColorBlendingCode(TERRAIN_LAYERS)
 		const normalBlending = generateNormalBlendingCode(TERRAIN_LAYERS)
 
-		return { uniformDeclarations, blendCalculations, samplingCode, colorBlending, normalBlending }
+		return { uniformDeclarations: declarations, uniforms, blendCalculations, samplingCode, colorBlending, normalBlending }
 	}, [])
 
 	// Shader customization callback
@@ -325,8 +305,7 @@ const useTerrainMaterial = () => {
 			})
 
 			// Set parameter uniforms from config
-			const paramUniforms = generateLayerUniforms(TERRAIN_LAYERS)
-			Object.entries(paramUniforms).forEach(([key, value]) => {
+			Object.entries(shaderCode.uniforms).forEach(([key, value]) => {
 				shader.uniforms[key] = { value }
 			})
 
@@ -659,9 +638,7 @@ const useTerrainMaterial = () => {
 	// Create and configure the material
 	const material = useMemo(() => {
 		if (!layerTextures || !baseNormal) return null
-		const mat = new MeshStandardMaterial({
-			normalMap: baseNormal,
-		})
+		const mat = new MeshStandardMaterial({ normalMap: baseNormal })
 		mat.onBeforeCompile = onBeforeCompile
 		materialRef.current = mat
 		return mat
