@@ -81,8 +81,22 @@ void main() {
 
 	float distance = length(worldToEye);
 
+	// Calculate reflection UV from mirror coordinates
+	// Protect against division issues when w is very small (looking straight down)
+	float mirrorW = max(mirrorCoord.w, 0.001);
+	vec2 baseReflectionUV = mirrorCoord.xy / mirrorW;
+	
+	// Apply distortion based on surface normal and distance
 	vec2 distortion = surfaceNormal.xz * ( 0.001 + 1.0 / distance ) * distortionScale;
-	vec3 reflectionSample = vec3( texture2D( mirrorSampler, mirrorCoord.xy / mirrorCoord.w + distortion ) );
+	vec2 reflectionUV = baseReflectionUV + distortion;
+	
+	// Check if reflection UV is valid (within texture bounds with margin)
+	// When looking nearly straight down, UVs can become invalid
+	bool validReflection = reflectionUV.x > 0.0 && reflectionUV.x < 1.0 && 
+	                       reflectionUV.y > 0.0 && reflectionUV.y < 1.0 &&
+	                       mirrorCoord.w > 0.1;
+	
+	vec3 reflectionSample = validReflection ? vec3( texture2D( mirrorSampler, reflectionUV ) ) : vec3(0.0);
 
 	float theta = max( dot( eyeDirection, surfaceNormal ), 0.0 );
 	float rf0 = 0.3;
@@ -92,8 +106,12 @@ void main() {
 	vec3 reflectionDir = reflect( -eyeDirection, surfaceNormal );
 	vec3 skyReflection = GetSkyColour( reflectionDir, normalize(sunDirection), skyColor, skyHorizonColor, sunColor );
 
-	// Blend mirror reflection with sky color for more realistic fallback
-	vec3 finalReflection = mix( skyReflection, reflectionSample, 0.8 );
+	// Fade mirror reflection based on mirrorCoord.w to handle steep angles smoothly
+	// When looking straight down, w becomes small and reflections become invalid
+	float mirrorBlend = validReflection ? smoothstep(0.1, 0.5, mirrorCoord.w) : 0.0;
+
+	// Blend mirror reflection with sky color
+	vec3 finalReflection = mix( skyReflection, reflectionSample, mirrorBlend );
 
 	// Depth-based color: shallow water appears brighter/more transparent
 	float depthFactor = smoothstep(0.0, maxVisibleDepth, vDepth);

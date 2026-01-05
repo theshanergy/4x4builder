@@ -31,9 +31,7 @@ const createWaterMaterial = (waterNormals, renderTarget, textureMatrix) => {
 			sunColor: { value: sunColor.clone() },
 			sunDirection: { value: sunDirection.clone() },
 			eye: { value: new Vector3() },
-			waterColor: {
-				value: new Color(WATER_DEPTH_CONFIG.waterColor[0], WATER_DEPTH_CONFIG.waterColor[1], WATER_DEPTH_CONFIG.waterColor[2]),
-			},
+			waterColor: { value: new Color(WATER_DEPTH_CONFIG.waterColor[0], WATER_DEPTH_CONFIG.waterColor[1], WATER_DEPTH_CONFIG.waterColor[2]) },
 
 			// Sky colors for reflection fallback
 			skyColor: { value: skyColorZenith.clone() },
@@ -95,11 +93,15 @@ const useWaterMaterial = () => {
 		mirrorPlane: new Plane(),
 		clipPlane: new Vector4(),
 		q: new Vector4(),
+		// Track render target size
+		rtWidth: 0,
+		rtHeight: 0,
 	})
 
 	// Initialize reflection objects
 	useMemo(() => {
 		const refs = reflectionRefs.current
+		// Start with a reasonable size, will be resized to match screen
 		refs.renderTarget = new WebGLRenderTarget(512, 512)
 		refs.mirrorCamera = new PerspectiveCamera()
 		refs.textureMatrix = new Matrix4()
@@ -118,9 +120,6 @@ const useWaterMaterial = () => {
 	// Throttle reflection updates (update every N frames)
 	const frameCounter = useRef(0)
 	const REFLECTION_UPDATE_INTERVAL = 2 // Update every 2 frames
-
-	// Cache previous camera parameters to detect changes
-	const prevCameraParams = useRef({ fov: 0, aspect: 0, near: 0, far: 0 })
 
 	// Cleanup on unmount
 	useEffect(() => {
@@ -148,6 +147,16 @@ const useWaterMaterial = () => {
 		const cameraWorldPosition = refs.cameraWorldPosition
 		cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld)
 		waterMaterial.uniforms.eye.value.copy(cameraWorldPosition)
+
+		// Resize render target to match screen size (at half resolution for performance)
+		const pixelRatio = gl.getPixelRatio()
+		const targetWidth = Math.floor(gl.domElement.clientWidth * pixelRatio * 0.5)
+		const targetHeight = Math.floor(gl.domElement.clientHeight * pixelRatio * 0.5)
+		if (refs.rtWidth !== targetWidth || refs.rtHeight !== targetHeight) {
+			refs.renderTarget.setSize(targetWidth, targetHeight)
+			refs.rtWidth = targetWidth
+			refs.rtHeight = targetHeight
+		}
 
 		// Throttle reflection rendering
 		frameCounter.current++
@@ -188,25 +197,14 @@ const useWaterMaterial = () => {
 		mirrorCamera.up.reflect(normal)
 		mirrorCamera.lookAt(target)
 
-		// Only update projection if camera params changed
-		const prev = prevCameraParams.current
-		const paramsChanged = prev.fov !== camera.fov || prev.aspect !== camera.aspect || prev.near !== camera.near || prev.far !== camera.far
-
-		if (paramsChanged) {
-			mirrorCamera.far = camera.far
-			mirrorCamera.near = camera.near
-			mirrorCamera.fov = camera.fov
-			mirrorCamera.aspect = camera.aspect
-			prev.fov = camera.fov
-			prev.aspect = camera.aspect
-			prev.near = camera.near
-			prev.far = camera.far
-		}
+		// Update mirror camera projection to match main camera
+		mirrorCamera.far = camera.far
+		mirrorCamera.near = camera.near
+		mirrorCamera.fov = camera.fov
+		mirrorCamera.aspect = camera.aspect
 
 		mirrorCamera.updateMatrixWorld()
-		if (paramsChanged) {
-			mirrorCamera.updateProjectionMatrix()
-		}
+		mirrorCamera.updateProjectionMatrix()
 
 		// Calculate texture matrix
 		textureMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1)
@@ -233,6 +231,8 @@ const useWaterMaterial = () => {
 		const currentRenderTarget = gl.getRenderTarget()
 		const currentXrEnabled = gl.xr.enabled
 		const currentShadowAutoUpdate = gl.shadowMap.autoUpdate
+		const currentClearColor = gl.getClearColor(new Color())
+		const currentClearAlpha = gl.getClearAlpha()
 
 		// Temporarily hide water tiles by making material invisible
 		const originalVisible = waterMaterial.visible
@@ -243,9 +243,9 @@ const useWaterMaterial = () => {
 		gl.setRenderTarget(renderTarget)
 		gl.state.buffers.depth.setMask(true)
 
-		if (gl.autoClear === false) {
-			gl.clear()
-		}
+		// Set clear color to sky horizon so unrendered areas blend with sky reflection
+		gl.setClearColor(skyColorHorizon, 1.0)
+		gl.clear(true, true, false)
 
 		gl.render(scene, mirrorCamera)
 
@@ -253,6 +253,7 @@ const useWaterMaterial = () => {
 		waterMaterial.visible = originalVisible
 		gl.xr.enabled = currentXrEnabled
 		gl.shadowMap.autoUpdate = currentShadowAutoUpdate
+		gl.setClearColor(currentClearColor, currentClearAlpha)
 		gl.setRenderTarget(currentRenderTarget)
 
 		const viewport = camera.viewport
