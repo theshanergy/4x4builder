@@ -74,30 +74,19 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		}
 
 		/**
-		 * Get wave stitch info for edge vertices.
-		 * Returns [coarseCoord0, coarseCoord1, blendFactor] for interpolation.
-		 * For non-stitched or on-grid vertices, blend factor is -1 (use actual UV).
+		 * Snap a coordinate to the nearest coarse grid position.
+		 * Used for water geometry to collapse edge vertices to match coarse neighbor's grid.
 		 */
-		const getWaveStitchInfo = (coord, neighborStep) => {
-			const grid = coord / neighborStep
-			const gridFloor = Math.floor(grid)
-			const c0 = gridFloor * neighborStep
-			const c1 = c0 + neighborStep
-			const t = grid - gridFloor  // 0 to 1, how far between c0 and c1
-			
-			// If very close to a grid point (within epsilon), no interpolation needed
-			const epsilon = 0.001
-			if (t < epsilon || t > 1 - epsilon) {
-				return { c0: coord, c1: coord, t: -1 }  // -1 means "use actual coord"
-			}
-			return { c0, c1, t }
+		const snapToCoarseGrid = (coord, neighborStep) => {
+			return Math.round(coord / neighborStep) * neighborStep
 		}
 
+		// Track water stitch info per vertex for later water geometry creation
+		// Stores snapped world coordinates for stitched edge vertices
+		const waterSnappedX = new Float32Array(totalSamples)
+		const waterSnappedZ = new Float32Array(totalSamples)
+
 		// Generate vertices
-		// waveStitch stores [c0, c1, t, axis] per vertex for wave interpolation
-		// axis: 0 = no stitch, 1 = stitch along X (south/north edge), 2 = stitch along Z (west/east edge)
-		const waveStitch = new Float32Array(totalSamples * 4)
-		
 		let vertIndex = 0
 		for (let j = 0; j < sampleCount; j++) {
 			const localZ = j * step
@@ -112,36 +101,33 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				const onEastEdge = i === segments
 
 				let height
-				// Wave stitch info for this vertex
-				let stitchInfo = { c0: 0, c1: 0, t: -1 }
-				let stitchAxis = 0  // 0 = none, 1 = X, 2 = Z
+				// For water: snapped world coordinates that match coarse grid
+				let snappedWorldX = worldX
+				let snappedWorldZ = worldZ
 
 				// Apply edge stitching - check edges in priority order
+				// Height is interpolated for terrain; coordinates are snapped for water
 				if (onWestEdge && westNeedsStitch) {
 					height = getStitchedHeight(worldX, worldZ, westStep, 'z')
-					stitchInfo = getWaveStitchInfo(worldZ, westStep)
-					stitchAxis = 2  // Z axis
+					snappedWorldZ = snapToCoarseGrid(worldZ, westStep)
 				} else if (onEastEdge && eastNeedsStitch) {
 					height = getStitchedHeight(worldX, worldZ, eastStep, 'z')
-					stitchInfo = getWaveStitchInfo(worldZ, eastStep)
-					stitchAxis = 2  // Z axis
+					snappedWorldZ = snapToCoarseGrid(worldZ, eastStep)
 				} else if (onSouthEdge && southNeedsStitch) {
 					height = getStitchedHeight(worldX, worldZ, southStep, 'x')
-					stitchInfo = getWaveStitchInfo(worldX, southStep)
-					stitchAxis = 1  // X axis
+					snappedWorldX = snapToCoarseGrid(worldX, southStep)
 				} else if (onNorthEdge && northNeedsStitch) {
 					height = getStitchedHeight(worldX, worldZ, northStep, 'x')
-					stitchInfo = getWaveStitchInfo(worldX, northStep)
-					stitchAxis = 1  // X axis
+					snappedWorldX = snapToCoarseGrid(worldX, northStep)
 				} else {
 					height = terrainHelpers.getNormalizedHeight(worldX, worldZ) * baseHeightScale
 				}
 
 				const posIndex = vertIndex * 3
 				const uvIndex = vertIndex * 2
-				const stitchIndex = vertIndex * 4
 
-				// Position centered on node
+				// TERRAIN position - use original local coordinates (not snapped)
+				// Height stitching handles the LOD boundary for terrain
 				positions[posIndex] = localX - halfSize
 				positions[posIndex + 1] = height
 				positions[posIndex + 2] = localZ - halfSize
@@ -152,15 +138,13 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				normals[posIndex + 1] = normalVec.y
 				normals[posIndex + 2] = normalVec.z
 
-				// UVs in world space (unstitched - shader will handle interpolation)
+				// TERRAIN UVs - use original world coordinates
 				uvs[uvIndex] = worldX
 				uvs[uvIndex + 1] = worldZ
-				
-				// Wave stitch data: [c0, c1, t, axis]
-				waveStitch[stitchIndex] = stitchInfo.c0
-				waveStitch[stitchIndex + 1] = stitchInfo.c1
-				waveStitch[stitchIndex + 2] = stitchInfo.t
-				waveStitch[stitchIndex + 3] = stitchAxis
+
+				// Store snapped coordinates for water geometry
+				waterSnappedX[vertIndex] = snappedWorldX
+				waterSnappedZ[vertIndex] = snappedWorldZ
 
 				// Calculate water depth
 				if (height < WATER_LEVEL) {
@@ -207,29 +191,30 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		// Build water geometry if there's water in this tile
 		let waterGeom = null
 		if (hasWater) {
-			// Create water positions at WATER_LEVEL
+			// Create water positions at WATER_LEVEL with snapped coordinates for LOD boundaries
 			const waterPositions = new Float32Array(totalSamples * 3)
 			const waterNormals = new Float32Array(totalSamples * 3)
 			const waterUvs = new Float32Array(totalSamples * 2)
 
-			// Copy and transform positions to water level
+			// Build water geometry with snapped positions for seamless LOD boundaries
 			for (let i = 0; i < totalSamples; i++) {
 				const posIndex = i * 3
 				const uvIndex = i * 2
 
-				// Position at water level (reuse x and z, set y to WATER_LEVEL)
-				waterPositions[posIndex] = positions[posIndex]
+				// WATER position - use snapped coordinates (creates degenerate tris at boundaries)
+				// This ensures edge vertices have identical world positions as the coarse neighbor
+				waterPositions[posIndex] = waterSnappedX[i] - originX - halfSize
 				waterPositions[posIndex + 1] = WATER_LEVEL
-				waterPositions[posIndex + 2] = positions[posIndex + 2]
+				waterPositions[posIndex + 2] = waterSnappedZ[i] - originZ - halfSize
 
 				// Normal pointing up (waves added in shader)
 				waterNormals[posIndex] = 0
 				waterNormals[posIndex + 1] = 1
 				waterNormals[posIndex + 2] = 0
 
-				// Reuse UVs from terrain
-				waterUvs[uvIndex] = uvs[uvIndex]
-				waterUvs[uvIndex + 1] = uvs[uvIndex + 1]
+				// WATER UVs - use snapped world coordinates for seamless wave calculation
+				waterUvs[uvIndex] = waterSnappedX[i]
+				waterUvs[uvIndex + 1] = waterSnappedZ[i]
 			}
 
 			// Build water indices - only create triangles where at least one vertex is underwater
@@ -266,8 +251,6 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				waterGeom.setAttribute('normal', new BufferAttribute(waterNormals, 3))
 				waterGeom.setAttribute('uv', new BufferAttribute(waterUvs, 2))
 				waterGeom.setAttribute('depth', new BufferAttribute(depths, 1))
-				// Wave stitch data for seamless LOD boundaries: [c0, c1, t, axis]
-				waterGeom.setAttribute('waveStitch', new BufferAttribute(waveStitch, 4))
 				// Use slice to trim to actual size used
 				waterGeom.setIndex(new BufferAttribute(waterIndicesArray.slice(0, waterIdx), 1))
 			}
