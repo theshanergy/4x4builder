@@ -78,10 +78,8 @@ export const TERRAIN_LAYERS = [
 		textureScale: 0.4,
 		normalScale: 0.5,
 		height: {
-			min: 0.0,
-			max: 40,
-			transitionMin: 1.5,
-			transitionMax: 50.0,
+			max: 45,
+			transitionMax: 55,
 			influence: 1.0,
 		},
 		slope: {
@@ -96,7 +94,7 @@ export const TERRAIN_LAYERS = [
 			albedo: '/assets/images/ground/snow.jpg',
 			normal: '/assets/images/ground/snow_normal.jpg',
 		},
-		textureScale: 0.05,
+		textureScale: 0.025,
 		normalScale: 0.5,
 		height: {
 			min: 180,
