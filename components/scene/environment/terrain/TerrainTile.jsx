@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useRef, memo } from 'react'
 
-import { TILE_RESOLUTION } from '../../../../config/terrain'
+import { TILE_RESOLUTION } from '../../../../config/lod'
 import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
 
 // Default edge stitch info (no stitching needed)

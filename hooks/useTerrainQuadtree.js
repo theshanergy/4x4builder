@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS } from '../config/terrain'
+import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS } from '../config/lod'
 import { QuadtreeNode, getEdgeStitchInfo } from '../utils/terrain/quadtree'
 
 /**

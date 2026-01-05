@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
 
 import { vehicleState } from '../../../../store/gameStore'
-import { QUADTREE_MIN_SIZE, TILE_RESOLUTION } from '../../../../config/terrain'
+import { QUADTREE_MIN_SIZE, TILE_RESOLUTION } from '../../../../config/lod'
 
 // Collider size and resolution
 const SAMPLE_COUNT = TILE_RESOLUTION + 1

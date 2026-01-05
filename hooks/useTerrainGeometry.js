@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { BufferGeometry, BufferAttribute } from 'three'
-import { TILE_RESOLUTION } from '../config/terrain'
+import { TILE_RESOLUTION } from '../config/lod'
 import { WATER_LEVEL } from '../config/water'
 
 /**
