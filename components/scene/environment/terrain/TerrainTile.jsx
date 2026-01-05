@@ -3,7 +3,6 @@ import { useMemo, useEffect, useRef, memo } from 'react'
 import { TILE_RESOLUTION } from '../../../../config/terrain'
 import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
 import TerrainMaterial from './TerrainMaterial'
-import WaterTile from './WaterTile'
 
 // Default edge stitch info (no stitching needed)
 const DEFAULT_EDGE_STITCH_INFO = {
@@ -69,37 +68,53 @@ const TerrainTile = memo(({ node, terrainHelpers, layerTextures, edgeStitchInfo,
 	const { centerX, centerZ } = node
 	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
 
-	// Track geometry ref for proper disposal
-	const geometryRef = useRef(null)
+	// Track geometry refs for proper disposal
+	const terrainGeometryRef = useRef(null)
+	const waterGeometryRef = useRef(null)
 
 	// Use effective edge stitch info for both terrain and water
 	const effectiveEdgeStitchInfo = edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO
 
-	// Create geometry
-	const geometry = useTerrainGeometry(node, terrainHelpers, effectiveEdgeStitchInfo)
+	// Create geometries
+	const { terrainGeometry, waterGeometry } = useTerrainGeometry(node, terrainHelpers, effectiveEdgeStitchInfo)
 
-	// Dispose old geometry when it changes and on unmount
+	// Dispose old geometries when they change and on unmount
 	useEffect(() => {
-		// Dispose previous geometry if it exists and is different
-		if (geometryRef.current && geometryRef.current !== geometry) {
-			geometryRef.current.dispose()
+		// Dispose previous terrain geometry if it exists and is different
+		if (terrainGeometryRef.current && terrainGeometryRef.current !== terrainGeometry) {
+			terrainGeometryRef.current.dispose()
 		}
-		geometryRef.current = geometry
+		terrainGeometryRef.current = terrainGeometry
 
 		return () => {
-			if (geometryRef.current) {
-				geometryRef.current.dispose()
-				geometryRef.current = null
+			if (terrainGeometryRef.current) {
+				terrainGeometryRef.current.dispose()
+				terrainGeometryRef.current = null
 			}
 		}
-	}, [geometry])
+	}, [terrainGeometry])
+
+	useEffect(() => {
+		// Dispose previous water geometry if it exists and is different
+		if (waterGeometryRef.current && waterGeometryRef.current !== waterGeometry) {
+			waterGeometryRef.current.dispose()
+		}
+		waterGeometryRef.current = waterGeometry
+
+		return () => {
+			if (waterGeometryRef.current) {
+				waterGeometryRef.current.dispose()
+				waterGeometryRef.current = null
+			}
+		}
+	}, [waterGeometry])
 
 	return (
 		<group position={position}>
-			<mesh geometry={geometry} receiveShadow>
+			<mesh geometry={terrainGeometry} receiveShadow>
 				<TerrainMaterial layerTextures={layerTextures} />
 			</mesh>
-			{waterMaterial && <WaterTile node={node} terrainHelpers={terrainHelpers} waterMaterial={waterMaterial} edgeStitchInfo={effectiveEdgeStitchInfo} />}
+			{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} />}
 		</group>
 	)
 }, arePropsEqual)
