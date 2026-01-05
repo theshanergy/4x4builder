@@ -73,8 +73,10 @@ const useWaterMaterial = () => {
 
 	// Load water normal texture
 	const waterNormals = useLoader(TextureLoader, '/assets/images/ground/water_normal.jpg')
-	useMemo(() => {
-		waterNormals.wrapS = waterNormals.wrapT = RepeatWrapping
+	useEffect(() => {
+		if (waterNormals) {
+			waterNormals.wrapS = waterNormals.wrapT = RepeatWrapping
+		}
 	}, [waterNormals])
 
 	// Create reflection render target and related objects
@@ -96,6 +98,8 @@ const useWaterMaterial = () => {
 		// Track render target size
 		rtWidth: 0,
 		rtHeight: 0,
+		// Reusable objects
+		clearColor: new Color(),
 	})
 
 	// Initialize reflection objects
@@ -148,6 +152,16 @@ const useWaterMaterial = () => {
 		cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld)
 		waterMaterial.uniforms.eye.value.copy(cameraWorldPosition)
 
+		// Skip reflection if camera is very far from water (> 1000 units)
+		const distanceToWater = Math.abs(cameraWorldPosition.y - WATER_LEVEL)
+		if (distanceToWater > 1000) return
+
+		// Throttle reflection rendering
+		frameCounter.current++
+		if (frameCounter.current % REFLECTION_UPDATE_INTERVAL !== 0) {
+			return
+		}
+
 		// Resize render target to match screen size (at half resolution for performance)
 		const pixelRatio = gl.getPixelRatio()
 		const targetWidth = Math.floor(gl.domElement.clientWidth * pixelRatio * 0.5)
@@ -156,12 +170,6 @@ const useWaterMaterial = () => {
 			refs.renderTarget.setSize(targetWidth, targetHeight)
 			refs.rtWidth = targetWidth
 			refs.rtHeight = targetHeight
-		}
-
-		// Throttle reflection rendering
-		frameCounter.current++
-		if (frameCounter.current % REFLECTION_UPDATE_INTERVAL !== 0) {
-			return
 		}
 
 		const { renderTarget, mirrorCamera, textureMatrix, mirrorWorldPosition, normal, view, target, lookAtPosition, rotationMatrix, mirrorPlane, clipPlane, q } = refs
@@ -217,21 +225,22 @@ const useWaterMaterial = () => {
 		clipPlane.set(mirrorPlane.normal.x, mirrorPlane.normal.y, mirrorPlane.normal.z, mirrorPlane.constant)
 
 		const projectionMatrix = mirrorCamera.projectionMatrix
-		q.x = (Math.sign(clipPlane.x) + projectionMatrix.elements[8]) / projectionMatrix.elements[0]
-		q.y = (Math.sign(clipPlane.y) + projectionMatrix.elements[9]) / projectionMatrix.elements[5]
+		const elements = projectionMatrix.elements // Cache array reference
+		q.x = (Math.sign(clipPlane.x) + elements[8]) / elements[0]
+		q.y = (Math.sign(clipPlane.y) + elements[9]) / elements[5]
 		q.z = -1
-		q.w = (1 + projectionMatrix.elements[10]) / projectionMatrix.elements[14]
+		q.w = (1 + elements[10]) / elements[14]
 		clipPlane.multiplyScalar(2 / clipPlane.dot(q))
-		projectionMatrix.elements[2] = clipPlane.x
-		projectionMatrix.elements[6] = clipPlane.y
-		projectionMatrix.elements[10] = clipPlane.z + 1
-		projectionMatrix.elements[14] = clipPlane.w
+		elements[2] = clipPlane.x
+		elements[6] = clipPlane.y
+		elements[10] = clipPlane.z + 1
+		elements[14] = clipPlane.w
 
 		// Render reflection
 		const currentRenderTarget = gl.getRenderTarget()
 		const currentXrEnabled = gl.xr.enabled
 		const currentShadowAutoUpdate = gl.shadowMap.autoUpdate
-		const currentClearColor = gl.getClearColor(new Color())
+		gl.getClearColor(refs.clearColor) // Reuse Color instance
 		const currentClearAlpha = gl.getClearAlpha()
 
 		// Temporarily hide water tiles by making material invisible
@@ -253,7 +262,7 @@ const useWaterMaterial = () => {
 		waterMaterial.visible = originalVisible
 		gl.xr.enabled = currentXrEnabled
 		gl.shadowMap.autoUpdate = currentShadowAutoUpdate
-		gl.setClearColor(currentClearColor, currentClearAlpha)
+		gl.setClearColor(refs.clearColor, currentClearAlpha)
 		gl.setRenderTarget(currentRenderTarget)
 
 		const viewport = camera.viewport
