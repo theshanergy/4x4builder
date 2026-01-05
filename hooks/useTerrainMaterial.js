@@ -1,6 +1,7 @@
-import { useMemo, useRef } from 'react'
-import { RepeatWrapping } from 'three'
-import { TERRAIN_LAYERS } from '../../../../config/terrain'
+import { useMemo, useRef, useEffect } from 'react'
+import { useLoader } from '@react-three/fiber'
+import { RepeatWrapping, MeshStandardMaterial, TextureLoader } from 'three'
+import { TERRAIN_LAYERS } from '../config/terrain'
 
 // Uniform field definitions - maps layer properties to shader uniform names and values
 const UNIFORM_FIELDS = [
@@ -254,19 +255,40 @@ const generateNormalBlendingCode = (layers) => {
 }
 
 /**
- * TerrainMaterial - Extends MeshStandardMaterial with procedural terrain blending
+ * useTerrainMaterial - Creates a shared MeshStandardMaterial with procedural terrain blending
  *
  * Features:
  * - Preserves standard PBR lighting (identical to meshStandardMaterial)
  * - Config-driven layer system with arbitrary texture layers
  * - Height-based, slope-based, and curvature-based blending
  * - Triplanar projection and stochastic sampling for base layer
+ *
+ * @returns {THREE.MeshStandardMaterial} Shared terrain material instance
  */
-const TerrainMaterial = ({ layerTextures }) => {
+const useTerrainMaterial = () => {
 	const materialRef = useRef()
+
+	// Build texture paths array from layer config
+	const texturePaths = useMemo(() => TERRAIN_LAYERS.flatMap((layer) => [layer.textures.albedo, layer.textures.normal]), [])
+
+	// Load all layer textures
+	const loadedTextures = useLoader(TextureLoader, texturePaths)
+
+	// Layer textures mapped by layer name
+	const layerTextures = useMemo(() => {
+		const result = {}
+		TERRAIN_LAYERS.forEach((layer, index) => {
+			result[layer.name] = {
+				albedo: loadedTextures[index * 2],
+				normal: loadedTextures[index * 2 + 1],
+			}
+		})
+		return result
+	}, [loadedTextures])
 
 	// Configure textures for proper wrapping
 	useMemo(() => {
+		if (!layerTextures) return
 		Object.values(layerTextures).forEach((textures) => {
 			if (textures.albedo) {
 				textures.albedo.wrapS = textures.albedo.wrapT = RepeatWrapping
@@ -290,6 +312,7 @@ const TerrainMaterial = ({ layerTextures }) => {
 
 	// Shader customization callback
 	const onBeforeCompile = useMemo(() => {
+		if (!layerTextures) return () => {}
 		return (shader) => {
 			// Set texture uniforms
 			TERRAIN_LAYERS.forEach((layer, index) => {
@@ -631,9 +654,30 @@ const TerrainMaterial = ({ layerTextures }) => {
 
 	// We don't need map/normalMap props since all layers are sampled in custom shader code
 	// But we need a normalMap to trigger USE_NORMALMAP define, so pass the first layer's normal
-	const baseNormal = layerTextures[TERRAIN_LAYERS[0].name]?.normal
+	const baseNormal = layerTextures?.[TERRAIN_LAYERS[0].name]?.normal
 
-	return <meshStandardMaterial ref={materialRef} normalMap={baseNormal} onBeforeCompile={onBeforeCompile} />
+	// Create and configure the material
+	const material = useMemo(() => {
+		if (!layerTextures || !baseNormal) return null
+		const mat = new MeshStandardMaterial({
+			normalMap: baseNormal,
+		})
+		mat.onBeforeCompile = onBeforeCompile
+		materialRef.current = mat
+		return mat
+	}, [layerTextures, baseNormal, onBeforeCompile])
+
+	// Dispose material on unmount
+	useEffect(() => {
+		return () => {
+			if (materialRef.current) {
+				materialRef.current.dispose()
+				materialRef.current = null
+			}
+		}
+	}, [])
+
+	return material
 }
 
-export default TerrainMaterial
+export default useTerrainMaterial

@@ -2,7 +2,6 @@ import { useMemo, useEffect, useRef, memo } from 'react'
 
 import { TILE_RESOLUTION } from '../../../../config/terrain'
 import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
-import TerrainMaterial from './TerrainMaterial'
 
 // Default edge stitch info (no stitching needed)
 const DEFAULT_EDGE_STITCH_INFO = {
@@ -47,7 +46,7 @@ const arePropsEqual = (prevProps, nextProps) => {
 	}
 
 	// Reference comparisons for objects that should be stable
-	if (prevProps.terrainHelpers !== nextProps.terrainHelpers || prevProps.layerTextures !== nextProps.layerTextures || prevProps.waterMaterial !== nextProps.waterMaterial) {
+	if (prevProps.terrainHelpers !== nextProps.terrainHelpers || prevProps.terrainMaterial !== nextProps.terrainMaterial || prevProps.waterMaterial !== nextProps.waterMaterial) {
 		return false
 	}
 
@@ -60,11 +59,11 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
  * @param {Object} props.terrainHelpers - Height/normal sampling functions
- * @param {Object} props.layerTextures - Textures for each terrain layer { layerName: { albedo, normal } }
  * @param {Object} props.edgeStitchInfo - Edge stitching configuration
+ * @param {THREE.Material} props.terrainMaterial - Shared terrain material instance
  * @param {THREE.Material} props.waterMaterial - Shared water material instance
  */
-const TerrainTile = memo(({ node, terrainHelpers, layerTextures, edgeStitchInfo, waterMaterial }) => {
+const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMaterial, waterMaterial }) => {
 	const { centerX, centerZ } = node
 	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
 
@@ -78,42 +77,31 @@ const TerrainTile = memo(({ node, terrainHelpers, layerTextures, edgeStitchInfo,
 	// Create geometries
 	const { terrainGeometry, waterGeometry } = useTerrainGeometry(node, terrainHelpers, effectiveEdgeStitchInfo)
 
+	// Helper to manage geometry lifecycle (disposal on change and unmount)
+	const useGeometryDisposal = (geometryRef, geometry) => {
+		useEffect(() => {
+			// Dispose previous geometry if it exists and is different
+			if (geometryRef.current && geometryRef.current !== geometry) {
+				geometryRef.current.dispose()
+			}
+			geometryRef.current = geometry
+
+			return () => {
+				if (geometryRef.current) {
+					geometryRef.current.dispose()
+					geometryRef.current = null
+				}
+			}
+		}, [geometry])
+	}
+
 	// Dispose old geometries when they change and on unmount
-	useEffect(() => {
-		// Dispose previous terrain geometry if it exists and is different
-		if (terrainGeometryRef.current && terrainGeometryRef.current !== terrainGeometry) {
-			terrainGeometryRef.current.dispose()
-		}
-		terrainGeometryRef.current = terrainGeometry
-
-		return () => {
-			if (terrainGeometryRef.current) {
-				terrainGeometryRef.current.dispose()
-				terrainGeometryRef.current = null
-			}
-		}
-	}, [terrainGeometry])
-
-	useEffect(() => {
-		// Dispose previous water geometry if it exists and is different
-		if (waterGeometryRef.current && waterGeometryRef.current !== waterGeometry) {
-			waterGeometryRef.current.dispose()
-		}
-		waterGeometryRef.current = waterGeometry
-
-		return () => {
-			if (waterGeometryRef.current) {
-				waterGeometryRef.current.dispose()
-				waterGeometryRef.current = null
-			}
-		}
-	}, [waterGeometry])
+	useGeometryDisposal(terrainGeometryRef, terrainGeometry)
+	useGeometryDisposal(waterGeometryRef, waterGeometry)
 
 	return (
 		<group position={position}>
-			<mesh geometry={terrainGeometry} receiveShadow>
-				<TerrainMaterial layerTextures={layerTextures} />
-			</mesh>
+			{terrainMaterial && <mesh geometry={terrainGeometry} material={terrainMaterial} receiveShadow />}
 			{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} />}
 		</group>
 	)

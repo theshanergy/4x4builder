@@ -1,12 +1,10 @@
 import { useMemo, useEffect } from 'react'
-import { useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
 import { Noise } from 'noisejs'
 
-import { TERRAIN_LAYERS } from '../../../../config/terrain'
 import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
 import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
 import useWaterMaterial from '../../../../hooks/useWaterMaterial'
+import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
 import useGameStore from '../../../../store/gameStore'
 import TerrainCollider from './TerrainCollider'
 import TerrainTile from './TerrainTile'
@@ -28,23 +26,8 @@ const Terrain = () => {
 		useGameStore.getState().setTerrainNormalFunction(terrainHelpers.getNormal)
 	}, [terrainHelpers])
 
-	// Build texture paths array from layer config
-	const texturePaths = useMemo(() => TERRAIN_LAYERS.flatMap((layer) => [layer.textures.albedo, layer.textures.normal]), [])
-
-	// Load all layer textures
-	const loadedTextures = useLoader(TextureLoader, texturePaths)
-
-	// Layer textures mapped by layer name
-	const layerTextures = useMemo(() => {
-		const result = {}
-		TERRAIN_LAYERS.forEach((layer, index) => {
-			result[layer.name] = {
-				albedo: loadedTextures[index * 2],
-				normal: loadedTextures[index * 2 + 1],
-			}
-		})
-		return result
-	}, [loadedTextures])
+	// Terrain material shared by all terrain tiles
+	const terrainMaterial = useTerrainMaterial()
 
 	// Water material shared by all water tiles
 	const waterMaterial = useWaterMaterial()
@@ -57,8 +40,8 @@ const Terrain = () => {
 					key={node.key}
 					node={node}
 					terrainHelpers={terrainHelpers}
-					layerTextures={layerTextures}
 					edgeStitchInfo={edgeStitchInfo}
+					terrainMaterial={terrainMaterial}
 					waterMaterial={waterMaterial}
 				/>
 			))}
