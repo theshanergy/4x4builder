@@ -7,10 +7,10 @@ import useGameStore, { vehicleState } from '../store/gameStore'
 import useVehicleInput from './useVehicleInput'
 import useBuoyancy from './useBuoyancy'
 
-// Reset position (scene center, slightly above ground)
-const RESET_POSITION = { x: 0, y: 1, z: 0 }
 // Upright rotation (identity quaternion)
 const RESET_ROTATION = { x: 0, y: 0, z: 0, w: 1 }
+// Safety clearance above terrain for reset (meters)
+const RESET_CLEARANCE = 0.5
 
 // Constants
 const VECTORS = {
@@ -141,13 +141,49 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Get lights toggle function from store
 	const toggleLights = useGameStore((state) => state.toggleLights)
 
-	// Reset vehicle function
+	// Get terrain height function from store
+	const getTerrainHeight = useGameStore((state) => state.getTerrainHeight)
+
+	// Reset vehicle function - rights the vehicle at its current location
 	const resetVehicle = useCallback(() => {
 		const vehicle = vehicleRef.current
 		if (!vehicle) return
 
-		// Reset position to scene center
-		vehicle.setTranslation(RESET_POSITION, true)
+		// Get current position and rotation
+		const currentPos = vehicle.translation()
+		const currentRot = vehicle.rotation()
+
+		// Sample terrain height at wheel positions to handle uneven terrain
+		let maxTerrainHeight = 0
+		if (getTerrainHeight && wheels.length > 0) {
+			// Create a quaternion for current rotation to transform wheel positions
+			const quat = new Quaternion(currentRot.x, currentRot.y, currentRot.z, currentRot.w)
+			const worldPos = new Vector3()
+
+			// Sample terrain at each wheel position to find the highest point
+			// This ensures we don't spawn inside hills or steep terrain
+			for (const wheel of wheels) {
+				// Transform wheel local position to world space
+				worldPos.copy(wheel.position)
+				worldPos.applyQuaternion(quat)
+				worldPos.add(currentPos)
+
+				const height = getTerrainHeight(worldPos.x, worldPos.z)
+				if (height > maxTerrainHeight) {
+					maxTerrainHeight = height
+				}
+			}
+		} else {
+			// Fallback if terrain height function not available
+			maxTerrainHeight = Math.max(0, currentPos.y - 2)
+		}
+
+		// Calculate reset height: terrain height + clearance + a bit extra for safety
+		// The wheels will be at approximately vehicleHeight, so we position the body above that
+		const resetY = maxTerrainHeight + RESET_CLEARANCE + 0.5
+
+		// Reset position at current XZ but safe height
+		vehicle.setTranslation({ x: currentPos.x, y: resetY, z: currentPos.z }, true)
 
 		// Reset rotation to upright
 		vehicle.setRotation(RESET_ROTATION, true)
@@ -160,7 +196,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		vehicleState.gear = 0
 		isInPark.current = true
 		parkEngageTimer.current = 0
-	}, [vehicleRef])
+	}, [vehicleRef, getTerrainHeight, wheels])
 
 	// Setup vehicle physics
 	useEffect(() => {
@@ -266,7 +302,10 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		}
 
 		// Get processed vehicle input
-		const { throttleInput, brakeInput, brakeJustPressed, steerInput, isDrifting, shouldReset, shouldToggleLights, pitchInput, rollInput, yawInput } = getVehicleInput(delta, forwardSpeed)
+		const { throttleInput, brakeInput, brakeJustPressed, steerInput, isDrifting, shouldReset, shouldToggleLights, pitchInput, rollInput, yawInput } = getVehicleInput(
+			delta,
+			forwardSpeed
+		)
 
 		// Handle reset
 		if (shouldReset) {
