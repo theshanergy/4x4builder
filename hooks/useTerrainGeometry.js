@@ -34,7 +34,18 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		const depths = new Float32Array(totalSamples)
 		let hasWater = false
 
+		// Reuse Vector3 for all normal calculations
 		const normalVec = new Vector3()
+
+		// Pre-check edge stitch conditions to avoid repeated property access
+		const westNeedsStitch = edgeStitchInfo.west.needsStitch
+		const eastNeedsStitch = edgeStitchInfo.east.needsStitch
+		const southNeedsStitch = edgeStitchInfo.south.needsStitch
+		const northNeedsStitch = edgeStitchInfo.north.needsStitch
+		const westStep = edgeStitchInfo.west.neighborStep
+		const eastStep = edgeStitchInfo.east.neighborStep
+		const southStep = edgeStitchInfo.south.neighborStep
+		const northStep = edgeStitchInfo.north.neighborStep
 
 		/**
 		 * Get interpolated height for stitched edges.
@@ -63,34 +74,34 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		}
 
 		// Generate vertices
-		for (let i = 0; i < sampleCount; i++) {
-			const localX = i * step
-			const worldX = originX + localX
-			const onWestEdge = i === 0
-			const onEastEdge = i === segments
+		let vertIndex = 0
+		for (let j = 0; j < sampleCount; j++) {
+			const localZ = j * step
+			const worldZ = originZ + localZ
+			const onSouthEdge = j === 0
+			const onNorthEdge = j === segments
 
-			for (let j = 0; j < sampleCount; j++) {
-				const localZ = j * step
-				const worldZ = originZ + localZ
-				const onSouthEdge = j === 0
-				const onNorthEdge = j === segments
+			for (let i = 0; i < sampleCount; i++) {
+				const localX = i * step
+				const worldX = originX + localX
+				const onWestEdge = i === 0
+				const onEastEdge = i === segments
 
 				let height
 
 				// Apply edge stitching - check edges in priority order
-				if (onWestEdge && edgeStitchInfo.west.needsStitch) {
-					height = getStitchedHeight(worldX, worldZ, edgeStitchInfo.west.neighborStep, 'z')
-				} else if (onEastEdge && edgeStitchInfo.east.needsStitch) {
-					height = getStitchedHeight(worldX, worldZ, edgeStitchInfo.east.neighborStep, 'z')
-				} else if (onSouthEdge && edgeStitchInfo.south.needsStitch) {
-					height = getStitchedHeight(worldX, worldZ, edgeStitchInfo.south.neighborStep, 'x')
-				} else if (onNorthEdge && edgeStitchInfo.north.needsStitch) {
-					height = getStitchedHeight(worldX, worldZ, edgeStitchInfo.north.neighborStep, 'x')
+				if (onWestEdge && westNeedsStitch) {
+					height = getStitchedHeight(worldX, worldZ, westStep, 'z')
+				} else if (onEastEdge && eastNeedsStitch) {
+					height = getStitchedHeight(worldX, worldZ, eastStep, 'z')
+				} else if (onSouthEdge && southNeedsStitch) {
+					height = getStitchedHeight(worldX, worldZ, southStep, 'x')
+				} else if (onNorthEdge && northNeedsStitch) {
+					height = getStitchedHeight(worldX, worldZ, northStep, 'x')
 				} else {
 					height = terrainHelpers.getNormalizedHeight(worldX, worldZ) * baseHeightScale
 				}
 
-				const vertIndex = i + sampleCount * j
 				const posIndex = vertIndex * 3
 				const uvIndex = vertIndex * 2
 
@@ -110,26 +121,37 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				uvs[uvIndex + 1] = worldZ
 
 				// Calculate water depth
-				const isUnderwater = height < WATER_LEVEL
-				depths[vertIndex] = isUnderwater ? WATER_LEVEL - height : 0
-				if (isUnderwater) {
+				if (height < WATER_LEVEL) {
+					depths[vertIndex] = WATER_LEVEL - height
 					hasWater = true
+				} else {
+					depths[vertIndex] = 0
 				}
+
+				vertIndex++
 			}
 		}
 
-		// Build indices for the grid
-		const indices = []
-		for (let i = 0; i < segments; i++) {
-			for (let j = 0; j < segments; j++) {
-				const a = i + sampleCount * j
-				const b = i + 1 + sampleCount * j
-				const c = i + sampleCount * (j + 1)
-				const d = i + 1 + sampleCount * (j + 1)
+		// Build indices for the grid - pre-allocate for performance
+		const numTriangles = segments * segments * 2
+		const indices = new Uint32Array(numTriangles * 3)
+		let idx = 0
+
+		for (let j = 0; j < segments; j++) {
+			const rowOffset = sampleCount * j
+			for (let i = 0; i < segments; i++) {
+				const a = i + rowOffset
+				const b = a + 1
+				const c = a + sampleCount
+				const d = c + 1
 
 				// Two triangles per quad
-				indices.push(a, c, b)
-				indices.push(b, c, d)
+				indices[idx++] = a
+				indices[idx++] = c
+				indices[idx++] = b
+				indices[idx++] = b
+				indices[idx++] = c
+				indices[idx++] = d
 			}
 		}
 
@@ -138,7 +160,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		terrainGeom.setAttribute('position', new BufferAttribute(positions, 3))
 		terrainGeom.setAttribute('normal', new BufferAttribute(normals, 3))
 		terrainGeom.setAttribute('uv', new BufferAttribute(uvs, 2))
-		terrainGeom.setIndex(indices)
+		terrainGeom.setIndex(new BufferAttribute(indices, 1))
 
 		// Build water geometry if there's water in this tile
 		let waterGeom = null
@@ -148,58 +170,62 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			const waterNormals = new Float32Array(totalSamples * 3)
 			const waterUvs = new Float32Array(totalSamples * 2)
 
-			for (let i = 0; i < sampleCount; i++) {
-				const localX = i * step
-				for (let j = 0; j < sampleCount; j++) {
-					const localZ = j * step
-					const vertIndex = i + sampleCount * j
-					const posIndex = vertIndex * 3
-					const uvIndex = vertIndex * 2
+			// Copy and transform positions to water level
+			for (let i = 0; i < totalSamples; i++) {
+				const posIndex = i * 3
+				const uvIndex = i * 2
 
-					// Position at water level
-					waterPositions[posIndex] = localX - halfSize
-					waterPositions[posIndex + 1] = WATER_LEVEL
-					waterPositions[posIndex + 2] = localZ - halfSize
+				// Position at water level (reuse x and z, set y to WATER_LEVEL)
+				waterPositions[posIndex] = positions[posIndex]
+				waterPositions[posIndex + 1] = WATER_LEVEL
+				waterPositions[posIndex + 2] = positions[posIndex + 2]
 
-					// Normal pointing up (waves added in shader)
-					waterNormals[posIndex] = 0
-					waterNormals[posIndex + 1] = 1
-					waterNormals[posIndex + 2] = 0
+				// Normal pointing up (waves added in shader)
+				waterNormals[posIndex] = 0
+				waterNormals[posIndex + 1] = 1
+				waterNormals[posIndex + 2] = 0
 
-					// UVs in world space for seamless texturing
-					const worldX = originX + localX
-					const worldZ = originZ + localZ
-					waterUvs[uvIndex] = worldX
-					waterUvs[uvIndex + 1] = worldZ
-				}
+				// Reuse UVs from terrain
+				waterUvs[uvIndex] = uvs[uvIndex]
+				waterUvs[uvIndex + 1] = uvs[uvIndex + 1]
 			}
 
 			// Build water indices - only create triangles where at least one vertex is underwater
-			const waterIndices = []
-			for (let i = 0; i < segments; i++) {
-				for (let j = 0; j < segments; j++) {
-					const a = i + sampleCount * j
-					const b = i + 1 + sampleCount * j
-					const c = i + sampleCount * (j + 1)
-					const d = i + 1 + sampleCount * (j + 1)
+			// Pre-allocate maximum possible size (all quads underwater)
+			const maxWaterIndices = numTriangles * 3
+			const waterIndicesArray = new Uint32Array(maxWaterIndices)
+			let waterIdx = 0
+
+			for (let j = 0; j < segments; j++) {
+				const rowOffset = sampleCount * j
+				for (let i = 0; i < segments; i++) {
+					const a = i + rowOffset
+					const b = a + 1
+					const c = a + sampleCount
+					const d = c + 1
 
 					// Check if any vertex in this quad is underwater
 					if (depths[a] > 0 || depths[b] > 0 || depths[c] > 0 || depths[d] > 0) {
 						// Two triangles per quad
-						waterIndices.push(a, c, b)
-						waterIndices.push(b, c, d)
+						waterIndicesArray[waterIdx++] = a
+						waterIndicesArray[waterIdx++] = c
+						waterIndicesArray[waterIdx++] = b
+						waterIndicesArray[waterIdx++] = b
+						waterIndicesArray[waterIdx++] = c
+						waterIndicesArray[waterIdx++] = d
 					}
 				}
 			}
 
 			// Only create water geometry if we have triangles
-			if (waterIndices.length > 0) {
+			if (waterIdx > 0) {
 				waterGeom = new BufferGeometry()
 				waterGeom.setAttribute('position', new BufferAttribute(waterPositions, 3))
 				waterGeom.setAttribute('normal', new BufferAttribute(waterNormals, 3))
 				waterGeom.setAttribute('uv', new BufferAttribute(waterUvs, 2))
 				waterGeom.setAttribute('depth', new BufferAttribute(depths, 1))
-				waterGeom.setIndex(waterIndices)
+				// Use slice to trim to actual size used
+				waterGeom.setIndex(new BufferAttribute(waterIndicesArray.slice(0, waterIdx), 1))
 			}
 		}
 
