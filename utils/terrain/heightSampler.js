@@ -4,7 +4,7 @@
 // Water is simply wherever terrain height < water level (no special casing)
 
 import { Vector3 } from 'three'
-import { TERRAIN_CONFIG, STAGING_AREA } from '../../config/terrain'
+import { TERRAIN_CONFIG } from '../../config/terrain'
 import { WATER_LEVEL, WATER_BODY_CONFIG } from '../../config/water'
 
 // Epsilon for numerical gradient approximation
@@ -18,11 +18,10 @@ const GRADIENT_EPSILON = 0.01
  * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and isWater functions
  */
 export const createTerrainHelpers = (noise) => {
-	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnProtectionRadius, spawnTransitionWidth } = TERRAIN_CONFIG
+	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnProtectionRadius, spawnTransitionWidth, spawnFlatRadius, spawnTransitionDistance } = TERRAIN_CONFIG
 
-	const { flatRadius, transitionEnd } = STAGING_AREA
-	const flatRadiusSq = flatRadius * flatRadius
-	const transitionEndSq = transitionEnd * transitionEnd
+	const flatRadiusSq = spawnFlatRadius * spawnFlatRadius
+	const transitionEndSq = spawnTransitionDistance * spawnTransitionDistance
 
 	/**
 	 * Smoothstep interpolation (cubic hermite)
@@ -47,7 +46,7 @@ export const createTerrainHelpers = (noise) => {
 		const distSq = x * x + z * z
 		const dist = Math.sqrt(distSq)
 
-		// === STAGING AREA: Flat spawn zone (check first for early return) ===
+		// === SPAWN AREA: Flat spawn zone (check first for early return) ===
 		if (distSq < flatRadiusSq) {
 			return 0
 		}
@@ -129,9 +128,9 @@ export const createTerrainHelpers = (noise) => {
 
 		height += mountainHeight
 
-		// === STAGING AREA: Smooth transition ===
+		// === SPAWN AREA: Smooth transition ===
 		if (distSq < transitionEndSq) {
-			const t = (dist - flatRadius) / (transitionEnd - flatRadius)
+			const t = (dist - spawnFlatRadius) / (spawnTransitionDistance - spawnFlatRadius)
 			const blend = t * t * t * (t * (t * 6 - 15) + 10)
 			const blendedHeight = height * blend
 			

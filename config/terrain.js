@@ -29,14 +29,13 @@ export const TERRAIN_CONFIG = {
 
 	// Width of transition zone from protected to natural terrain
 	spawnTransitionWidth: 300,
-}
 
-// Staging Area Configuration (flat spawn area)
-export const STAGING_AREA = {
+	// === Spawn Area (flat starting zone) ===
 	// Radius of completely flat area around origin
-	flatRadius: 16,
-	// Distance where terrain reaches full height (smooth blend zone)
-	transitionEnd: 2500,
+	spawnFlatRadius: 16,
+
+	// Distance where terrain reaches full height (smooth blend zone from flat area)
+	spawnTransitionDistance: 2500,
 }
 
 /**
