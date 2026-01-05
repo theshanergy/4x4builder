@@ -7,7 +7,7 @@ import { vehicleState } from '../store/gameStore'
 /**
  * Buoyancy hook for vehicle water physics
  * Automatically applies buoyancy forces each frame when vehicle is in water
- * Works with the procedural water body system (lakes, seas, rivers)
+ * Works with the procedural water body system (lakes, seas)
  * @param {Object} vehicleRef - Reference to the vehicle rigid body
  */
 const useBuoyancy = (vehicleRef) => {

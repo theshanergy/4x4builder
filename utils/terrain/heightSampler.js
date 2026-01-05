@@ -7,7 +7,6 @@ import { TERRAIN_CONFIG, CONTINENTAL_CONFIG } from '../../config/terrain'
 import { getContinentalValue, getBeachBlend, isWaterBody } from './features/continental'
 import { blendWaterBodyTerrain } from './features/waterBodies'
 import { getMountainContribution } from './features/mountains'
-import { applyRiverCarving } from './features/rivers'
 import { getStagingBlend } from './features/staging'
 
 // Epsilon for numerical gradient approximation
@@ -72,12 +71,7 @@ export const createTerrainHelpers = (noise) => {
 		const mountainInfluence = mountainHeight > 0 ? Math.min(1, mountainHeight * 0.5) : 0
 		let combinedHeight = baseHeight * (1 - mountainInfluence * 0.7) + mountainHeight
 
-		// 10. Apply procedural river carving (only on land)
-		if (!isWaterBody(continental)) {
-			combinedHeight = applyRiverCarving(combinedHeight, worldX, worldZ, noise, continental, baseHeightScale)
-		}
-
-		// 11. Apply water body blending - handles lakes, seas, and beach transitions
+		// 10. Apply water body blending - handles lakes, seas, and beach transitions
 		combinedHeight = blendWaterBodyTerrain(combinedHeight, continental, baseHeightScale, noise, worldX, worldZ)
 
 		return combinedHeight

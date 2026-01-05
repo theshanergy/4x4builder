@@ -69,24 +69,6 @@ export const MOUNTAIN_CONFIG = {
 	rangeThreshold: 0.3,
 }
 
-// Procedural river configuration
-export const RIVER_CONFIG_PROCEDURAL = {
-	// Scale of river channel noise (smaller = wider, more spread out rivers)
-	channelScale: 0.0005,
-	// Threshold for river channels (lower = more rivers, higher = fewer)
-	channelThreshold: 0.5,
-	// River width at full channel strength
-	maxWidth: 100,
-	// River depth below water level
-	depth: 2.5,
-	// Transition width for river banks
-	bankTransition: 60,
-	// Minimum continental value for rivers (they need land to flow through)
-	minContinental: -0.05,
-	// Rivers are more likely near water bodies
-	waterProximityBoost: 0.4,
-}
-
 /**
  * Terrain Layer Configuration
  *
