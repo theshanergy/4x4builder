@@ -1,9 +1,7 @@
-import { useMemo, useEffect, useRef, memo } from 'react'
+import { useEffect, useRef, memo } from 'react'
 
 import { TILE_RESOLUTION } from '../../../../config/terrain'
-import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
-import TerrainMaterial from './TerrainMaterial'
-import WaterTile from './WaterTile'
+import useWaterGeometry from '../../../../hooks/useWaterGeometry'
 
 // Default edge stitch info (no stitching needed)
 const DEFAULT_EDGE_STITCH_INFO = {
@@ -14,7 +12,7 @@ const DEFAULT_EDGE_STITCH_INFO = {
 }
 
 /**
- * Custom comparison for QuadtreeTerrainTile props.
+ * Custom comparison for WaterTile props.
  * Prevents unnecessary re-renders when props haven't meaningfully changed.
  */
 const arePropsEqual = (prevProps, nextProps) => {
@@ -48,7 +46,7 @@ const arePropsEqual = (prevProps, nextProps) => {
 	}
 
 	// Reference comparisons for objects that should be stable
-	if (prevProps.terrainHelpers !== nextProps.terrainHelpers || prevProps.layerTextures !== nextProps.layerTextures || prevProps.waterMaterial !== nextProps.waterMaterial) {
+	if (prevProps.terrainHelpers !== nextProps.terrainHelpers || prevProps.waterMaterial !== nextProps.waterMaterial) {
 		return false
 	}
 
@@ -56,27 +54,21 @@ const arePropsEqual = (prevProps, nextProps) => {
 }
 
 /**
- * TerrainTile - Renders a single quadtree leaf node as terrain geometry.
+ * WaterTile - Renders water surface for a single quadtree leaf node.
+ * Only renders if there is water (terrain below WATER_LEVEL) in this tile.
  *
  * @param {Object} props
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
- * @param {Object} props.terrainHelpers - Height/normal sampling functions
- * @param {Object} props.layerTextures - Textures for each terrain layer { layerName: { albedo, normal } }
- * @param {Object} props.edgeStitchInfo - Edge stitching configuration
+ * @param {Object} props.terrainHelpers - Height sampling functions
  * @param {THREE.Material} props.waterMaterial - Shared water material instance
+ * @param {Object} props.edgeStitchInfo - Edge stitching configuration
  */
-const TerrainTile = memo(({ node, terrainHelpers, layerTextures, edgeStitchInfo, waterMaterial }) => {
-	const { centerX, centerZ } = node
-	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
-
+const WaterTile = memo(({ node, terrainHelpers, waterMaterial, edgeStitchInfo }) => {
 	// Track geometry ref for proper disposal
 	const geometryRef = useRef(null)
 
-	// Use effective edge stitch info for both terrain and water
-	const effectiveEdgeStitchInfo = edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO
-
-	// Create geometry
-	const geometry = useTerrainGeometry(node, terrainHelpers, effectiveEdgeStitchInfo)
+	// Create water geometry (returns null if no water in this tile)
+	const geometry = useWaterGeometry(node, terrainHelpers, edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO)
 
 	// Dispose old geometry when it changes and on unmount
 	useEffect(() => {
@@ -94,14 +86,14 @@ const TerrainTile = memo(({ node, terrainHelpers, layerTextures, edgeStitchInfo,
 		}
 	}, [geometry])
 
-	return (
-		<group position={position}>
-			<mesh geometry={geometry} receiveShadow>
-				<TerrainMaterial layerTextures={layerTextures} />
-			</mesh>
-			{waterMaterial && <WaterTile node={node} terrainHelpers={terrainHelpers} waterMaterial={waterMaterial} edgeStitchInfo={effectiveEdgeStitchInfo} />}
-		</group>
-	)
+	// Don't render if no water in this tile
+	if (!geometry) {
+		return null
+	}
+
+	// Note: No position needed - geometry is in local tile coordinates
+	// and this component is already a child of the positioned TerrainTile group
+	return <mesh geometry={geometry} material={waterMaterial} />
 }, arePropsEqual)
 
-export default TerrainTile
+export default WaterTile

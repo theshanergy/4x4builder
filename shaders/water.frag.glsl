@@ -13,8 +13,13 @@ uniform vec3 waterColor;
 uniform vec3 skyColor;
 uniform vec3 skyHorizonColor;
 
+// Depth-based visual effects
+uniform vec3 shallowWaterColor;
+uniform float maxVisibleDepth;
+
 varying vec4 mirrorCoord;
 varying vec4 worldPosition;
+varying float vDepth;
 
 uniform float offsetX;
 uniform float offsetZ;
@@ -43,16 +48,16 @@ vec3 GetSkyColour(vec3 vRayDir, vec3 vSunDir, vec3 vSkyColor, vec3 vSkyHorizonCo
 	float elevation = max(0.0, vRayDir.y);
 	float skyBlend = pow(elevation, 0.5);
 	vec3 vSkyColour = mix(vSkyHorizonColor, vSkyColor, skyBlend);
-	
+
 	// Subtle sun glow near sun position
 	float fSunDotV = max(0.0, dot(vSunDir, vRayDir));
 	float sunGlow = pow(fSunDotV, 8.0) * 0.3;
 	vSkyColour += vSunColor * sunGlow * (1.0 - elevation * 0.5);
-	
+
 	// Very subtle horizon haze
 	float horizonHaze = pow(1.0 - elevation, 12.0) * 0.15;
 	vSkyColour = mix(vSkyColour, vec3(0.9, 0.92, 0.95), horizonHaze);
-	
+
 	return vSkyColour;
 }
 
@@ -73,7 +78,8 @@ void main() {
 
 	#include <logdepthbuf_fragment>
 
-	vec4 noise = getNoise( (worldPosition.xz) + vec2(offsetX/12.25,offsetZ/12.25) * size );
+	// Use world position for seamless noise across tiles
+	vec4 noise = getNoise( worldPosition.xz * size );
 	vec3 surfaceNormal = normalize( noise.xzy * vec3( 1.5, 1.0, 1.5 ) );
 
 	vec3 diffuseLight = vec3(0.0);
@@ -91,20 +97,28 @@ void main() {
 	float theta = max( dot( eyeDirection, surfaceNormal ), 0.0 );
 	float rf0 = 0.3;
 	float reflectance = rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 );
-	
+
 	// Use sky color for non-reflected rays
 	vec3 reflectionDir = reflect( -eyeDirection, surfaceNormal );
 	vec3 skyReflection = GetSkyColour( reflectionDir, normalize(sunDirection), skyColor, skyHorizonColor, sunColor );
-	
+
 	// Blend mirror reflection with sky color for more realistic fallback
 	vec3 finalReflection = mix( skyReflection, reflectionSample, 0.8 );
-	
-	vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * waterColor;
+
+	// Depth-based color blending: shallow = turquoise, deep = original water color
+	float depthFactor = smoothstep(0.0, maxVisibleDepth, vDepth);
+	vec3 depthBlendedColor = mix(shallowWaterColor, waterColor, depthFactor);
+
+	// Use depth-blended color for scatter
+	vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * depthBlendedColor;
 	vec3 albedo = mix( ( sunColor * diffuseLight * 0.3 + scatter ) * getShadowMask(), ( vec3( 0.1 ) + finalReflection * 0.9 + finalReflection * specularLight ), reflectance);
-	
+
 	// Apply consistent tone mapping
 	vec3 outgoingLight = FinalColorProcess(albedo);
-	gl_FragColor = vec4( outgoingLight, alpha );
+
+	// Depth-based alpha: shallow water more transparent
+	float depthAlpha = mix(0.6, alpha, depthFactor);
+	gl_FragColor = vec4( outgoingLight, depthAlpha );
 
 	#include <tonemapping_fragment>
 	#include <fog_fragment>

@@ -11,6 +11,17 @@ export const WATER_BODY_CONFIG = {
 	beachSteepness: 2.5,
 }
 
+// Per-tile water depth configuration
+export const WATER_DEPTH_CONFIG = {
+	// Depth thresholds for wave modulation (in world units)
+	shorelineDepthThreshold: 0.5, // Waves nearly flat below this depth
+	shallowDepthThreshold: 3.0, // Full wave amplitude above this depth
+
+	// Visual depth effects
+	maxVisibleDepth: 8.0, // Depth at which water reaches full opacity/color
+	shallowWaterColor: [0.2, 0.6, 0.6], // Turquoise tint for shallow water (RGB 0-1)
+}
+
 // Flow map texture configuration (for water shader animation)
 // Now covers a larger area for the infinite terrain
 export const FLOW_MAP_CONFIG = {

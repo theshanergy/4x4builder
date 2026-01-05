@@ -6,6 +6,7 @@ import { Noise } from 'noisejs'
 import { TERRAIN_LAYERS } from '../../../../config/terrain'
 import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
 import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
+import useWaterMaterial from '../../../../hooks/useWaterMaterial'
 import useGameStore from '../../../../store/gameStore'
 import TerrainCollider from './TerrainCollider'
 import TerrainTile from './TerrainTile'
@@ -33,7 +34,7 @@ const Terrain = () => {
 	// Load all layer textures
 	const loadedTextures = useLoader(TextureLoader, texturePaths)
 
-	// Organize textures by layer name
+	// Layer textures mapped by layer name
 	const layerTextures = useMemo(() => {
 		const result = {}
 		TERRAIN_LAYERS.forEach((layer, index) => {
@@ -45,11 +46,21 @@ const Terrain = () => {
 		return result
 	}, [loadedTextures])
 
+	// Water material shared by all water tiles
+	const waterMaterial = useWaterMaterial()
+
 	return (
 		<group name='Terrain'>
 			<TerrainCollider terrainHelpers={terrainHelpers} />
 			{leafTiles.map(({ node, edgeStitchInfo }) => (
-				<TerrainTile key={node.key} node={node} terrainHelpers={terrainHelpers} layerTextures={layerTextures} edgeStitchInfo={edgeStitchInfo} />
+				<TerrainTile
+					key={node.key}
+					node={node}
+					terrainHelpers={terrainHelpers}
+					layerTextures={layerTextures}
+					edgeStitchInfo={edgeStitchInfo}
+					waterMaterial={waterMaterial}
+				/>
 			))}
 		</group>
 	)
