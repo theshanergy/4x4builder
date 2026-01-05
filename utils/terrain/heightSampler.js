@@ -133,7 +133,17 @@ export const createTerrainHelpers = (noise) => {
 		if (distSq < transitionEndSq) {
 			const t = (dist - flatRadius) / (transitionEnd - flatRadius)
 			const blend = t * t * t * (t * (t * 6 - 15) + 10)
-			height *= blend
+			const blendedHeight = height * blend
+			
+			// Prevent transition from pushing beaches below water
+			// If natural terrain would be a beach (slightly above water), preserve that
+			const waterThresholdNormalized = WATER_LEVEL / baseHeightScale
+			if (height > waterThresholdNormalized && blendedHeight < waterThresholdNormalized) {
+				// Beach preservation: keep terrain at least at water level
+				height = waterThresholdNormalized
+			} else {
+				height = blendedHeight
+			}
 		}
 
 		return height

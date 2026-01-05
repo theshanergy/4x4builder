@@ -34,9 +34,9 @@ export const TERRAIN_CONFIG = {
 // Staging Area Configuration (flat spawn area)
 export const STAGING_AREA = {
 	// Radius of completely flat area around origin
-	flatRadius: 160,
+	flatRadius: 16,
 	// Distance where terrain reaches full height (smooth blend zone)
-	transitionEnd: 820,
+	transitionEnd: 2500,
 }
 
 /**
