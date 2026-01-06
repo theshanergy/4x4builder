@@ -46,12 +46,11 @@ const BLADE_CONFIG = {
 }
 
 // Grass configuration for chunk-based generation
-const GRASS_CHUNK_SIZE = 16
-const GRASS_VIEW_DISTANCE = 60
-const GRASS_LOD_DISTANCE = 35 // Distance at which to reduce blade count
-const GRASS_FRUSTUM_BUFFER = 1.3 // Multiplier to extend frustum (prevents pop-in)
-
 const GRASS_CONFIG = {
+	chunkSize: 16,
+	viewDistance: 160,
+	lodDistance: 35, // Distance at which to reduce blade count
+	frustumBuffer: 1.3, // Multiplier to extend frustum (prevents pop-in)
 	patchesPerChunk: { min: 4, max: 7 },
 	patchRadius: { min: 0.3, max: 0.6 },
 	bladesPerPatch: { min: 50, max: 150 },
@@ -388,7 +387,7 @@ const Grass = memo(() => {
 
 		// Create an expanded frustum by temporarily modifying camera far plane
 		const originalFar = camera.far
-		camera.far *= GRASS_FRUSTUM_BUFFER
+		camera.far *= GRASS_CONFIG.frustumBuffer
 		camera.updateProjectionMatrix()
 
 		projScreenMatrix.current.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
@@ -400,17 +399,17 @@ const Grass = memo(() => {
 
 		// Update active chunks based on camera position and frustum
 		const targetPos = camera.position
-		const currentChunkX = Math.floor(targetPos.x / GRASS_CHUNK_SIZE)
-		const currentChunkZ = Math.floor(targetPos.z / GRASS_CHUNK_SIZE)
+		const currentChunkX = Math.floor(targetPos.x / GRASS_CONFIG.chunkSize)
+		const currentChunkZ = Math.floor(targetPos.z / GRASS_CONFIG.chunkSize)
 
-		const chunksInView = Math.ceil(GRASS_VIEW_DISTANCE / GRASS_CHUNK_SIZE)
+		const chunksInView = Math.ceil(GRASS_CONFIG.viewDistance / GRASS_CONFIG.chunkSize)
 		const newActiveChunkKeys = new Set()
-		const viewDistSq = GRASS_VIEW_DISTANCE * GRASS_VIEW_DISTANCE
-		const lodDistSq = GRASS_LOD_DISTANCE * GRASS_LOD_DISTANCE
+		const viewDistSq = GRASS_CONFIG.viewDistance * GRASS_CONFIG.viewDistance
+		const lodDistSq = GRASS_CONFIG.lodDistance * GRASS_CONFIG.lodDistance
 
 		// Use pre-allocated scratch vector for frustum checks
 		const chunkCenter = chunkCenterScratch.current
-		const chunkRadius = GRASS_CHUNK_SIZE * 0.866 // sqrt(0.5^2 + 0.5^2) * chunkSize
+		const chunkRadius = GRASS_CONFIG.chunkSize * 0.866 // sqrt(0.5^2 + 0.5^2) * chunkSize
 
 		let hasChanges = false
 
@@ -420,8 +419,8 @@ const Grass = memo(() => {
 				const chunkZ = currentChunkZ + z
 				const chunkKey = `${chunkX},${chunkZ}`
 
-				const chunkCenterX = chunkX * GRASS_CHUNK_SIZE + GRASS_CHUNK_SIZE / 2
-				const chunkCenterZ = chunkZ * GRASS_CHUNK_SIZE + GRASS_CHUNK_SIZE / 2
+				const chunkCenterX = chunkX * GRASS_CONFIG.chunkSize + GRASS_CONFIG.chunkSize / 2
+				const chunkCenterZ = chunkZ * GRASS_CONFIG.chunkSize + GRASS_CONFIG.chunkSize / 2
 
 				const dx = targetPos.x - chunkCenterX
 				const dz = targetPos.z - chunkCenterZ
@@ -445,7 +444,7 @@ const Grass = memo(() => {
 				if (!chunkData) {
 					chunkData = {
 						key: chunkKey,
-						position: [chunkX * GRASS_CHUNK_SIZE, 0, chunkZ * GRASS_CHUNK_SIZE],
+						position: [chunkX * GRASS_CONFIG.chunkSize, 0, chunkZ * GRASS_CONFIG.chunkSize],
 						lodFactor,
 					}
 					chunkCache.current.set(chunkKey, chunkData)
@@ -491,7 +490,7 @@ const Grass = memo(() => {
 						key={key}
 						chunkKey={key}
 						chunkPosition={position}
-						chunkSize={GRASS_CHUNK_SIZE}
+						chunkSize={GRASS_CONFIG.chunkSize}
 						lodFactor={lodFactor}
 						getTerrainHeight={getTerrainHeight}
 						getTerrainNormal={getTerrainNormal}
