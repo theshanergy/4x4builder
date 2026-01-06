@@ -184,13 +184,6 @@ const DroneCamera = () => {
 			euler.current.x = MathUtils.lerp(euler.current.x, defaultPitch.current, config.rotationReturnSpeed * dt)
 		}
 
-		// Interpolate tilt - only apply side-to-side (roll) tilt for strafe input
-		droneTilt.current.pitch = 0 // No forward/back tilt
-		const rollTarget = Math.abs(strafeInput) > 0.1 ? strafeInput * config.maxTiltAngle : 0
-		const rollLerpSpeed = Math.abs(strafeInput) > 0.1 ? config.tiltSpeed : config.tiltRecovery
-
-		droneTilt.current.roll = MathUtils.lerp(droneTilt.current.roll, rollTarget, rollLerpSpeed * dt)
-
 		// Apply yaw rotation (simple lerp to target speed)
 		euler.current.y += yawInput * config.yawSpeed * dt
 
@@ -223,6 +216,17 @@ const DroneCamera = () => {
 		velocity.current.z = MathUtils.lerp(velocity.current.z, targetVelZ, config.acceleration * dt)
 		velocity.current.y = MathUtils.lerp(velocity.current.y, targetVelY, config.acceleration * dt)
 
+		// Calculate tilt based on velocity - measure lateral (strafe) velocity
+		// Project velocity onto right vector to get strafe speed
+		const strafeVelocity = velocity.current.x * rightX + velocity.current.z * rightZ
+		// Normalize by move speed to get a -1 to 1 range for tilt
+		const normalizedStrafeVel = MathUtils.clamp(strafeVelocity / currentMoveSpeed, -1, 1)
+		const rollTarget = normalizedStrafeVel * config.maxTiltAngle
+		
+		// Smoothly interpolate tilt
+		droneTilt.current.pitch = 0 // No forward/back tilt
+		droneTilt.current.roll = MathUtils.lerp(droneTilt.current.roll, -rollTarget, config.tiltSpeed * dt)
+
 		// Apply velocity to position
 		currentPosition.current.x += velocity.current.x * dt
 		currentPosition.current.y += velocity.current.y * dt
@@ -246,11 +250,6 @@ const DroneCamera = () => {
 
 		// Apply position to sceneState (for Sky and other consumers)
 		sceneState.cameraPosition.copy(currentPosition.current)
-
-		// Calculate elevation-based downward tilt
-		// At ground level (baseElevation), tilt is 0. As we go higher, tilt increases
-		const elevation = Math.max(0, currentPosition.current.y - config.baseElevation)
-		const elevationTilt = Math.min(elevation * config.elevationTiltFactor, config.maxElevationTilt)
 
 		// Apply rotation to camera - combine look direction with drone tilt for visual effect
 		// Create a combined euler that adds tilt to the look direction
