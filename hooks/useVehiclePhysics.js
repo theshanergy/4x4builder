@@ -45,7 +45,6 @@ const TRANSMISSION = {
 	idleRpm: 850,
 	maxRpm: 9000,
 	redlineRpm: 7000,
-	shiftDownRpm: 3500,
 	shiftCooldown: 0.4, // seconds between shifts to prevent gear skipping
 	parkEngageSpeed: 0.05, // Speed threshold (m/s) below which park engages
 	parkEngageDelay: 0.1, // Time (seconds) vehicle must be stopped before park engages
