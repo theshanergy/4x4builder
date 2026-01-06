@@ -1,11 +1,12 @@
 import { useRef, useCallback } from 'react'
 import useInputStore from '../store/inputStore'
 import useMultiplayerStore from '../store/multiplayerStore'
+import useGameStore from '../store/gameStore'
 
 /**
  * Hook to process raw input into vehicle control values
  * Handles keyboard, gamepad, and touch input combining
- * Respects chat open state to block keyboard input
+ * Respects chat open state and drone camera mode to block vehicle input
  *
  * @returns {Function} getVehicleInput - Call each frame to get current vehicle input state
  */
@@ -29,6 +30,24 @@ export const useVehicleInput = () => {
 	const getVehicleInput = useCallback((delta, forwardSpeed = 0) => {
 		const { keys, input } = useInputStore.getState()
 		const chatOpen = useMultiplayerStore.getState().chatOpen
+		const cameraMode = useGameStore.getState().cameraMode
+
+		// Disable vehicle input when in drone camera mode
+		if (cameraMode === 'drone') {
+			return {
+				throttleInput: 0,
+				brakeInput: 0,
+				brakeJustPressed: false,
+				steerInput: 0,
+				isDrifting: false,
+				shouldReset: false,
+				shouldToggleLights: false,
+				hornActive: false,
+				pitchInput: 0,
+				rollInput: 0,
+				yawInput: 0,
+			}
+		}
 
 		// Helper to clamp values
 		const clamp = (value) => Math.min(1, Math.max(-1, value))
