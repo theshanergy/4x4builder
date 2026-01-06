@@ -46,8 +46,6 @@ export const TERRAIN_CONFIG = {
  * - textures: Paths to albedo and normal textures
  * - textureScale: World-space texture tiling scale
  * - normalScale: Normal map intensity (optional, default 1.0)
- * - triplanar: Use triplanar projection instead of world XZ (optional)
- * - stochastic: Use stochastic sampling to reduce tiling (optional)
  * - lod: LOD configuration { distance, levels }
  * - height: Height blending { min, max, influence } - all optional
  * - slope: Slope blending { min, max, influence, range } - all optional (0=flat, 1=steep)
@@ -61,11 +59,9 @@ export const TERRAIN_LAYERS = [
 			albedo: '/assets/images/ground/dark_rough_rock_albedo.jpg',
 			normal: '/assets/images/ground/dark_rough_rock_normal.jpg',
 		},
-		textureScale: 0.015,
-		triplanar: true,
-		stochastic: true,
+		textureScale: 0.02,
 		lod: {
-			distance: 300,
+			distance: 400,
 			levels: 3,
 		},
 	},
