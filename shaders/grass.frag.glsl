@@ -8,6 +8,7 @@ uniform vec3 uSunColor;
 varying vec2 vUv;
 varying vec3 vNormal;
 varying float vHeightFactor;
+varying float vFadeAlpha;
 
 void main() {
     // Gradient from base to tip
@@ -37,5 +38,5 @@ void main() {
     float tipBleach = smoothstep(0.6, 1.0, vHeightFactor) * 0.15;
     finalColor = mix(finalColor, vec3(0.9, 0.85, 0.75), tipBleach);
 
-    gl_FragColor = vec4(finalColor, 1.0);
+    gl_FragColor = vec4(finalColor, vFadeAlpha);
 }

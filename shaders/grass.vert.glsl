@@ -1,10 +1,14 @@
 uniform float uTime;
 uniform float uWindStrength;
 uniform float uWindFrequency;
+uniform vec3 uCameraPosition;
+uniform float uViewDistance;
+uniform float uFadeThreshold;
 
 varying vec2 vUv;
 varying vec3 vNormal;
 varying float vHeightFactor;
+varying float vFadeAlpha;
 
 void main() {
     vUv = uv;
@@ -72,6 +76,12 @@ void main() {
     
     worldPosition.x += windDir.x * displacement;
     worldPosition.z += windDir.y * displacement;
+
+    // Calculate distance-based fade
+    vec4 finalWorldPos = modelMatrix * worldPosition;
+    float distToCamera = length(uCameraPosition - finalWorldPos.xyz);
+    float fadeStart = uViewDistance - uFadeThreshold;
+    vFadeAlpha = 1.0 - smoothstep(fadeStart, uViewDistance, distToCamera);
 
     gl_Position = projectionMatrix * modelViewMatrix * worldPosition;
 }

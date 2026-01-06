@@ -40,7 +40,7 @@ const BLADE_CONFIG = {
 	colorBase: '#c9b896',
 	colorTip: '#ddd5b8',
 	ambientStrength: 0.6,
-	translucency: 0.1,
+	translucency: 1.0,
 	windStrength: 0.055,
 	windFrequency: 1.5,
 }
@@ -49,11 +49,12 @@ const BLADE_CONFIG = {
 const GRASS_CONFIG = {
 	chunkSize: 16,
 	viewDistance: 160,
-	lodDistance: 35, // Distance at which to reduce blade count
-	frustumBuffer: 1.3, // Multiplier to extend frustum (prevents pop-in)
+	frustumBuffer: 1.2, // Multiplier to extend frustum (prevents pop-in)
+	fadeThreshold: 40, // Distance before viewDistance to start fading out
 	patchesPerChunk: { min: 4, max: 7 },
 	patchRadius: { min: 0.3, max: 0.6 },
-	bladesPerPatch: { min: 50, max: 150 },
+	bladesPerPatch: { min: 25, max: 75 },
+	maxBladesPerChunk: 1200, // Maximum blades per chunk (for pre-allocating InstancedMesh)
 	slopeThreshold: 0.85,
 	flatAreaRadius: 12,
 	heightOffset: -0.02,
@@ -62,11 +63,8 @@ const GRASS_CONFIG = {
 	rotationVariation: 0.5,
 }
 
-// Maximum blades per chunk (for pre-allocating InstancedMesh)
-const MAX_BLADES_PER_CHUNK = 1200
-
 // Pre-allocate a reusable Float32Array for matrix building (16 elements per matrix * max blades)
-const _matrixBuffer = new Float32Array(MAX_BLADES_PER_CHUNK * 16)
+const _matrixBuffer = new Float32Array(GRASS_CONFIG.maxBladesPerChunk * 16)
 
 // Generate procedural grass blade geometry (shared across all instances)
 const createGrassBladeGeometry = (config) => {
@@ -173,8 +171,7 @@ const createGrassBladeGeometry = (config) => {
 const _normalScratch = new Vector3()
 
 // Generate all blade instances for a chunk (returns Float32Array of matrices and count)
-// lodFactor: 1.0 = full detail, 0.5 = half blades, etc.
-const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal, lodFactor = 1.0) => {
+const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal) => {
 	const { patchesPerChunk, patchRadius, bladesPerPatch, slopeThreshold, flatAreaRadius, scaleRange, heightOffset, scaleVariation, rotationVariation } = GRASS_CONFIG
 
 	const chunkX = Math.floor(chunkPosition[0] / chunkSize)
@@ -220,8 +217,7 @@ const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerr
 
 		// Reduce blade count on steeper slopes
 		const slopeFactor = (patchTerrainNormal.y - slopeThreshold) / (1 - slopeThreshold)
-		// Apply LOD factor to reduce blades at distance
-		const adjustedBladeCount = Math.floor(baseBladeCount * (0.5 + 0.5 * slopeFactor) * lodFactor)
+		const adjustedBladeCount = Math.floor(baseBladeCount * (0.5 + 0.5 * slopeFactor))
 
 		// Use a sub-seed for blade distribution within the patch
 		const bladeSeed = hashCoords(chunkX * 1000 + patchIdx, chunkZ, 12345)
@@ -273,9 +269,9 @@ const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerr
 			bladeCount++
 
 			// Safety check to prevent buffer overflow
-			if (bladeCount >= MAX_BLADES_PER_CHUNK) break
+			if (bladeCount >= GRASS_CONFIG.maxBladesPerChunk) break
 		}
-		if (bladeCount >= MAX_BLADES_PER_CHUNK) break
+		if (bladeCount >= GRASS_CONFIG.maxBladesPerChunk) break
 	}
 
 	// Return a copy of only the used portion of the buffer
@@ -286,13 +282,13 @@ const generateChunkBladeInstances = (chunkKey, chunkPosition, chunkSize, getTerr
 }
 
 // GrassChunk component - single InstancedMesh for all blades in a chunk
-const GrassChunk = memo(({ chunkKey, chunkPosition, chunkSize, lodFactor, getTerrainHeight, getTerrainNormal, sharedGeometry, sharedMaterial }) => {
+const GrassChunk = memo(({ chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal, sharedGeometry, sharedMaterial }) => {
 	const meshRef = useRef()
 
 	// Generate all blade matrices for this chunk
 	const bladeData = useMemo(() => {
-		return generateChunkBladeInstances(chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal, lodFactor)
-	}, [chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal, lodFactor])
+		return generateChunkBladeInstances(chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal)
+	}, [chunkKey, chunkPosition, chunkSize, getTerrainHeight, getTerrainNormal])
 
 	// Create a single InstancedMesh for the entire chunk
 	const instancedMesh = useMemo(() => {
@@ -369,14 +365,20 @@ const Grass = memo(() => {
 				// Shared atmosphere uniforms for consistent lighting
 				uSunDirection: { value: sunDirection.clone() },
 				uSunColor: { value: sunColor.clone() },
+				// Fade uniforms for distance-based fading
+				uCameraPosition: { value: new Vector3() },
+				uViewDistance: { value: GRASS_CONFIG.viewDistance },
+				uFadeThreshold: { value: GRASS_CONFIG.fadeThreshold },
 			},
 			side: DoubleSide,
+			transparent: true,
 		})
 	}, [])
 
 	// Animate wind on the shared material
 	useFrame((state) => {
 		sharedMaterial.uniforms.uTime.value = state.clock.elapsedTime
+		sharedMaterial.uniforms.uCameraPosition.value.copy(state.camera.position)
 
 		// Throttle chunk updates to every 5 frames (was 10, reduced for faster movement response)
 		frameCount.current++
@@ -405,7 +407,6 @@ const Grass = memo(() => {
 		const chunksInView = Math.ceil(GRASS_CONFIG.viewDistance / GRASS_CONFIG.chunkSize)
 		const newActiveChunkKeys = new Set()
 		const viewDistSq = GRASS_CONFIG.viewDistance * GRASS_CONFIG.viewDistance
-		const lodDistSq = GRASS_CONFIG.lodDistance * GRASS_CONFIG.lodDistance
 
 		// Use pre-allocated scratch vector for frustum checks
 		const chunkCenter = chunkCenterScratch.current
@@ -437,21 +438,12 @@ const Grass = memo(() => {
 
 				newActiveChunkKeys.add(chunkKey)
 
-				// Calculate LOD factor based on distance
-				const lodFactor = distSq <= lodDistSq ? 1.0 : 0.5
-
 				let chunkData = chunkCache.current.get(chunkKey)
 				if (!chunkData) {
 					chunkData = {
 						key: chunkKey,
 						position: [chunkX * GRASS_CONFIG.chunkSize, 0, chunkZ * GRASS_CONFIG.chunkSize],
-						lodFactor,
 					}
-					chunkCache.current.set(chunkKey, chunkData)
-					hasChanges = true
-				} else if (chunkData.lodFactor !== lodFactor) {
-					// Update LOD if changed
-					chunkData = { ...chunkData, lodFactor }
 					chunkCache.current.set(chunkKey, chunkData)
 					hasChanges = true
 				}
@@ -485,13 +477,12 @@ const Grass = memo(() => {
 	return (
 		<group name='Grass'>
 			{activeChunks &&
-				activeChunks.map(({ key, position, lodFactor }) => (
+				activeChunks.map(({ key, position }) => (
 					<GrassChunk
 						key={key}
 						chunkKey={key}
 						chunkPosition={position}
 						chunkSize={GRASS_CONFIG.chunkSize}
-						lodFactor={lodFactor}
 						getTerrainHeight={getTerrainHeight}
 						getTerrainNormal={getTerrainNormal}
 						sharedGeometry={sharedGeometry}
