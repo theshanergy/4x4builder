@@ -5,6 +5,7 @@ varying vec4 mirrorCoord;
 varying vec4 worldPosition;
 varying float vDepth;
 varying vec2 vWorldXZ;
+varying float vCameraDistance;
 
 #include <common>
 
@@ -66,6 +67,10 @@ void main() {
 	mirrorCoord = textureMatrix * worldPos;
 
 	vDepth = depth;
+	
+	// Calculate camera distance for distance-based effects
+	vec4 viewPos = viewMatrix * worldPos;
+	vCameraDistance = length(viewPos.xyz);
 
 	gl_Position = projectionMatrix * viewMatrix * worldPos;
 }

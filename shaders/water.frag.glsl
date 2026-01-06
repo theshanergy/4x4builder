@@ -21,6 +21,7 @@ varying vec4 mirrorCoord;
 varying vec4 worldPosition;
 varying float vDepth;
 varying vec2 vWorldXZ; // Original world XZ from UVs for seamless noise
+varying float vCameraDistance;
 
 vec4 getNoise( vec2 uv ) {
 	vec2 uv0 = ( uv / 103.0 ) + vec2(time / 17.0, time / 29.0);
@@ -129,6 +130,18 @@ void main() {
 	// Use a smoother fade near the edges for antialiasing
 	float edgeFade = smoothstep(0.0, edgeFadeDistance, vDepth);
 	float depthAlpha = mix(0.6, alpha, depthFactor) * edgeFade;
+	
+	// Distance-based edge smoothing to hide sawtooth artifacts at elevation
+	// Use only camera distance to avoid tile-boundary artifacts
+	// At large distances, water edges fade more smoothly regardless of LOD
+	float distanceBasedSmoothing = smoothstep(100.0, 500.0, vCameraDistance); // Smooth from 100-500m away
+	float smoothedEdgeFade = edgeFadeDistance * (1.0 + distanceBasedSmoothing * 8.0);
+	
+	// Apply distance-based edge fade
+	// This hides the stair-stepping effect when viewed from elevation
+	float distanceEdgeFade = smoothstep(0.0, smoothedEdgeFade, vDepth);
+	depthAlpha *= distanceEdgeFade;
+	
 	gl_FragColor = vec4( outgoingLight, depthAlpha );
 
 	#include <tonemapping_fragment>
