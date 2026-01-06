@@ -58,8 +58,8 @@ export const TERRAIN_LAYERS = [
 	{
 		name: 'rock',
 		textures: {
-			albedo: '/assets/images/ground/slatecliffrock_albedo.jpg',
-			normal: '/assets/images/ground/slatecliffrock_normal.jpg',
+			albedo: '/assets/images/ground/dark_rough_rock_albedo.jpg',
+			normal: '/assets/images/ground/dark_rough_rock_normal.jpg',
 		},
 		textureScale: 0.015,
 		triplanar: true,
@@ -78,7 +78,9 @@ export const TERRAIN_LAYERS = [
 		textureScale: 0.4,
 		normalScale: 0.5,
 		height: {
+			min: -1,
 			max: 45,
+			transitionMin: 3,
 			transitionMax: 55,
 			influence: 1.0,
 		},
@@ -97,8 +99,8 @@ export const TERRAIN_LAYERS = [
 		textureScale: 0.025,
 		normalScale: 0.5,
 		height: {
-			min: 180,
-			transitionMin: 35.0,
+			min: 220,
+			transitionMin: 55.0,
 			influence: 1.0,
 		},
 		lod: {
