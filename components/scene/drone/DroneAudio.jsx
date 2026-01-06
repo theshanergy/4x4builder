@@ -1,4 +1,6 @@
 import { useRef, useEffect } from 'react'
+import { useThree, useFrame } from '@react-three/fiber'
+import { AudioListener, PositionalAudio } from 'three'
 import useGameStore from '../../../store/gameStore'
 import droneWorklet from '../../../utils/sound/droneWorklet'
 
@@ -22,12 +24,16 @@ class DroneAudioEngine {
 		this.altitudeParam = null
 	}
 
-	async init() {
+	async init(outputNode = null) {
 		if (this.isInitialized || this.isInitializing) return
 		this.isInitializing = true
 
 		try {
-			this.context = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' })
+			if (outputNode && outputNode.context) {
+				this.context = outputNode.context
+			} else {
+				this.context = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' })
+			}
 
 			// Only register the worklet processor if not already registered on this context
 			if (!registeredContexts.has(this.context)) {
@@ -49,12 +55,13 @@ class DroneAudioEngine {
 				outputChannelCount: [2],
 			})
 
-		// Cache parameters for performance
-		this.velocityParam = this.workletNode.parameters.get('velocity');
-		this.gainNode = this.context.createGain()
+			// Cache parameters for performance
+			this.velocityParam = this.workletNode.parameters.get('velocity')
+			this.gainNode = this.context.createGain()
 			this.gainNode.gain.value = 0.5
 
-			this.workletNode.connect(this.gainNode).connect(this.context.destination)
+			this.workletNode.connect(this.gainNode)
+			this.connectOutput(outputNode)
 			this.isInitialized = true
 
 			if (this.context.state === 'suspended') {
@@ -66,6 +73,24 @@ class DroneAudioEngine {
 			throw e
 		} finally {
 			this.isInitializing = false
+		}
+	}
+
+	connectOutput(outputNode) {
+		if (!this.gainNode) return
+
+		try {
+			this.gainNode.disconnect()
+		} catch (e) {
+			// Ignore disconnect errors
+		}
+
+		if (outputNode && outputNode.setNodeSource) {
+			outputNode.setNodeSource(this.gainNode)
+		} else if (outputNode) {
+			this.gainNode.connect(outputNode)
+		} else {
+			this.gainNode.connect(this.context.destination)
 		}
 	}
 
@@ -96,11 +121,8 @@ class DroneAudioEngine {
 			this[nodeName] = null
 		})
 
-		try {
-			this.context?.close()
-		} catch (e) {
-			// Ignore close errors
-		}
+		// Don't close the context - it may be shared with other audio nodes
+		// The context will be cleaned up when the AudioListener is removed
 		this.context = null
 		this.isInitialized = false
 	}
@@ -109,33 +131,65 @@ class DroneAudioEngine {
 /**
  * DroneAudio component
  * Manages drone sound engine and responds to mute state
+ * Returns a group containing the audio node for proper positioning
  * @param {Object} props
- * @param {number} props.velocity - Current velocity magnitude
+ * @param {Object} props.velocityRef - Ref to velocity Vector3
  */
-const DroneAudio = ({ velocity }) => {
+const DroneAudio = ({ velocityRef }) => {
+	const camera = useThree((state) => state.camera)
 	const audioEngineRef = useRef(null)
+	const audioRef = useRef(null)
+	const groupRef = useRef(null)
 	const muted = useGameStore((state) => state.muted)
 
 	// Initialize audio engine
 	useEffect(() => {
 		const initAudio = async () => {
-			if (!audioEngineRef.current) {
-				audioEngineRef.current = new DroneAudioEngine()
-				try {
-					await audioEngineRef.current.init()
-				} catch (e) {
-					console.error('Failed to initialize drone audio:', e)
-				}
+			// Find or create AudioListener on camera
+			let listener = camera.children.find((c) => c.type === 'AudioListener')
+			if (!listener) {
+				listener = new AudioListener()
+				camera.add(listener)
+			}
+
+			// Create PositionalAudio node and add to group
+			const audio = new PositionalAudio(listener)
+			audio.setRefDistance(5)
+			if (groupRef.current) {
+				groupRef.current.add(audio)
+			}
+			audioRef.current = audio
+
+			// Create audio engine instance
+			const engine = new DroneAudioEngine()
+			audioEngineRef.current = engine
+
+			// Initialize engine - at this point audio.context should be available
+			try {
+				await engine.init(audio)
+				const isMuted = useGameStore.getState().muted
+				engine.setVolume(isMuted ? 0 : 0.5)
+			} catch (e) {
+				console.error('Failed to initialize drone audio:', e)
 			}
 		}
 
 		initAudio()
 
 		return () => {
+			try {
+				if (audioRef.current?.source) audioRef.current.disconnect()
+			} catch (e) {}
+			
+			if (groupRef.current && audioRef.current) {
+				groupRef.current.remove(audioRef.current)
+			}
+
 			audioEngineRef.current?.destroy()
 			audioEngineRef.current = null
+			audioRef.current = null
 		}
-	}, [])
+	}, [camera])
 
 	// Handle mute state changes
 	useEffect(() => {
@@ -144,14 +198,15 @@ const DroneAudio = ({ velocity }) => {
 		}
 	}, [muted])
 
-	// Update audio parameters when velocity changes
-	useEffect(() => {
-		if (audioEngineRef.current?.isInitialized) {
-			audioEngineRef.current.updateParams(velocity)
+	// Update audio parameters every frame based on velocity
+	useFrame(() => {
+		if (audioEngineRef.current?.isInitialized && velocityRef) {
+			const velocityMagnitude = velocityRef.current.length()
+			audioEngineRef.current.updateParams(velocityMagnitude)
 		}
-	}, [velocity])
+	})
 
-	return null
+	return <group ref={groupRef} />
 }
 
 export default DroneAudio

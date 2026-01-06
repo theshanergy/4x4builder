@@ -1,283 +1,61 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import { Vector3, MathUtils, Euler } from 'three'
-import { useFrame, useThree } from '@react-three/fiber'
-
-import { vehicleState } from '../../../store/gameStore'
-import useInputStore from '../../../store/inputStore'
-import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
-import DroneAudio from '../drone/DroneAudio'
+import { useThree, useFrame } from '@react-three/fiber'
 import Drone from '../drone/Drone'
 
-// Drone camera controller with simplified arcade-style movement
-// Controls:
-//   W/S: Tilt forward/back (pitch) - moves drone forward/back
-//   A/D: Strafe left/right
-//   Q/E: Descend/Ascend altitude (throttle)
-//   Arrow Up/Down: Increase/decrease altitude (throttle)
-//   Arrow Left/Right: Rotate left/right (yaw)
-//   Shift: Speed boost (doubles movement speed)
-//   Mouse: Look around (adjusts drone orientation)
-//   Gamepad: Left stick = strafe/altitude, Right stick = look, Triggers = yaw
+// Drone camera wrapper that follows the drone
+// The drone itself handles all input, physics, and movement
 const DroneCamera = () => {
 	const camera = useThree((state) => state.camera)
 
-	// Ref for the visual drone model
-	const droneGroupRef = useRef(null)
-
-	// Audio state (for DroneAudio component)
-	const [audioParams, setAudioParams] = useState({ velocity: 0 })
-
-	// Camera/drone state
-	const currentPosition = useRef(camera.position.clone())
-	const euler = useRef(new Euler(0, 0, 0, 'YXZ'))
-	const defaultPitch = useRef(-0.2) // Default vertical angle to return to (-0.2 radians ≈ -11 degrees)
-	const combinedEuler = useRef(new Euler(0, 0, 0, 'YXZ'))
-	const hasInitialized = useRef(false)
-	const hasLaunched = useRef(false) // Track if we've done the initial launch
-
-	// Movement state
-	const velocity = useRef(new Vector3(0, 0, 0))
-	const droneTilt = useRef({ pitch: 0, roll: 0 }) // Visual tilt separate from camera look
-
-	// Movement config
-	const config = {
-		// Movement speeds
-		moveSpeed: 20, // Horizontal movement speed
-		boostMultiplier: 2.5, // Speed multiplier when boosting
-		verticalSpeed: 30, // Vertical movement speed
-		acceleration: 2, // How fast we lerp to target speed
-
-		// Tilt (visual only)
-		maxTiltAngle: 0.5, // Max tilt in radians (~29 degrees)
-		tiltSpeed: 3, // How fast drone tilts
-		tiltRecovery: 4, // How fast drone returns to level
-
-		// Rotation
-		yawSpeed: 2, // Rotation speed around vertical axis
-		mouseSensitivity: 0.002,
-		gamepadLookSensitivity: 2.5,
-		rotationReturnSpeed: 2, // Speed at which camera returns to default angle when unlocked
-
-		// Limits
-		minGroundDistance: 1.0,
-		maxCeilingElevation: 200, // Maximum height above ground (meters)
-
-		// Camera
-		targetFov: 60,
-
-		// Elevation-based tilt
-		elevationTiltFactor: 0.015, // Radians of downward tilt per meter of elevation
-		maxElevationTilt: 0.3, // Max downward tilt from elevation (~17 degrees)
-		baseElevation: 0, // Ground level reference
-	}
-
+	// Camera state
+	const currentPosition = useRef(new Vector3(0, 0, 0))
+	const currentVelocity = useRef(new Vector3(0, 0, 0))
+	const droneYaw = useRef(0)
+	const dronePitch = useRef(0)
 	const lastFov = useRef(camera.fov)
+	const originalNear = useRef(camera.near)
 
-	// Ground avoidance
-	const checkGroundAvoidance = useGroundAvoidance(currentPosition, config.minGroundDistance)
-
-	// Initialize camera rotation from current orientation
+	// Set lower near clipping plane for drone mode to allow close-up views
 	useEffect(() => {
-		if (!hasInitialized.current) {
-			euler.current.setFromQuaternion(camera.quaternion)
-			hasInitialized.current = true
-		}
+		originalNear.current = camera.near
+		camera.near = 0.01
+		camera.updateProjectionMatrix()
 
-		// Position camera above and behind the vehicle if starting fresh
-		if (currentPosition.current.distanceTo(vehicleState.position) < 1) {
-			currentPosition.current.set(vehicleState.position.x - 10, vehicleState.position.y + 8, vehicleState.position.z - 10)
-			camera.position.copy(currentPosition.current)
-		}
-
-		// Launch drone upward by 5 meters when first switching to it
-		if (!hasLaunched.current) {
-			velocity.current.y = 10 // Set upward velocity for smooth launch
-			hasLaunched.current = true
+		return () => {
+			camera.near = originalNear.current
+			camera.updateProjectionMatrix()
 		}
 	}, [camera])
 
-	// Request pointer lock on mount, handle click-to-lock, and exit on unmount
-	useEffect(() => {
-		const { requestPointerLock, exitPointerLock } = useInputStore.getState()
+	// Camera config
+	const config = {
+		targetFov: 60,
+		verticalOffset: 0.1, // Offset camera slightly above drone
+	}
 
-		// Automatically request pointer lock when entering drone mode
-		requestPointerLock?.()
+	// Callbacks for drone to update camera
+	const handlePositionUpdate = (position, velocity) => {
+		currentPosition.current.copy(position)
+		currentVelocity.current.copy(velocity)
+	}
 
-		// Click to re-acquire pointer lock
-		const handleClick = () => {
-			const { mouseInput } = useInputStore.getState()
-			if (!mouseInput.isPointerLocked) {
-				requestPointerLock?.()
-			}
-		}
-
-		document.addEventListener('click', handleClick)
-
-		return () => {
-			document.removeEventListener('click', handleClick)
-			// Exit pointer lock when switching away from drone camera
-			exitPointerLock?.()
-		}
-	}, [])
+	const handleRotationUpdate = (rotation, tilt) => {
+		// Extract yaw and pitch from drone rotation for camera control
+		droneYaw.current = rotation.y
+		dronePitch.current = rotation.x
+	}
 
 	useFrame((state, delta) => {
-		// Clamp delta to prevent physics explosions on lag spikes
 		const dt = Math.min(delta, 0.1)
 
-		const { keys, input, touchInput, mouseInput, consumeMouseMovement } = useInputStore.getState()
-		const isPointerLocked = mouseInput.isPointerLocked
-
-		// Handle mouse look input
-		const mouseMovement = consumeMouseMovement()
-		if (isPointerLocked && (mouseMovement.x !== 0 || mouseMovement.y !== 0)) {
-			euler.current.y -= mouseMovement.x * config.mouseSensitivity
-			euler.current.x -= mouseMovement.y * config.mouseSensitivity
-			euler.current.x = MathUtils.clamp(euler.current.x, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1)
-		}
-
-		// Keyboard inputs
-		// WASD: pitch (forward/back tilt) and strafe (left/right)
-		let pitchInput = 0 // W/S - tilt forward/back
-		let yawInput = 0 // Arrow Left/Right - rotate
-		let throttleInput = 0 // Arrow Up/Down - altitude
-		let strafeInput = 0 // A/D - strafe left/right
-
-		if (keys.has('w')) pitchInput += 1 // Tilt forward
-		if (keys.has('s')) pitchInput -= 1 // Tilt backward
-		if (keys.has('ArrowLeft')) yawInput += 1 // Rotate left
-		if (keys.has('ArrowRight')) yawInput -= 1 // Rotate right
-		if (keys.has('ArrowUp') || keys.has('e') || keys.has('E')) throttleInput += 1 // Ascend
-		if (keys.has('ArrowDown') || keys.has('q') || keys.has('Q')) throttleInput -= 1 // Descend
-		if (keys.has('a')) strafeInput -= 1 // Strafe left
-		if (keys.has('d')) strafeInput += 1 // Strafe right
-
-		// Speed boost
-		const isBoosting = keys.has('Shift')
-
-		// Gamepad inputs
-		// Left stick: strafe (X) and altitude (Y)
-		// Right stick: camera look
-		// Triggers/Bumpers: yaw rotation
-		const gamepadLookX = input.rightStickX || touchInput.rightStickX || 0
-		const gamepadLookY = input.rightStickY || touchInput.rightStickY || 0
-		const gamepadStrafeX = input.leftStickX || touchInput.leftStickX || 0
-		const gamepadThrottle = -(input.leftStickY || touchInput.leftStickY || 0) // Inverted: up = ascend
-		const gamepadYaw = (input.leftTrigger || 0) - (input.rightTrigger || 0) // LT = rotate left, RT = rotate right
-
-		// Combine gamepad with keyboard
-		strafeInput += gamepadStrafeX
-		throttleInput += gamepadThrottle
-		yawInput += gamepadYaw
-
-		// Pitch from right stick Y when held with bumper (advanced control)
-		if (input.rightBumper) {
-			pitchInput += -gamepadLookY
-		}
-
-		// Clamp combined inputs
-		pitchInput = MathUtils.clamp(pitchInput, -1, 1)
-		yawInput = MathUtils.clamp(yawInput, -1, 1)
-		throttleInput = MathUtils.clamp(throttleInput, -1, 1)
-		strafeInput = MathUtils.clamp(strafeInput, -1, 1)
-
-		// Handle gamepad look input (right stick) - only when not using advanced pitch control
-		if (!input.rightBumper && (Math.abs(gamepadLookX) > 0.1 || Math.abs(gamepadLookY) > 0.1)) {
-			euler.current.y -= gamepadLookX * config.gamepadLookSensitivity * dt
-			euler.current.x -= gamepadLookY * config.gamepadLookSensitivity * dt
-			euler.current.x = MathUtils.clamp(euler.current.x, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1)
-		}
-
-		// When pointer is not locked, smoothly return camera to default vertical angle
-		if (!isPointerLocked) {
-			euler.current.x = MathUtils.lerp(euler.current.x, defaultPitch.current, config.rotationReturnSpeed * dt)
-		}
-
-		// Apply yaw rotation (simple lerp to target speed)
-		euler.current.y += yawInput * config.yawSpeed * dt
-
-		// Apply speed boost if shift is held
-		const currentMoveSpeed = isBoosting ? config.moveSpeed * config.boostMultiplier : config.moveSpeed
-		const currentVerticalSpeed = isBoosting ? config.verticalSpeed * config.boostMultiplier : config.verticalSpeed
-
-		// Calculate forward direction vector from camera's look direction (includes pitch)
-		const pitch = euler.current.x
-		const yaw = euler.current.y
-
-		// Forward direction (where camera is looking)
-		const forwardX = -Math.sin(yaw) * Math.cos(pitch)
-		const forwardY = Math.sin(pitch)
-		const forwardZ = -Math.cos(yaw) * Math.cos(pitch)
-
-		// Right direction (perpendicular to forward, on horizontal plane)
-		const rightX = Math.cos(yaw)
-		const rightY = 0
-		const rightZ = -Math.sin(yaw)
-
-		// Calculate target velocity from inputs
-		// Forward/back moves in look direction, strafe moves perpendicular
-		const targetVelX = (forwardX * pitchInput + rightX * strafeInput) * currentMoveSpeed
-		const targetVelY = forwardY * pitchInput * currentMoveSpeed + throttleInput * currentVerticalSpeed
-		const targetVelZ = (forwardZ * pitchInput + rightZ * strafeInput) * currentMoveSpeed
-
-		// Lerp velocity towards target
-		velocity.current.x = MathUtils.lerp(velocity.current.x, targetVelX, config.acceleration * dt)
-		velocity.current.z = MathUtils.lerp(velocity.current.z, targetVelZ, config.acceleration * dt)
-		velocity.current.y = MathUtils.lerp(velocity.current.y, targetVelY, config.acceleration * dt)
-
-		// Strafe (Roll)
-		const strafeVelocity = velocity.current.x * rightX + velocity.current.z * rightZ
-		const normalizedStrafeVel = MathUtils.clamp(strafeVelocity / currentMoveSpeed, -1, 1)
-		const rollTarget = normalizedStrafeVel * config.maxTiltAngle
-
-		// Forward (Pitch) - Tilt forward (negative X) when moving forward
-		const forwardVelocity = velocity.current.x * forwardX + velocity.current.z * forwardZ
-		const normalizedForwardVel = MathUtils.clamp(forwardVelocity / currentMoveSpeed, -1, 1)
-		const pitchTarget = -normalizedForwardVel * config.maxTiltAngle // Negative for nose down
-
-		// Smoothly interpolate tilt
-		droneTilt.current.pitch = MathUtils.lerp(droneTilt.current.pitch, pitchTarget, config.tiltSpeed * dt)
-		droneTilt.current.roll = MathUtils.lerp(droneTilt.current.roll, -rollTarget, config.tiltSpeed * dt)
-
-		// Apply velocity to position
-		currentPosition.current.x += velocity.current.x * dt
-		currentPosition.current.y += velocity.current.y * dt
-		currentPosition.current.z += velocity.current.z * dt
-
-		// Ground avoidance - stop downward velocity if we hit ground
-		const prevY = currentPosition.current.y
-		checkGroundAvoidance()
-		if (currentPosition.current.y > prevY && velocity.current.y < 0) {
-			velocity.current.y = 0
-		}
-
-		// Ceiling limit - prevent drone from going too high relative to vehicle
-		const maxAllowedY = vehicleState.position.y + config.maxCeilingElevation
-		if (currentPosition.current.y > maxAllowedY) {
-			currentPosition.current.y = maxAllowedY
-			if (velocity.current.y > 0) {
-				velocity.current.y = 0
-			}
-		}
-
-		// Update visual drone model
-		if (droneGroupRef.current) {
-			// Position just above camera
-			droneGroupRef.current.position.copy(currentPosition.current)
-			droneGroupRef.current.position.y += 0.2
-
-			// Rotate to match camera yaw + visual tilt
-			// YXZ order: Yaw -> Pitch -> Roll
-			droneGroupRef.current.rotation.set(droneTilt.current.pitch, euler.current.y, droneTilt.current.roll, 'YXZ')
-		}
-
-		// Apply rotation to camera - combine look direction with drone tilt for visual effect
-		// Create a combined euler that adds tilt to the look direction
-		combinedEuler.current.copy(euler.current)
-		combinedEuler.current.z = -droneTilt.current.roll * 0.5 // Roll tilts the horizon
-		camera.quaternion.setFromEuler(combinedEuler.current)
-
-		// Update camera position
+		// Update camera position to follow drone with vertical offset
 		camera.position.copy(currentPosition.current)
+		camera.position.y -= config.verticalOffset
+
+		// Apply pitch (look up/down) and yaw (turn left/right) to camera
+		// Pitch is controlled by mouse Y, yaw is controlled by mouse X
+		camera.rotation.set(dronePitch.current, droneYaw.current, 0, 'YXZ')
 
 		// Smoothly transition FOV
 		const newFov = MathUtils.damp(camera.fov, config.targetFov, 3, dt)
@@ -286,18 +64,9 @@ const DroneCamera = () => {
 			camera.updateProjectionMatrix()
 			lastFov.current = newFov
 		}
-
-		// Update drone audio parameters
-		const velocityMagnitude = velocity.current.length()
-		setAudioParams({ velocity: velocityMagnitude })
 	})
 
-	return (
-		<group ref={droneGroupRef}>
-			<Drone velocity={audioParams.velocity} />
-			<DroneAudio velocity={audioParams.velocity} />
-		</group>
-	)
+	return <Drone onPositionUpdate={handlePositionUpdate} onRotationUpdate={handleRotationUpdate} />
 }
 
 export default DroneCamera
