@@ -35,9 +35,9 @@ const DroneCamera = () => {
 	const config = {
 		// Movement speeds
 		moveSpeed: 20, // Horizontal movement speed
-		boostMultiplier: 20.0, // Speed multiplier when boosting
+		boostMultiplier: 2.5, // Speed multiplier when boosting
 		verticalSpeed: 10, // Vertical movement speed
-		acceleration: 6, // How fast we lerp to target speed
+		acceleration: 2, // How fast we lerp to target speed
 
 		// Tilt (visual only)
 		maxTiltAngle: 0.5, // Max tilt in radians (~29 degrees)
@@ -52,6 +52,7 @@ const DroneCamera = () => {
 
 		// Limits
 		minGroundDistance: 1.0,
+		maxCeilingElevation: 200, // Maximum height above ground (meters)
 
 		// Camera
 		targetFov: 60,
@@ -232,6 +233,15 @@ const DroneCamera = () => {
 		checkGroundAvoidance()
 		if (currentPosition.current.y > prevY && velocity.current.y < 0) {
 			velocity.current.y = 0
+		}
+
+		// Ceiling limit - prevent drone from going too high relative to vehicle
+		const maxAllowedY = vehicleState.position.y + config.maxCeilingElevation
+		if (currentPosition.current.y > maxAllowedY) {
+			currentPosition.current.y = maxAllowedY
+			if (velocity.current.y > 0) {
+				velocity.current.y = 0
+			}
 		}
 
 		// Apply position to sceneState (for Sky and other consumers)
