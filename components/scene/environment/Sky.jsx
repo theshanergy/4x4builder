@@ -3,14 +3,13 @@ import { useFrame } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
 import { BackSide, Vector3 } from 'three'
 
-import { sceneState } from '../../../store/gameStore'
 import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../../../config/environment'
 import skyVertexShader from '../../../shaders/sky.vert.glsl'
 import skyFragmentShader from '../../../shaders/sky.frag.glsl'
 
 // Custom Atmospheric Sky component with procedural clouds
 // Uses shared atmosphere config for consistency with water shader
-// Automatically follows camera position each frame via sceneState
+// Automatically follows camera position each frame
 const AtmosphericSky = () => {
 	const meshRef = useRef()
 	const materialRef = useRef()
@@ -34,10 +33,8 @@ const AtmosphericSky = () => {
 		const mesh = meshRef.current
 		if (!mesh) return
 
-		// Update sky position to match camera position from sceneState
-		// Camera modes update sceneState, CameraManager applies to camera.position
-		// Both Sky and camera read from same source = perfect sync
-		mesh.position.copy(sceneState.cameraPosition)
+		// Update sky position to match camera position
+		mesh.position.copy(state.camera.position)
 
 		// Update time uniform for animated clouds
 		if (materialRef.current) {

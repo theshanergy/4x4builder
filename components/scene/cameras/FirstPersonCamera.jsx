@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react'
 import { Vector3, MathUtils, Quaternion, Matrix4 } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
-import useGameStore, { sceneState } from '../../../store/gameStore'
+import useGameStore from '../../../store/gameStore'
 import vehicleConfigs from '../../../vehicleConfigs'
 
 const UP_VECTOR = new Vector3(0, 1, 0)
@@ -100,7 +100,7 @@ const FirstPersonCamera = ({ target }) => {
 
 			if (t >= 1) {
 				isTransitioning.current = false
-				sceneState.cameraPosition.copy(targetPosition.current)
+				camera.position.copy(targetPosition.current)
 				camera.lookAt(targetLookAt.current)
 				camera.fov = targetFov
 				camera.updateProjectionMatrix()
@@ -112,14 +112,14 @@ const FirstPersonCamera = ({ target }) => {
 				// Lerp position, rotation, and FOV
 				const alpha = 1 - Math.pow(1 - t, 3) // Ease out cubic
 				const fovAlpha = 1 - Math.pow(1 - t * 0.5, 3) // Slower FOV transition
-				sceneState.cameraPosition.lerpVectors(startPos.current, targetPosition.current, alpha)
+				camera.position.lerpVectors(startPos.current, targetPosition.current, alpha)
 				camera.quaternion.slerpQuaternions(startQuat.current, targetQuat.current, alpha)
 				camera.fov = MathUtils.lerp(startFov.current, targetFov, fovAlpha)
 				camera.updateProjectionMatrix()
 			}
 		} else {
 			// Set camera position and FOV - only update projection matrix if FOV changed
-			sceneState.cameraPosition.copy(targetPosition.current)
+			camera.position.copy(targetPosition.current)
 			camera.lookAt(targetLookAt.current)
 			if (camera.fov !== targetFov) {
 				camera.fov = targetFov

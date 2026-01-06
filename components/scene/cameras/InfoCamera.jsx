@@ -1,8 +1,7 @@
 import { useRef } from 'react'
-import { Vector3, MathUtils, Quaternion } from 'three'
+import { Vector3, MathUtils } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
-import { sceneState } from '../../../store/gameStore'
 import { dampVector3 } from '../../../utils/dampVector3'
 
 // Info camera controller - triggered by info mode
@@ -55,7 +54,7 @@ const InfoCamera = ({ target }) => {
 			lastFov.current = newFov
 		}
 
-		sceneState.cameraPosition.copy(currentPosition.current)
+		camera.position.copy(currentPosition.current)
 		camera.lookAt(currentLookAt.current)
 	})
 

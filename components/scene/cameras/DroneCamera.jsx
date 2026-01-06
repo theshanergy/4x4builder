@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import { Vector3, MathUtils, Euler } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
-import { vehicleState, sceneState } from '../../../store/gameStore'
+import { vehicleState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
 import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
 import DroneAudio from '../drone/DroneAudio'
@@ -259,9 +259,6 @@ const DroneCamera = () => {
 			}
 		}
 
-		// Apply position to sceneState (for Sky and other consumers)
-		sceneState.cameraPosition.copy(currentPosition.current)
-
 		// Update visual drone model
 		if (droneGroupRef.current) {
 			// Position just above camera
@@ -278,6 +275,9 @@ const DroneCamera = () => {
 		combinedEuler.current.copy(euler.current)
 		combinedEuler.current.z = -droneTilt.current.roll * 0.5 // Roll tilts the horizon
 		camera.quaternion.setFromEuler(combinedEuler.current)
+
+		// Update camera position
+		camera.position.copy(currentPosition.current)
 
 		// Smoothly transition FOV
 		const newFov = MathUtils.damp(camera.fov, config.targetFov, 3, dt)

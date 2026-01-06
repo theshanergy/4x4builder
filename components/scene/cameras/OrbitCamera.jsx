@@ -3,7 +3,7 @@ import { Vector3, MathUtils } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 
-import useGameStore, { vehicleState, sceneState } from '../../../store/gameStore'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
 import { dampVector3 } from '../../../utils/dampVector3'
 import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
 
@@ -97,9 +97,6 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, transitionFromInfo }) => 
 				camera.position.y = cameraPosition.current.y
 			}
 		}
-
-		// Update sceneState with camera world position (for Sky and other consumers)
-		camera.getWorldPosition(sceneState.cameraPosition)
 	})
 
 	return (

@@ -25,11 +25,6 @@ export const vehicleState = {
 	isInWater: false, // Whether vehicle is currently submerged in water
 }
 
-// Mutable scene state for high-frequency rendering data
-export const sceneState = {
-	cameraPosition: new Vector3(0, 5, 10), // Camera world position (updated every frame by camera modes)
-}
-
 // Game store
 const useGameStore = create((set, get) => {
 	// Set up resize listener for isMobile detection
