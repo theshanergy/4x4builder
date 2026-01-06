@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { MathUtils, Vector3, Euler } from 'three'
 import DroneAudio from './DroneAudio'
@@ -14,7 +14,7 @@ const Drone = ({ onPositionUpdate, onRotationUpdate }) => {
 	const droneTilt = useRef({ pitch: 0, roll: 0 })
 	const position = useRef(new Vector3(0, 0, 0))
 	const velocity = useRef(new Vector3(0, 0, 0))
-	const euler = useRef(new Euler(0, 0, 0, 'YXZ'))
+	const euler = useRef(new Euler(0, vehicleState.heading + Math.PI, 0, 'YXZ')) // Initialize yaw to face vehicle (opposite of vehicle heading)
 	const defaultPitch = useRef(-0.2) // Default vertical angle to return to (-0.2 radians ≈ -11 degrees)
 	const hasLaunched = useRef(false) // Track if we've done the initial launch
 
@@ -45,16 +45,23 @@ const Drone = ({ onPositionUpdate, onRotationUpdate }) => {
 		defaultPitch: defaultPitch.current,
 	}
 
-	// Initialize position above and behind the vehicle
-	if (position.current.distanceTo(vehicleState.position) < 1) {
-		position.current.set(vehicleState.position.x - 10, vehicleState.position.y + 8, vehicleState.position.z - 10)
-	}
+	// Initialize position above and behind the vehicle on mount
+	useEffect(() => {
+		const behindDistance = 10 // Distance behind vehicle
+		const aboveDistance = 8 // Height above vehicle
 
-	// Launch drone upward by 5 meters when first switching to it
-	if (!hasLaunched.current) {
+		// Calculate position behind the vehicle using its heading
+		// Vehicle heading points forward, so we subtract PI to get the rear direction
+		const behindAngle = vehicleState.heading - Math.PI
+		const offsetX = Math.sin(behindAngle) * behindDistance
+		const offsetZ = Math.cos(behindAngle) * behindDistance
+
+		position.current.set(vehicleState.position.x + offsetX, vehicleState.position.y + aboveDistance, vehicleState.position.z + offsetZ)
+
+		// Launch drone upward by 5 meters when first switching to it
 		velocity.current.y = 10 // Set upward velocity for smooth launch
 		hasLaunched.current = true
-	}
+	}, [])
 
 	// Ground avoidance
 	const checkGroundAvoidance = useGroundAvoidance(position, config.minGroundDistance)
