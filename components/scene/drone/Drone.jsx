@@ -4,7 +4,7 @@ import { MathUtils, Vector3, Euler } from 'three'
 import DroneAudio from './DroneAudio'
 import { useDroneInput } from '../../../hooks/useDroneInput'
 import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
-import { vehicleState } from '../../../store/gameStore'
+import useGameStore, { vehicleState } from '../../../store/gameStore'
 
 // Visual drone model with arms and spinning propellers
 // Manages its own physics, input, and movement
@@ -45,21 +45,26 @@ const Drone = ({ onPositionUpdate, onRotationUpdate }) => {
 		defaultPitch: defaultPitch.current,
 	}
 
-	// Initialize position above and behind the vehicle on mount
+	// Initialize position at vehicle center on mount
 	useEffect(() => {
-		const behindDistance = 10 // Distance behind vehicle
-		const aboveDistance = 8 // Height above vehicle
+		// Enable physics if not already enabled
+		if (!useGameStore.getState().physicsEnabled) {
+			useGameStore.getState().setPhysicsEnabled(true)
+		}
 
-		// Calculate position behind the vehicle using its heading
-		// Vehicle heading points forward, so we subtract PI to get the rear direction
-		const behindAngle = vehicleState.heading - Math.PI
-		const offsetX = Math.sin(behindAngle) * behindDistance
-		const offsetZ = Math.cos(behindAngle) * behindDistance
+		// Position at vehicle center
+		position.current.set(vehicleState.position.x, vehicleState.position.y, vehicleState.position.z)
 
-		position.current.set(vehicleState.position.x + offsetX, vehicleState.position.y + aboveDistance, vehicleState.position.z + offsetZ)
+		// Add velocity in opposite direction of vehicle heading (backward) and upward
+		const backwardSpeed = 25 // Horizontal speed away from vehicle
+		const upwardSpeed = 10 // Upward velocity for smooth launch
 
-		// Launch drone upward by 5 meters when first switching to it
-		velocity.current.y = 10 // Set upward velocity for smooth launch
+		// Calculate backward direction (opposite of vehicle heading)
+		const backwardAngle = vehicleState.heading - Math.PI
+		velocity.current.x = Math.sin(backwardAngle) * backwardSpeed
+		velocity.current.y = upwardSpeed
+		velocity.current.z = Math.cos(backwardAngle) * backwardSpeed
+
 		hasLaunched.current = true
 	}, [])
 
