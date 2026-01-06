@@ -4,7 +4,7 @@ import { AudioListener, PositionalAudio } from 'three'
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
 import useMultiplayerStore from '../../../store/multiplayerStore'
-import { workletCode } from '../../../hooks/engineWorklet'
+import engineWorklet from '../../../utils/sound/engineWorklet'
 
 // Track which AudioContexts have already registered the worklet processor
 const registeredContexts = new WeakSet()
@@ -46,7 +46,7 @@ class AudioEngine {
 			// Only register the worklet processor if not already registered on this context
 			if (!registeredContexts.has(this.context)) {
 				// Create worklet from Blob to avoid external file loading issues
-				const blob = new Blob([workletCode], { type: 'application/javascript' })
+				const blob = new Blob([engineWorklet], { type: 'application/javascript' })
 				const url = URL.createObjectURL(blob)
 
 				try {

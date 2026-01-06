@@ -1,5 +1,4 @@
-
-export const workletCode = `
+const engineWorklet = `
 class AeroSonicProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -116,3 +115,5 @@ class AeroSonicProcessor extends AudioWorkletProcessor {
 
 registerProcessor('aerosonic-processor', AeroSonicProcessor);
 `
+
+export default engineWorklet
