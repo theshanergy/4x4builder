@@ -3,7 +3,7 @@ import { useGLTF } from '@react-three/drei'
 
 import vehicleConfigs from '../../../vehicleConfigs'
 import useAnimateHeight from '../../../hooks/useAnimateHeight'
-import useMaterialProperties from '../../../hooks/useMaterialProperties'
+import useVehicleMaterials from '../../../hooks/useVehicleMaterials'
 import cloneWithMaterials from '../../../utils/cloneWithMaterials'
 import Lighting from './Lighting'
 
@@ -12,7 +12,7 @@ const DEFAULT_POSITION = [0, 0, 0]
 
 // Single addon component - loads and applies materials before first render
 const Addon = memo(({ path, color, roughness, position }) => {
-	const { setObjectMaterials } = useMaterialProperties()
+	const { setMaterials } = useVehicleMaterials()
 	const gltf = useGLTF(path)
 
 	// Clone scene once (only depends on gltf.scene)
@@ -20,8 +20,8 @@ const Addon = memo(({ path, color, roughness, position }) => {
 
 	// Apply materials synchronously before paint to avoid flash
 	useLayoutEffect(() => {
-		setObjectMaterials(materials, color, roughness)
-	}, [materials, setObjectMaterials, color, roughness])
+		setMaterials(materials, color, roughness)
+	}, [materials, setMaterials, color, roughness])
 
 	return <primitive object={scene} position={position || DEFAULT_POSITION} />
 })
@@ -29,7 +29,7 @@ const Addon = memo(({ path, color, roughness, position }) => {
 // Shared vehicle body component used by both local and remote vehicles
 const VehicleBody = forwardRef(({ id, height, color, roughness, addons, lighting }, ref) => {
 	const vehicle = useRef()
-	const { setObjectMaterials } = useMaterialProperties()
+	const { setMaterials } = useVehicleMaterials()
 
 	// Check if vehicle config exists
 	const vehicleConfig = vehicleConfigs.vehicles[id]
@@ -42,15 +42,12 @@ const VehicleBody = forwardRef(({ id, height, color, roughness, addons, lighting
 	const bodyGltf = useGLTF(vehicleConfig.model)
 
 	// Clone scene once (only depends on gltf.scene)
-	const { scene: bodyScene, materials: bodyMaterials } = useMemo(
-		() => cloneWithMaterials(bodyGltf.scene),
-		[bodyGltf.scene]
-	)
+	const { scene: bodyScene, materials: bodyMaterials } = useMemo(() => cloneWithMaterials(bodyGltf.scene), [bodyGltf.scene])
 
 	// Apply materials synchronously before paint to avoid flash
 	useLayoutEffect(() => {
-		setObjectMaterials(bodyMaterials, color, roughness)
-	}, [bodyMaterials, setObjectMaterials, color, roughness])
+		setMaterials(bodyMaterials, color, roughness)
+	}, [bodyMaterials, setMaterials, color, roughness])
 
 	// Memoize the set of replaceable meshes
 	const replaceableMeshes = useMemo(() => {
