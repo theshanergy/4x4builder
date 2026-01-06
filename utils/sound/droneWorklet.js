@@ -35,8 +35,7 @@ class DroneSoundProcessor extends AudioWorkletProcessor {
 
   static get parameterDescriptors() {
     return [
-      { name: 'velocity', defaultValue: 0, minValue: 0, maxValue: 50 },
-      { name: 'altitude', defaultValue: 10, minValue: 0, maxValue: 100 }
+      { name: 'velocity', defaultValue: 0, minValue: 0, maxValue: 50 }
     ];
   }
 
@@ -46,7 +45,6 @@ class DroneSoundProcessor extends AudioWorkletProcessor {
     const blockSize = channelL.length;
     
     const velocity = parameters.velocity[0];
-    const altitude = parameters.altitude[0];
     
     // Base frequency increases with velocity (drone motors spin faster)
     // Typical quadcopter motor frequency range: 80-250 Hz
@@ -69,9 +67,6 @@ class DroneSoundProcessor extends AudioWorkletProcessor {
     
     // High frequency buzz from propellers
     const buzzFreq = 1200 + velocity * 30;
-    
-    // Distance attenuation (higher altitude = quieter)
-    const distanceAtten = Math.max(0.2, 1.0 - altitude * 0.008);
     
     const { noiseBuffer, dt } = this;
     const PI = Math.PI;
@@ -119,9 +114,6 @@ class DroneSoundProcessor extends AudioWorkletProcessor {
       // Low-pass filter for smoothness
       filterState = filterState * 0.85 + output * 0.15;
       output = filterState;
-      
-      // Apply distance attenuation
-      output *= distanceAtten;
       
       // Soft clipping
       output = Math.tanh(output * 1.5);

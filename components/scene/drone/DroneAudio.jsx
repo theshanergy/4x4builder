@@ -49,11 +49,9 @@ class DroneAudioEngine {
 				outputChannelCount: [2],
 			})
 
-			// Cache parameters for performance
-			this.velocityParam = this.workletNode.parameters.get('velocity')
-			this.altitudeParam = this.workletNode.parameters.get('altitude')
-
-			this.gainNode = this.context.createGain()
+		// Cache parameters for performance
+		this.velocityParam = this.workletNode.parameters.get('velocity');
+		this.gainNode = this.context.createGain()
 			this.gainNode.gain.value = 0.5
 
 			this.workletNode.connect(this.gainNode).connect(this.context.destination)
@@ -71,7 +69,7 @@ class DroneAudioEngine {
 		}
 	}
 
-	updateParams(velocity, altitude) {
+	updateParams(velocity) {
 		if (!this.workletNode || !this.context) return
 
 		// Clamp velocity to valid range (0-50) to prevent warnings
@@ -79,7 +77,6 @@ class DroneAudioEngine {
 
 		const now = this.context.currentTime
 		this.velocityParam.setTargetAtTime(clampedVelocity, now, 0.1)
-		this.altitudeParam.setTargetAtTime(altitude, now, 0.1)
 	}
 
 	setVolume(vol) {
@@ -114,9 +111,8 @@ class DroneAudioEngine {
  * Manages drone sound engine and responds to mute state
  * @param {Object} props
  * @param {number} props.velocity - Current velocity magnitude
- * @param {number} props.altitude - Current altitude above ground
  */
-const DroneAudio = ({ velocity, altitude }) => {
+const DroneAudio = ({ velocity }) => {
 	const audioEngineRef = useRef(null)
 	const muted = useGameStore((state) => state.muted)
 
@@ -148,12 +144,12 @@ const DroneAudio = ({ velocity, altitude }) => {
 		}
 	}, [muted])
 
-	// Update audio parameters when velocity or altitude changes
+	// Update audio parameters when velocity changes
 	useEffect(() => {
 		if (audioEngineRef.current?.isInitialized) {
-			audioEngineRef.current.updateParams(velocity, altitude)
+			audioEngineRef.current.updateParams(velocity)
 		}
-	}, [velocity, altitude])
+	}, [velocity])
 
 	return null
 }

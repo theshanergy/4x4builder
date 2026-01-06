@@ -5,7 +5,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { vehicleState, sceneState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
 import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
-import DroneAudio from './DroneAudio'
+import DroneAudio from '../drone/DroneAudio'
+import Drone from '../drone/Drone'
 
 // Drone camera controller with simplified arcade-style movement
 // Controls:
@@ -19,9 +20,12 @@ import DroneAudio from './DroneAudio'
 //   Gamepad: Left stick = strafe/altitude, Right stick = look, Triggers = yaw
 const DroneCamera = () => {
 	const camera = useThree((state) => state.camera)
+	
+	// Ref for the visual drone model
+	const droneGroupRef = useRef(null)
 
 	// Audio state (for DroneAudio component)
-	const [audioParams, setAudioParams] = useState({ velocity: 0, altitude: 0 })
+	const [audioParams, setAudioParams] = useState({ velocity: 0 })
 
 	// Camera/drone state
 	const currentPosition = useRef(camera.position.clone())
@@ -220,15 +224,20 @@ const DroneCamera = () => {
 		velocity.current.z = MathUtils.lerp(velocity.current.z, targetVelZ, config.acceleration * dt)
 		velocity.current.y = MathUtils.lerp(velocity.current.y, targetVelY, config.acceleration * dt)
 
-		// Calculate tilt based on velocity - measure lateral (strafe) velocity
-		// Project velocity onto right vector to get strafe speed
+		// Calculate visual tilt based on horizontal velocity
+		
+		// Strafe (Roll)
 		const strafeVelocity = velocity.current.x * rightX + velocity.current.z * rightZ
-		// Normalize by move speed to get a -1 to 1 range for tilt
 		const normalizedStrafeVel = MathUtils.clamp(strafeVelocity / currentMoveSpeed, -1, 1)
 		const rollTarget = normalizedStrafeVel * config.maxTiltAngle
-		
+
+		// Forward (Pitch) - Tilt forward (negative X) when moving forward
+		const forwardVelocity = velocity.current.x * forwardX + velocity.current.z * forwardZ
+		const normalizedForwardVel = MathUtils.clamp(forwardVelocity / currentMoveSpeed, -1, 1)
+		const pitchTarget = -normalizedForwardVel * config.maxTiltAngle // Negative for nose down
+
 		// Smoothly interpolate tilt
-		droneTilt.current.pitch = 0 // No forward/back tilt
+		droneTilt.current.pitch = MathUtils.lerp(droneTilt.current.pitch, pitchTarget, config.tiltSpeed * dt)
 		droneTilt.current.roll = MathUtils.lerp(droneTilt.current.roll, -rollTarget, config.tiltSpeed * dt)
 
 		// Apply velocity to position
@@ -255,6 +264,22 @@ const DroneCamera = () => {
 		// Apply position to sceneState (for Sky and other consumers)
 		sceneState.cameraPosition.copy(currentPosition.current)
 
+		// Update visual drone model
+		if (droneGroupRef.current) {
+			// Position just above camera
+			droneGroupRef.current.position.copy(currentPosition.current)
+			droneGroupRef.current.position.y += 0.2
+			
+			// Rotate to match camera yaw + visual tilt
+			// YXZ order: Yaw -> Pitch -> Roll
+			droneGroupRef.current.rotation.set(
+				droneTilt.current.pitch * 1.5,
+				euler.current.y,
+				droneTilt.current.roll * 1.5,
+				'YXZ'
+			)
+		}
+
 		// Apply rotation to camera - combine look direction with drone tilt for visual effect
 		// Create a combined euler that adds tilt to the look direction
 		combinedEuler.current.copy(euler.current)
@@ -271,11 +296,15 @@ const DroneCamera = () => {
 
 		// Update drone audio parameters
 		const velocityMagnitude = velocity.current.length()
-		const altitude = Math.max(0, currentPosition.current.y - vehicleState.position.y)
-		setAudioParams({ velocity: velocityMagnitude, altitude })
+		setAudioParams({ velocity: velocityMagnitude })
 	})
 
-	return <DroneAudio velocity={audioParams.velocity} altitude={audioParams.altitude} />
+	return (
+		<group ref={droneGroupRef}>
+			<Drone velocity={audioParams.velocity} />
+			<DroneAudio velocity={audioParams.velocity} />
+		</group>
+	)
 }
 
 export default DroneCamera
