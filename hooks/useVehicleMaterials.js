@@ -7,8 +7,8 @@ const COLORS = {
 	LIGHT_GREY: new Color(0.8, 0.8, 0.8),
 	MED_GREY: new Color(0.5, 0.5, 0.5),
 	DARK_GREY: new Color(0.2, 0.2, 0.2),
-	BLACK: new Color(0.025, 0.025, 0.025),
-	BRONZE: new Color().setHSL(0.075, 0.5, 0.35),
+	BLACK: new Color(0.02, 0.02, 0.02),
+	BRONZE: new Color().setHSL(0.07, 0.6, 0.35),
 	HEADLIGHT_BLUE: new Color(0.8, 0.9, 1.0),
 }
 
@@ -26,7 +26,7 @@ const useVehicleMaterials = () => {
 				switch (material.name) {
 					case 'body':
 						material.color.setStyle(color)
-						material.metalness = 0.4
+						material.metalness = 0.5
 						material.roughness = roughness
 						break
 					case 'chrome':
@@ -76,7 +76,7 @@ const useVehicleMaterials = () => {
 						material.color.set(COLORS.BLACK)
 						break
 					case 'black':
-						material.metalness = 0
+						material.metalness = 0.35
 						material.roughness = 0.6
 						material.color.set(COLORS.BLACK)
 						break
@@ -96,17 +96,17 @@ const useVehicleMaterials = () => {
 								break
 							case 'gloss_black':
 								material.metalness = 1
-								material.roughness = 0.1
+								material.roughness = 0.25
 								material.color.set(COLORS.BLACK)
 								break
 							case 'flat_black':
-								material.metalness = 0.3
-								material.roughness = 1
+								material.metalness = 0.5
+								material.roughness = 1.0
 								material.color.set(COLORS.BLACK)
 								break
 							case 'bronze':
-								material.metalness = 0.8
-								material.roughness = 0.3
+								material.metalness = 0.85
+								material.roughness = 0.15
 								material.color.set(COLORS.BRONZE)
 								break
 							case 'body':
