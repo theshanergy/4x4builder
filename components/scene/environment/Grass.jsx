@@ -40,7 +40,6 @@ const BLADE_CONFIG = {
 	colorBase: '#c9b896',
 	colorTip: '#ddd5b8',
 	ambientStrength: 0.6,
-	translucency: 1.0,
 	windStrength: 0.055,
 	windFrequency: 1.5,
 }
@@ -361,7 +360,6 @@ const Grass = memo(() => {
 				uColorBase: { value: new Color(BLADE_CONFIG.colorBase) },
 				uColorTip: { value: new Color(BLADE_CONFIG.colorTip) },
 				uAmbientStrength: { value: BLADE_CONFIG.ambientStrength },
-				uTranslucency: { value: BLADE_CONFIG.translucency },
 				// Shared atmosphere uniforms for consistent lighting
 				uSunDirection: { value: sunDirection.clone() },
 				uSunColor: { value: sunColor.clone() },

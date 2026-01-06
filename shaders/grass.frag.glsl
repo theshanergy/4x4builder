@@ -1,7 +1,6 @@
 uniform vec3 uColorBase;
 uniform vec3 uColorTip;
 uniform float uAmbientStrength;
-uniform float uTranslucency;
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
 
@@ -18,8 +17,8 @@ void main() {
     vec3 lightDir = normalize(uSunDirection);
     float diffuse = max(dot(vNormal, lightDir), 0.0);
     
-    // Translucency effect - light passing through the blade
-    float backLight = max(dot(-vNormal, lightDir), 0.0) * uTranslucency;
+    // Back-lighting effect - light passing through the blade
+    float backLight = max(dot(-vNormal, lightDir), 0.0);
     
     // Combine lighting with sun color tinting
     float lighting = uAmbientStrength + diffuse * (1.0 - uAmbientStrength) + backLight;
