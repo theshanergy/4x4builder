@@ -161,12 +161,12 @@ const generateSamplingCode = (layer, index) => {
 		vec2 uvLower${index} = vWorldPos.xz * scaleLower${index};
 		vec2 uvUpper${index} = vWorldPos.xz * scaleUpper${index};
 		
-		vec4 colorLower${index} = textureNoTile(${prefix}Texture, uvLower${index}, true);
-		vec4 colorUpper${index} = textureNoTile(${prefix}Texture, uvUpper${index}, true);
+		vec4 colorLower${index} = sRGBToLinear(texture(${prefix}Texture, uvLower${index}));
+		vec4 colorUpper${index} = sRGBToLinear(texture(${prefix}Texture, uvUpper${index}));
 		layer${index}Color = mix(colorLower${index}, colorUpper${index}, lodBlend${index});
 		
-		vec3 normalLower${index} = textureNoTile(${prefix}NormalMap, uvLower${index}).xyz * 2.0 - 1.0;
-		vec3 normalUpper${index} = textureNoTile(${prefix}NormalMap, uvUpper${index}).xyz * 2.0 - 1.0;
+		vec3 normalLower${index} = texture(${prefix}NormalMap, uvLower${index}).xyz * 2.0 - 1.0;
+		vec3 normalUpper${index} = texture(${prefix}NormalMap, uvUpper${index}).xyz * 2.0 - 1.0;
 		vec3 normalSample${index} = mix(normalLower${index}, normalUpper${index}, lodBlend${index});
 		normalSample${index}.xy *= ${normalScaleStr};
 		// Convert tangent-space normal to world-space using UDN blending for Y-up projection
@@ -178,8 +178,8 @@ const generateSamplingCode = (layer, index) => {
 	} else {
 		code += `
 		vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
-		layer${index}Color = textureNoTile(${prefix}Texture, layer${index}UV, true);
-		vec3 layer${index}NormalSample = textureNoTile(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
+		layer${index}Color = sRGBToLinear(texture(${prefix}Texture, layer${index}UV));
+		vec3 layer${index}NormalSample = texture(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
 		layer${index}NormalSample.xy *= ${normalScaleStr};
 		// Convert tangent-space normal to world-space using UDN blending for Y-up projection
 		layer${index}Normal = normalize(vec3(
@@ -330,25 +330,11 @@ const useTerrainMaterial = () => {
 					return pow(srgb, vec3(2.2));
 				}
 
-				vec4 sRGBToLinear(vec4 srgb) {
-					return vec4(pow(srgb.rgb, vec3(2.2)), srgb.a);
-				}
+			vec4 sRGBToLinear(vec4 srgb) {
+				return vec4(pow(srgb.rgb, vec3(2.2)), srgb.a);
+			}
 
-				// Simple texture sampling wrapper with sRGB conversion
-				vec4 textureNoTile(sampler2D samp, vec2 uv, bool srgb) {
-					vec2 dx = dFdx(uv);
-					vec2 dy = dFdy(uv);
-					vec4 result = textureGrad(samp, uv, dx, dy);
-					// Convert sRGB to linear color space for albedo textures
-					return srgb ? sRGBToLinear(result) : result;
-				}
-
-				// Convenience overload for normal maps (no sRGB conversion)
-				vec4 textureNoTile(sampler2D samp, vec2 uv) {
-					return textureNoTile(samp, uv, false);
-				}
-
-				// Calculate LOD blend info - returns vec3(lowerScale, upperScale, blendFactor)
+			// Calculate LOD blend info - returns vec3(lowerScale, upperScale, blendFactor)
 				vec3 getDistanceLODBlend(vec3 worldPos, float distanceFactor, float lodLevels) {
 					float dist = length(worldPos - cameraPosition);
 					// Calculate continuous LOD level
