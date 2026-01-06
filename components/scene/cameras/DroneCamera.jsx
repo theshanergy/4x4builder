@@ -20,7 +20,7 @@ import Drone from '../drone/Drone'
 //   Gamepad: Left stick = strafe/altitude, Right stick = look, Triggers = yaw
 const DroneCamera = () => {
 	const camera = useThree((state) => state.camera)
-	
+
 	// Ref for the visual drone model
 	const droneGroupRef = useRef(null)
 
@@ -202,21 +202,21 @@ const DroneCamera = () => {
 		// Calculate forward direction vector from camera's look direction (includes pitch)
 		const pitch = euler.current.x
 		const yaw = euler.current.y
-		
+
 		// Forward direction (where camera is looking)
 		const forwardX = -Math.sin(yaw) * Math.cos(pitch)
 		const forwardY = Math.sin(pitch)
 		const forwardZ = -Math.cos(yaw) * Math.cos(pitch)
-		
+
 		// Right direction (perpendicular to forward, on horizontal plane)
 		const rightX = Math.cos(yaw)
 		const rightY = 0
 		const rightZ = -Math.sin(yaw)
-		
+
 		// Calculate target velocity from inputs
 		// Forward/back moves in look direction, strafe moves perpendicular
 		const targetVelX = (forwardX * pitchInput + rightX * strafeInput) * currentMoveSpeed
-		const targetVelY = (forwardY * pitchInput) * currentMoveSpeed + throttleInput * currentVerticalSpeed
+		const targetVelY = forwardY * pitchInput * currentMoveSpeed + throttleInput * currentVerticalSpeed
 		const targetVelZ = (forwardZ * pitchInput + rightZ * strafeInput) * currentMoveSpeed
 
 		// Lerp velocity towards target
@@ -224,8 +224,6 @@ const DroneCamera = () => {
 		velocity.current.z = MathUtils.lerp(velocity.current.z, targetVelZ, config.acceleration * dt)
 		velocity.current.y = MathUtils.lerp(velocity.current.y, targetVelY, config.acceleration * dt)
 
-		// Calculate visual tilt based on horizontal velocity
-		
 		// Strafe (Roll)
 		const strafeVelocity = velocity.current.x * rightX + velocity.current.z * rightZ
 		const normalizedStrafeVel = MathUtils.clamp(strafeVelocity / currentMoveSpeed, -1, 1)
@@ -269,15 +267,10 @@ const DroneCamera = () => {
 			// Position just above camera
 			droneGroupRef.current.position.copy(currentPosition.current)
 			droneGroupRef.current.position.y += 0.2
-			
+
 			// Rotate to match camera yaw + visual tilt
 			// YXZ order: Yaw -> Pitch -> Roll
-			droneGroupRef.current.rotation.set(
-				droneTilt.current.pitch * 1.5,
-				euler.current.y,
-				droneTilt.current.roll * 1.5,
-				'YXZ'
-			)
+			droneGroupRef.current.rotation.set(droneTilt.current.pitch, euler.current.y, droneTilt.current.roll, 'YXZ')
 		}
 
 		// Apply rotation to camera - combine look direction with drone tilt for visual effect
