@@ -40,13 +40,12 @@ const REAR_WHEEL_FRICTION = 0.85
 // Transmission simulation
 const TRANSMISSION = {
 	gearRatios: [0, 3.5, 2.2, 1.4, 1.0, 0.75], // 0 = park/neutral, 1-5 = gears
-	finalDrive: 3.73,
+	finalDrive: 4.88,
 	wheelRadius: 0.35, // meters (approximate)
 	idleRpm: 850,
-	maxRpm: 6200,
-	redlineRpm: 5800,
-	shiftUpRpm: 5500,
-	shiftDownRpm: 1800,
+	maxRpm: 9000,
+	redlineRpm: 7000,
+	shiftDownRpm: 3500,
 	shiftCooldown: 0.4, // seconds between shifts to prevent gear skipping
 	parkEngageSpeed: 0.05, // Speed threshold (m/s) below which park engages
 	parkEngageDelay: 0.1, // Time (seconds) vehicle must be stopped before park engages
@@ -87,6 +86,34 @@ const getTorqueMultiplier = (rpm) => {
 		}
 	}
 	return 1.0
+}
+
+// Calculate dynamic shift-up RPM based on gear
+const getShiftUpRpm = (gear) => {
+	if (gear <= 0) return TRANSMISSION.redlineRpm * 0.95
+
+	// Normalize gear to [0, 1], clamping at gear 5
+	const t = Math.min(gear - 1, 4) / 4
+
+	// Exponential falloff
+	const shiftPercent = 0.95 - 0.65 * Math.pow(t, 2.5)
+
+	return TRANSMISSION.redlineRpm * shiftPercent
+}
+
+// Calculate dynamic downshift RPM based on gear
+// Uses falloff to prevent rapid shifting in lower gears
+const getShiftDownRpm = (gear) => {
+	if (gear <= 1) return TRANSMISSION.idleRpm // Don't downshift below 1st gear
+
+	// Normalize gear to [0, 1], clamping at gear 5
+	const t = Math.min(gear - 1, 4) / 4
+
+	// Exponential falloff for downshift point
+	// Lower gears have wider RPM range before downshifting
+	const shiftPercent = 0.55 - 0.15 * Math.pow(t, 2.5)
+
+	return Math.max(TRANSMISSION.redlineRpm * shiftPercent, TRANSMISSION.idleRpm)
 }
 
 /**
@@ -395,11 +422,13 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		const canShift = currentTime - lastShiftTime.current > TRANSMISSION.shiftCooldown
 
 		if (!isAirborne.current && vehicleState.gear !== -1 && !isInPark.current) {
-			if (canShift && currentRpmFromDrivetrain > TRANSMISSION.shiftUpRpm && currentGear < TRANSMISSION.gearRatios.length - 1 && throttleInput > 0.3) {
+			const dynamicShiftUpRpm = getShiftUpRpm(currentGear)
+			const dynamicShiftDownRpm = getShiftDownRpm(currentGear)
+			if (canShift && currentRpmFromDrivetrain > dynamicShiftUpRpm && currentGear < TRANSMISSION.gearRatios.length - 1 && throttleInput > 0.3) {
 				currentGear++
 				vehicleState.gear = currentGear
 				lastShiftTime.current = currentTime
-			} else if (canShift && currentRpmFromDrivetrain < TRANSMISSION.shiftDownRpm && currentGear > 1 && absSpeed > 0.5) {
+			} else if (canShift && currentRpmFromDrivetrain < dynamicShiftDownRpm && currentGear > 1 && absSpeed > 0.5) {
 				currentGear--
 				vehicleState.gear = currentGear
 				lastShiftTime.current = currentTime
