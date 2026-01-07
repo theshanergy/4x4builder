@@ -13,20 +13,23 @@ const _scratchDummy = new Object3D()
 const _normalScratch = new Vector3()
 
 /**
- * Generate vegetation positions and matrices for a specific terrain tile.
+ * Generate vegetation positions and matrices for a specific vegetation type on a terrain tile.
  * Vegetation is placed deterministically based on absolute world grid positions.
  * This ensures the same vegetation always appears at the same location regardless of LOD.
  *
  * @param {Object} node - Quadtree node (tile) with centerX, centerZ, size
  * @param {Object} terrainHelpers - Terrain height/normal sampling functions
  * @param {number} lodLevel - LOD level (0 = highest detail, 3 = lowest)
- * @param {Object} config - Vegetation configuration object
+ * @param {Object} vegetationTypeConfig - Configuration for this vegetation type
+ * @param {Object} globalSettings - Global vegetation settings (gridSpacing, maxVegetationPerTile, etc.)
+ * @param {number} typeIndex - Index of this vegetation type (used for seeding)
  * @returns {Array} Array of vegetation matrices
  */
-export const generateVegetationForTile = (node, terrainHelpers, lodLevel, config) => {
+export const generateVegetationForType = (node, terrainHelpers, lodLevel, vegetationTypeConfig, globalSettings, typeIndex) => {
 	const { centerX, centerZ, size } = node
 	const { getWorldHeight, getNormal } = terrainHelpers
-	const { scale, slopeThreshold, heightOffset, density, gridSpacing, maxVegetationPerTile } = config
+	const { scale, slope, height, density } = vegetationTypeConfig
+	const { gridSpacing, maxVegetationPerTile, heightOffset } = globalSettings
 
 	const dummy = _scratchDummy
 	const matrices = []
@@ -45,6 +48,12 @@ export const generateVegetationForTile = (node, terrainHelpers, lodLevel, config
 	const startX = Math.floor(minX / gridSpacing) * gridSpacing
 	const startZ = Math.floor(minZ / gridSpacing) * gridSpacing
 
+	// Convert slope range (0-1) to normal Y threshold
+	// slope 0 = flat = normal.y = 1
+	// slope 0.25 = 25% slope = normal.y = 0.75
+	const slopeMinNormalY = 1 - slope.max
+	const slopeMaxNormalY = 1 - slope.min
+
 	// Generate vegetation on a world-aligned grid
 	for (let x = startX; x < maxX; x += gridSpacing) {
 		for (let z = startZ; z < maxZ; z += gridSpacing) {
@@ -54,10 +63,10 @@ export const generateVegetationForTile = (node, terrainHelpers, lodLevel, config
 			// Stop if we've reached max vegetation for this tile
 			if (matrices.length >= maxVegetationPerTile) break
 
-			// Use grid position to generate consistent seed for this vegetation location
+			// Use grid position + type index to generate consistent seed for this vegetation location
 			const gridX = Math.floor(x / gridSpacing)
 			const gridZ = Math.floor(z / gridSpacing)
-			const seed = hashCoords(gridX, gridZ, 88888)
+			const seed = hashCoords(gridX, gridZ, 88888 + typeIndex * 1000)
 			const random = createSeededRandom(seed)
 
 			// Density check (same for this location across all LODs)
@@ -72,19 +81,20 @@ export const generateVegetationForTile = (node, terrainHelpers, lodLevel, config
 			// Skip if offset moved it outside tile bounds
 			if (vegetationX < minX || vegetationX >= maxX || vegetationZ < minZ || vegetationZ >= maxZ) continue
 
+			// Get terrain height and check height range
+			const vegetationY = getWorldHeight(vegetationX, vegetationZ)
+			if (vegetationY < height.min || vegetationY > height.max) continue
+
 			// Get terrain normal and check slope
 			const terrainNormal = getNormal(vegetationX, vegetationZ, _normalScratch)
-			if (terrainNormal.y < slopeThreshold) continue
-
-			// Get terrain height
-			const vegetationY = getWorldHeight(vegetationX, vegetationZ) + heightOffset
+			if (terrainNormal.y < slopeMinNormalY || terrainNormal.y > slopeMaxNormalY) continue
 
 			// Random scale and rotation (same for this location)
 			const vegetationScale = scale.min + random() * (scale.max - scale.min)
 			const rotationY = random() * Math.PI * 2
 
 			// Set transform
-			dummy.position.set(vegetationX, vegetationY, vegetationZ)
+			dummy.position.set(vegetationX, vegetationY + heightOffset, vegetationZ)
 			dummy.rotation.set(0, rotationY, 0) // Random Y rotation only
 			dummy.scale.setScalar(vegetationScale)
 			dummy.updateMatrix() // Store matrix

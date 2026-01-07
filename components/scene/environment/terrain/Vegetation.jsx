@@ -1,9 +1,9 @@
 import { useMemo, useEffect, memo } from 'react'
 import { InstancedMesh } from 'three'
 
-import { VEGETATION_CONFIG } from '../../../../config/vegetation'
+import { VEGETATION_SETTINGS } from '../../../../config/vegetation'
 import useGameStore from '../../../../store/gameStore'
-import { generateVegetationForTile, getVegetationLODForTileSize } from '../../../../utils/terrain/vegetationGeneration'
+import { generateVegetationForType, getVegetationLODForTileSize } from '../../../../utils/terrain/vegetationGeneration'
 
 /**
  * Custom comparison for Vegetation props.
@@ -34,7 +34,7 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
  * @param {Object} props.terrainHelpers - Height/normal sampling functions
- * @param {Object} props.vegetationModels - Vegetation LOD models from useVegetationModels
+ * @param {Array} props.vegetationModels - Array of vegetation type models from useVegetationModels
  */
 const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 	// Check if vegetation should be disabled
@@ -48,45 +48,54 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 
 		// Determine LOD level based on tile size
 		const lodLevel = getVegetationLODForTileSize(node.size)
-		const lodMeshes = vegetationModels[lodLevel]
 
-		if (!lodMeshes || lodMeshes.length === 0) {
-			console.warn(`[Vegetation] No meshes for LOD ${lodLevel}`)
-			return null
-		}
+		const allInstances = []
 
-		// Generate vegetation matrices for this tile
-		const vegetationMatrices = generateVegetationForTile(node, terrainHelpers, lodLevel, VEGETATION_CONFIG)
+		// Generate instances for each vegetation type
+		vegetationModels.forEach((vegetationType, typeIndex) => {
+			const lodMeshes = vegetationType.lods[lodLevel]
 
-		if (vegetationMatrices.length === 0) {
-			return null
-		}
+			if (!lodMeshes || lodMeshes.length === 0) {
+				console.warn(`[Vegetation] No meshes for ${vegetationType.name} LOD ${lodLevel}`)
+				return
+			}
 
-		// Create instanced meshes for each vegetation part (trunk, leaves)
-		const instances = lodMeshes.map((meshData) => {
-			const instancedMesh = new InstancedMesh(meshData.geometry, meshData.material, vegetationMatrices.length)
-			instancedMesh.castShadow = true
-			instancedMesh.receiveShadow = true
-			instancedMesh.frustumCulled = true
+			// Generate vegetation matrices for this type
+			const vegetationMatrices = generateVegetationForType(node, terrainHelpers, lodLevel, vegetationType.config, VEGETATION_SETTINGS, typeIndex)
 
-			// Set all matrices
-			vegetationMatrices.forEach((matrix, i) => {
-				instancedMesh.setMatrixAt(i, matrix)
+			if (vegetationMatrices.length === 0) {
+				return
+			}
+
+			// Create instanced meshes for each part of this vegetation type (trunk, leaves, etc.)
+			lodMeshes.forEach((meshData, meshIndex) => {
+				const instancedMesh = new InstancedMesh(meshData.geometry, meshData.material, vegetationMatrices.length)
+				instancedMesh.castShadow = true
+				instancedMesh.receiveShadow = true
+				instancedMesh.frustumCulled = true
+
+				// Set all matrices
+				vegetationMatrices.forEach((matrix, i) => {
+					instancedMesh.setMatrixAt(i, matrix)
+				})
+				instancedMesh.instanceMatrix.needsUpdate = true
+
+				allInstances.push({
+					mesh: instancedMesh,
+					key: `${vegetationType.name}-${meshIndex}`,
+				})
 			})
-			instancedMesh.instanceMatrix.needsUpdate = true
-
-			return instancedMesh
 		})
 
-		return instances
+		return allInstances.length > 0 ? allInstances : null
 	}, [node.key, node.size, vegetationModels, terrainHelpers, showVegetation])
 
-	// Cleanup vegetation instancestances
+	// Cleanup vegetation instances
 	useEffect(() => {
 		return () => {
 			// Dispose instances when component unmounts or vegetationInstances change
 			if (vegetationInstances) {
-				vegetationInstances.forEach((mesh) => {
+				vegetationInstances.forEach(({ mesh }) => {
 					// Note: Don't dispose geometry/material as they're shared from GLTF
 					// Just let Three.js handle the cleanup
 					mesh.dispose()
@@ -96,7 +105,7 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 	}, [vegetationInstances])
 
 	// Vegetation is positioned in world space, not relative to tile
-	return <>{vegetationInstances && vegetationInstances.map((mesh, index) => <primitive key={`vegetation-${node.key}-${index}`} object={mesh} />)}</>
+	return <>{vegetationInstances && vegetationInstances.map(({ mesh, key }, index) => <primitive key={`vegetation-${node.key}-${key}-${index}`} object={mesh} />)}</>
 }, arePropsEqual)
 
 export default Vegetation
