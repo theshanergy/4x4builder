@@ -1,31 +1,20 @@
 /**
  * Vegetation Configuration
- *
- * Configuration values for vegetation placement and rendering.
- * Similar to terrain layers, each vegetation type defines:
- * - name: Vegetation identifier
- * - model: Path to GLTF model file
- * - meshNames: Array of mesh names within the model for LOD levels (lod0, lod1, lod2, lod3)
- * - mesh: Optional specific mesh name within model (for multi-mesh models)
- * - scale: { min, max } - Random scale variation range
- * - slope: { min, max } - Slope range where vegetation can spawn (0=flat, 1=vertical)
- * - height: { min, max } - World height range where vegetation can spawn
- * - density: Probability of placing vegetation at a valid location (0-1)
- */
-
-/**
- * Global vegetation settings
- */
-export const VEGETATION_SETTINGS = {
-	gridSpacing: 8, // Spacing between potential vegetation positions (world units)
-}
-
-/**
- * Vegetation Types Configuration
- * Each entry defines a type of vegetation that can be placed in the world.
- *
- * Placement:
- * - density: Probability (0-1) of placing vegetation at each grid position
+ * 
+ * Options:
+ * - name: Unique identifier for the vegetation type
+ * - model: Path to the GLB model file
+ * - meshNames: Array of mesh names in the model (including LOD variants)
+ * - scale: Random scale variation for instances
+ *   - min: Minimum scale multiplier
+ *   - max: Maximum scale multiplier
+ * - slope: Terrain slope constraints (0 = flat, 1 = vertical)
+ *   - min: Minimum allowed slope
+ *   - max: Maximum allowed slope
+ * - height: Elevation constraints in world units
+ *   - min: Minimum spawn height
+ *   - max: Maximum spawn height
+ * - density: Spawn probability per 100 square meters (e.g., 0.01 = ~1 per 500 sq m)
  */
 export const VEGETATION_TYPES = [
 	{
@@ -44,6 +33,6 @@ export const VEGETATION_TYPES = [
 			min: 5, // Above water level
 			max: 220, // Below snow line
 		},
-		density: 0.18, // Probability of placement at each grid position
+		density: 0.01, // Items per 100 sq meters (~1 tree per 500 sq meters)
 	},
 ]

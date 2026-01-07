@@ -1,9 +1,8 @@
 import { useMemo, useEffect, memo } from 'react'
 import { InstancedMesh } from 'three'
 
-import { VEGETATION_SETTINGS } from '../../../../config/vegetation'
 import useGameStore from '../../../../store/gameStore'
-import { generateVegetationForType, getVegetationLODForTileSize } from '../../../../utils/terrain/vegetationGeneration'
+import { generateVegetationForType } from '../../../../utils/terrain/vegetationGeneration'
 
 /**
  * Custom comparison for Vegetation props.
@@ -46,8 +45,8 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 	const vegetationInstances = useMemo(() => {
 		if (!vegetationModels || !showVegetation || !terrainHelpers) return null
 
-		// Determine LOD level based on tile size
-		const lodLevel = getVegetationLODForTileSize(node.size)
+		// Use the quadtree depth as the LOD level (0 = highest detail)
+		const lodLevel = node.depth
 
 		const allInstances = []
 
@@ -61,7 +60,7 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 			}
 
 			// Generate vegetation matrices for this type
-			const vegetationMatrices = generateVegetationForType(node, terrainHelpers, lodLevel, vegetationType.config, VEGETATION_SETTINGS, typeIndex)
+			const vegetationMatrices = generateVegetationForType(node, terrainHelpers, lodLevel, vegetationType.config, typeIndex)
 
 			if (vegetationMatrices.length === 0) {
 				return
