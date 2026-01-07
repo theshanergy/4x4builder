@@ -12,12 +12,6 @@ const MAX_TRACK_DISTANCE = 80
 
 const SLIP_THRESHOLD = 2.0
 
-// Simple seeded random for consistent texture generation
-const seededRandom = (seed) => {
-	const x = Math.sin(seed) * 10000
-	return x - Math.floor(x)
-}
-
 // Vertex shader - passes instance data to fragment shader
 const vertexShader = `
   attribute float aSpawnTime;
@@ -101,10 +95,9 @@ const createTrackTexture = () => {
 			const x = startX + col * (blockWidth + gap)
 			const y = row * (blockHeight + gap) + 8
 
-			// Use seeded random for consistent texture across renders
-			const seed = row * cols + col
-			const randW = blockWidth + (seededRandom(seed) - 0.5) * 3
-			const randH = blockHeight + (seededRandom(seed + 100) - 0.5) * 2
+			// Add slight random variation to tread block sizes
+			const randW = blockWidth + (Math.random() - 0.5) * 3
+			const randH = blockHeight + (Math.random() - 0.5) * 2
 
 			// Calculate fade factor based on distance from edges
 			const centerX = canvas.width / 2

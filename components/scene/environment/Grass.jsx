@@ -6,23 +6,7 @@ import useGameStore from '../../../store/gameStore'
 import { sunDirection, sunColor } from '../../../config/environment'
 import grassVertexShader from '../../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../../shaders/grass.frag.glsl'
-
-// Seeded random number generator (mulberry32) - inlined for performance
-const createSeededRandom = (seed) => {
-	let state = seed
-	return () => {
-		state = (state + 0x6d2b79f5) | 0
-		let t = Math.imul(state ^ (state >>> 15), state | 1)
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-	}
-}
-
-// Hash function for generating consistent seeds from coordinates
-const hashCoords = (x, z, salt = 0) => {
-	const h = (x * 374761393 + z * 668265263 + salt * 1013904223) | 0
-	return Math.abs(h)
-}
+import { createSeededRandom, hashCoords } from '../../../utils/seededRandom'
 
 // Pre-allocated scratch objects for matrix generation (avoids allocations in hot loop)
 const _scratchDummy = new Object3D()

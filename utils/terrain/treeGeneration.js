@@ -1,4 +1,5 @@
 import { Vector3, Object3D } from 'three'
+import { createSeededRandom, hashCoords } from '../seededRandom'
 
 /**
  * Tree Generation Utilities
@@ -6,23 +7,6 @@ import { Vector3, Object3D } from 'three'
  * Pure functions for generating tree positions and matrices.
  * These functions are deterministic and side-effect free.
  */
-
-// Seeded random number generator (mulberry32)
-const createSeededRandom = (seed) => {
-	let state = seed
-	return () => {
-		state = (state + 0x6d2b79f5) | 0
-		let t = Math.imul(state ^ (state >>> 15), state | 1)
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-	}
-}
-
-// Hash function for generating consistent seeds from tile coordinates
-const hashCoords = (x, z, salt = 0) => {
-	const h = (x * 374761393 + z * 668265263 + salt * 1013904223) | 0
-	return Math.abs(h)
-}
 
 // Pre-allocated scratch objects for matrix generation
 const _scratchDummy = new Object3D()
