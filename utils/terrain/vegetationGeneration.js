@@ -16,12 +16,15 @@ const _normalScratch = new Vector3()
  * Generate vegetation positions and matrices for a specific vegetation type on a terrain tile.
  * Vegetation is placed deterministically based on absolute world grid positions.
  * This ensures the same vegetation always appears at the same location regardless of LOD.
+ * 
+ * Distribution scales with tile size to maintain consistent visual density across LOD levels.
+ * Larger tiles get proportionally more vegetation to avoid sparse appearance on distant tiles.
  *
  * @param {Object} node - Quadtree node (tile) with centerX, centerZ, size
  * @param {Object} terrainHelpers - Terrain height/normal sampling functions
  * @param {number} lodLevel - LOD level (0 = highest detail, 3 = lowest)
- * @param {Object} vegetationTypeConfig - Configuration for this vegetation type
- * @param {Object} globalSettings - Global vegetation settings (gridSpacing, maxVegetationPerTile, etc.)
+ * @param {Object} vegetationTypeConfig - Configuration for this vegetation type (must have density)
+ * @param {Object} globalSettings - Global vegetation settings (gridSpacing, etc.)
  * @param {number} typeIndex - Index of this vegetation type (used for seeding)
  * @returns {Array} Array of vegetation matrices
  */
@@ -29,13 +32,13 @@ export const generateVegetationForType = (node, terrainHelpers, lodLevel, vegeta
 	const { centerX, centerZ, size } = node
 	const { getWorldHeight, getNormal } = terrainHelpers
 	const { scale, slope, height, density } = vegetationTypeConfig
-	const { gridSpacing, maxVegetationPerTile, heightOffset } = globalSettings
+	const { gridSpacing } = globalSettings
 
 	const dummy = _scratchDummy
 	const matrices = []
 
-	// Adjust density based on tile size to prevent too many vegetation on large tiles
-	const adjustedDensity = density * Math.min(1, 128 / size)
+	// Use density as-is (no adjustment needed since grid spacing handles distribution)
+	const vegetationDensity = density || 1.0
 
 	// Calculate grid bounds for vegetation placement
 	const halfSize = size / 2
@@ -60,9 +63,6 @@ export const generateVegetationForType = (node, terrainHelpers, lodLevel, vegeta
 			// Skip if outside tile bounds
 			if (x < minX || x >= maxX || z < minZ || z >= maxZ) continue
 
-			// Stop if we've reached max vegetation for this tile
-			if (matrices.length >= maxVegetationPerTile) break
-
 			// Use grid position + type index to generate consistent seed for this vegetation location
 			const gridX = Math.floor(x / gridSpacing)
 			const gridZ = Math.floor(z / gridSpacing)
@@ -70,7 +70,7 @@ export const generateVegetationForType = (node, terrainHelpers, lodLevel, vegeta
 			const random = createSeededRandom(seed)
 
 			// Density check (same for this location across all LODs)
-			if (random() > adjustedDensity) continue
+			if (random() > vegetationDensity) continue
 
 			// Add random offset within grid cell (same for this location)
 			const offsetX = (random() - 0.5) * gridSpacing * 0.8
@@ -94,13 +94,12 @@ export const generateVegetationForType = (node, terrainHelpers, lodLevel, vegeta
 			const rotationY = random() * Math.PI * 2
 
 			// Set transform
-			dummy.position.set(vegetationX, vegetationY + heightOffset, vegetationZ)
+			dummy.position.set(vegetationX, vegetationY, vegetationZ)
 			dummy.rotation.set(0, rotationY, 0) // Random Y rotation only
 			dummy.scale.setScalar(vegetationScale)
 			dummy.updateMatrix() // Store matrix
 			matrices.push(dummy.matrix.clone())
 		}
-		if (matrices.length >= maxVegetationPerTile) break
 	}
 
 	return matrices

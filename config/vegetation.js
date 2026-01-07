@@ -18,13 +18,14 @@
  */
 export const VEGETATION_SETTINGS = {
 	gridSpacing: 8, // Spacing between potential vegetation positions (world units)
-	maxVegetationPerTile: 50, // Maximum vegetation per terrain tile (per type)
-	heightOffset: 0, // Vertical offset from terrain surface
 }
 
 /**
  * Vegetation Types Configuration
  * Each entry defines a type of vegetation that can be placed in the world.
+ *
+ * Placement:
+ * - density: Probability (0-1) of placing vegetation at each grid position
  */
 export const VEGETATION_TYPES = [
 	{
@@ -43,6 +44,6 @@ export const VEGETATION_TYPES = [
 			min: 5, // Above water level
 			max: 220, // Below snow line
 		},
-		density: 0.18,
+		density: 0.18, // Probability of placement at each grid position
 	},
 ]
