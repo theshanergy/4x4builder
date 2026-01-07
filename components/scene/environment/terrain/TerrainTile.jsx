@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef, memo } from 'react'
 
 import { TILE_RESOLUTION } from '../../../../config/lod'
 import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
-import Trees from './Trees'
+import Vegetation from './Vegetation'
 
 // Default edge stitch info (no stitching needed)
 const DEFAULT_EDGE_STITCH_INFO = {
@@ -51,7 +51,7 @@ const arePropsEqual = (prevProps, nextProps) => {
 		prevProps.terrainHelpers !== nextProps.terrainHelpers ||
 		prevProps.terrainMaterial !== nextProps.terrainMaterial ||
 		prevProps.waterMaterial !== nextProps.waterMaterial ||
-		prevProps.treeModels !== nextProps.treeModels
+		prevProps.vegetationModels !== nextProps.vegetationModels
 	) {
 		return false
 	}
@@ -60,7 +60,7 @@ const arePropsEqual = (prevProps, nextProps) => {
 }
 
 /**
- * TerrainTile - Renders a single quadtree leaf node as terrain geometry with trees.
+ * TerrainTile - Renders a single quadtree leaf node as terrain geometry with vegetation.
  *
  * @param {Object} props
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
@@ -68,9 +68,9 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props.edgeStitchInfo - Edge stitching configuration
  * @param {THREE.Material} props.terrainMaterial - Shared terrain material instance
  * @param {THREE.Material} props.waterMaterial - Shared water material instance
- * @param {Object} props.treeModels - Tree LOD models from useTreeModels
+ * @param {Object} props.vegetationModels - Vegetation LOD models from useVegetationModels
  */
-const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMaterial, waterMaterial, treeModels }) => {
+const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMaterial, waterMaterial, vegetationModels }) => {
 	const { centerX, centerZ } = node
 	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
 
@@ -112,7 +112,7 @@ const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMateria
 				{terrainMaterial && <mesh geometry={terrainGeometry} material={terrainMaterial} receiveShadow />}
 				{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} />}
 			</group>
-			<Trees node={node} terrainHelpers={terrainHelpers} treeModels={treeModels} />
+			<Vegetation node={node} terrainHelpers={terrainHelpers} vegetationModels={vegetationModels} />
 		</>
 	)
 }, arePropsEqual)
