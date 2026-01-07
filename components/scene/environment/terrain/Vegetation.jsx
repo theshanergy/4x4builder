@@ -3,6 +3,7 @@ import { InstancedMesh } from 'three'
 
 import useGameStore from '../../../../store/gameStore'
 import { generateVegetationForType } from '../../../../utils/terrain/vegetationGeneration'
+import { MAX_QUADTREE_DEPTH } from '../../../../config/lod'
 
 /**
  * Custom comparison for Vegetation props.
@@ -50,20 +51,20 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 		// Generate instances for each vegetation type
 		vegetationModels.forEach((vegetationType, typeIndex) => {
 			// Map quadtree depth to vegetation LOD level:
-			// Quadtree: depth 0 = root (large/far tiles), depth N = leaves (small/near tiles)
-			// Vegetation: LOD 0 = high detail, LOD M = low detail
-			// Mapping: high depth → low LOD index (detailed vegetation on detailed terrain)
+			// Quadtree: depth 0 = root (large/far tiles), depth MAX = leaves (small/near tiles)
+			// Vegetation: LOD 0 = high detail, LOD 1 = medium detail, LOD 2 = low detail
+			// Mapping: highest depth → LOD 0 (most detailed vegetation on most subdivided terrain)
 			
 			// Get available LOD indices for this vegetation type
 			const availableLods = Object.keys(vegetationType.lods).map(Number).sort((a, b) => a - b)
 			const numLods = availableLods.length
 			
-			// Map depth to LOD index inversely, clamped to available range
-			// Examples for a tree with LODs [0, 1, 2] (numLods = 3):
-			// - depth 0 → LOD 2 (lowest detail on largest tiles)
-			// - depth 1 → LOD 1 (medium detail on medium tiles)  
-			// - depth 2+ → LOD 0 (highest detail on smallest tiles)
-			const lodLevel = availableLods[Math.max(0, numLods - 1 - node.depth)]
+			// Map depth to LOD index based on distance from max depth
+			// Examples with MAX_QUADTREE_DEPTH = 7 and LODs [0, 1, 2]:
+			// - depth 7 → LOD 0 (highest detail on most subdivided tiles)
+			// - depth 6 → LOD 1 (medium detail)  
+			// - depth 5 and below → LOD 2 (lowest detail on least subdivided tiles)
+			const lodLevel = availableLods[Math.min(numLods - 1, Math.max(0, MAX_QUADTREE_DEPTH - node.depth))]
 
 			const lodMeshes = vegetationType.lods[lodLevel]
 			if (!lodMeshes?.length) return

@@ -30,9 +30,9 @@ export const VEGETATION_TYPES = [
 			max: 0.25, // Up to 25% slope (0.75 normal Y)
 		},
 		height: {
-			min: 5, // Above water level
-			max: 220, // Below snow line
+			min: 0, // Above water level
+			max: 60,
 		},
-		density: 0.01, // Items per 100 sq meters (~1 tree per 500 sq meters)
+		density: 0.1, // Items per 100 sq meters (~1 tree per 500 sq meters)
 	},
 ]

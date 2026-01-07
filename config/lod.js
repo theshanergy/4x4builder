@@ -6,6 +6,9 @@ export const QUADTREE_ROOT_SIZE = 4096
 // Minimum tile size (highest detail level) - also determines physics tile size
 export const QUADTREE_MIN_SIZE = 32
 
+// Maximum quadtree depth based on root and minimum sizes
+export const MAX_QUADTREE_DEPTH = Math.log2(QUADTREE_ROOT_SIZE / QUADTREE_MIN_SIZE)
+
 // Resolution (vertices per side) for each tile regardless of size
 // Higher = more detail per tile, but more geometry
 export const TILE_RESOLUTION = 16
