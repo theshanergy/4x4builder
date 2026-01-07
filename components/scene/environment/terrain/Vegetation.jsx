@@ -45,19 +45,28 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 	const vegetationInstances = useMemo(() => {
 		if (!vegetationModels || !showVegetation || !terrainHelpers) return null
 
-		// Use the quadtree depth as the LOD level (0 = highest detail)
-		const lodLevel = node.depth
-
 		const allInstances = []
 
 		// Generate instances for each vegetation type
 		vegetationModels.forEach((vegetationType, typeIndex) => {
-			const lodMeshes = vegetationType.lods[lodLevel]
+			// Map quadtree depth to vegetation LOD level:
+			// Quadtree: depth 0 = root (large/far tiles), depth N = leaves (small/near tiles)
+			// Vegetation: LOD 0 = high detail, LOD M = low detail
+			// Mapping: high depth → low LOD index (detailed vegetation on detailed terrain)
+			
+			// Get available LOD indices for this vegetation type
+			const availableLods = Object.keys(vegetationType.lods).map(Number).sort((a, b) => a - b)
+			const numLods = availableLods.length
+			
+			// Map depth to LOD index inversely, clamped to available range
+			// Examples for a tree with LODs [0, 1, 2] (numLods = 3):
+			// - depth 0 → LOD 2 (lowest detail on largest tiles)
+			// - depth 1 → LOD 1 (medium detail on medium tiles)  
+			// - depth 2+ → LOD 0 (highest detail on smallest tiles)
+			const lodLevel = availableLods[Math.max(0, numLods - 1 - node.depth)]
 
-			if (!lodMeshes || lodMeshes.length === 0) {
-				console.warn(`[Vegetation] No meshes for ${vegetationType.name} LOD ${lodLevel}`)
-				return
-			}
+			const lodMeshes = vegetationType.lods[lodLevel]
+			if (!lodMeshes?.length) return
 
 			// Generate vegetation matrices for this type
 			const vegetationMatrices = generateVegetationForType(node, terrainHelpers, lodLevel, vegetationType.config, typeIndex)
