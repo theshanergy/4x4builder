@@ -2,6 +2,7 @@ import { useMemo, useEffect, useRef, memo } from 'react'
 
 import { TILE_RESOLUTION } from '../../../../config/lod'
 import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
+import Trees from './Trees'
 
 // Default edge stitch info (no stitching needed)
 const DEFAULT_EDGE_STITCH_INFO = {
@@ -46,7 +47,12 @@ const arePropsEqual = (prevProps, nextProps) => {
 	}
 
 	// Reference comparisons for objects that should be stable
-	if (prevProps.terrainHelpers !== nextProps.terrainHelpers || prevProps.terrainMaterial !== nextProps.terrainMaterial || prevProps.waterMaterial !== nextProps.waterMaterial) {
+	if (
+		prevProps.terrainHelpers !== nextProps.terrainHelpers ||
+		prevProps.terrainMaterial !== nextProps.terrainMaterial ||
+		prevProps.waterMaterial !== nextProps.waterMaterial ||
+		prevProps.treeModels !== nextProps.treeModels
+	) {
 		return false
 	}
 
@@ -54,7 +60,7 @@ const arePropsEqual = (prevProps, nextProps) => {
 }
 
 /**
- * TerrainTile - Renders a single quadtree leaf node as terrain geometry.
+ * TerrainTile - Renders a single quadtree leaf node as terrain geometry with trees.
  *
  * @param {Object} props
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
@@ -62,8 +68,9 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props.edgeStitchInfo - Edge stitching configuration
  * @param {THREE.Material} props.terrainMaterial - Shared terrain material instance
  * @param {THREE.Material} props.waterMaterial - Shared water material instance
+ * @param {Object} props.treeModels - Tree LOD models from useTreeModels
  */
-const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMaterial, waterMaterial }) => {
+const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMaterial, waterMaterial, treeModels }) => {
 	const { centerX, centerZ } = node
 	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
 
@@ -100,10 +107,13 @@ const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMateria
 	useGeometryDisposal(waterGeometryRef, waterGeometry)
 
 	return (
-		<group position={position}>
-			{terrainMaterial && <mesh geometry={terrainGeometry} material={terrainMaterial} receiveShadow />}
-			{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} />}
-		</group>
+		<>
+			<group position={position}>
+				{terrainMaterial && <mesh geometry={terrainGeometry} material={terrainMaterial} receiveShadow />}
+				{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} />}
+			</group>
+			<Trees node={node} terrainHelpers={terrainHelpers} treeModels={treeModels} />
+		</>
 	)
 }, arePropsEqual)
 

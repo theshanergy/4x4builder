@@ -5,6 +5,7 @@ import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
 import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
 import useWaterMaterial from '../../../../hooks/useWaterMaterial'
 import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
+import { useTreeModels } from '../../../../hooks/useTreeModels'
 import useGameStore from '../../../../store/gameStore'
 import TerrainCollider from './TerrainCollider'
 import TerrainTile from './TerrainTile'
@@ -32,6 +33,9 @@ const Terrain = () => {
 	// Water material shared by all water tiles
 	const waterMaterial = useWaterMaterial()
 
+	// Load tree models (LOD 0-3)
+	const treeModels = useTreeModels()
+
 	return (
 		<group name='Terrain'>
 			<TerrainCollider terrainHelpers={terrainHelpers} />
@@ -43,6 +47,7 @@ const Terrain = () => {
 					edgeStitchInfo={edgeStitchInfo}
 					terrainMaterial={terrainMaterial}
 					waterMaterial={waterMaterial}
+					treeModels={treeModels}
 				/>
 			))}
 		</group>
