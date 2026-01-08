@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { VEGETATION_TYPES } from '../config/vegetation'
-import { Matrix4 } from 'three'
+import { Matrix4, Vector3 } from 'three'
 
 // Extract unique models at module level (runs once)
 const UNIQUE_MODELS = (() => {
@@ -56,21 +56,21 @@ export const useVegetationModels = () => {
 
 			const lods = {}
 			const lodLevels = ['lod0', 'lod1', 'lod2', 'lod3']
-			
+
 			// Track the last valid LOD for fallback
 			let lastValidMeshName = null
 
 			// Load each LOD level
 			lodLevels.forEach((lodKey, lodIndex) => {
 				const meshName = type.meshes?.[lodKey]
-				
+
 				// Use provided mesh name or fall back to last valid LOD
 				const actualMeshName = meshName || lastValidMeshName
-				
+
 				if (!actualMeshName) {
 					return // No valid mesh for this LOD
 				}
-				
+
 				const vegetation = gltf.scene.getObjectByName(actualMeshName)
 
 				if (!vegetation) {
@@ -86,14 +86,50 @@ export const useVegetationModels = () => {
 						if (type.mesh && child.name !== type.mesh) {
 							return
 						}
-						
+
+						// Clone geometry to avoid modifying the original
+						const geometry = child.geometry.clone()
+
+						// Check if spherical normals are enabled for this LOD
+						const useSphericalNormals = type.sphericalNormals?.[lodKey]
+
+						if (useSphericalNormals) {
+							// Compute spherical-ish normals from billboard UV
+							const uvs = geometry.attributes.uv
+							const normals = geometry.attributes.normal
+
+							if (normals && uvs) {
+								for (let i = 0; i < normals.count; i++) {
+									// Get UV coordinates (0-1 range)
+									const u = uvs.getX(i)
+									const v = uvs.getY(i)
+
+									// Map UV to spherical coordinates
+									// Center UVs around 0 and scale to create sphere-like curvature
+									const centerU = (u - 0.5) * 2 // -1 to 1
+									const centerV = (v - 0.5) * 2 // -1 to 1
+
+									// Create spherical normal
+									// X and Z are based on horizontal position, Y points upward
+									const nx = centerU * 0.5 // Subtle horizontal curvature
+									const ny = 0.8 + centerV * 0.2 // Mostly upward with slight vertical variation
+									const nz = 0.1 // Slight forward bias
+
+									// Normalize the vector
+									const length = Math.sqrt(nx * nx + ny * ny + nz * nz)
+									normals.setXYZ(i, nx / length, ny / length, nz / length)
+								}
+								normals.needsUpdate = true
+							}
+						}
+
 						// Bake the mesh's local transform into a matrix
 						// This captures the mesh's position, rotation, and scale relative to its parent
 						const meshTransform = new Matrix4()
 						meshTransform.compose(child.position, child.quaternion, child.scale)
-						
+
 						meshes.push({
-							geometry: child.geometry,
+							geometry: geometry,
 							material: child.material,
 							transform: meshTransform,
 						})
