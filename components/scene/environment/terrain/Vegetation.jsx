@@ -49,8 +49,11 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 		const allInstances = []
 		const colliderData = []
 
-		// Reusable scratch matrix for transform composition (performance optimization)
+		// Reusable scratch objects for transform composition and decomposition
 		const composedMatrix = new Matrix4()
+		const scratchPosition = new Vector3()
+		const scratchQuaternion = new Quaternion()
+		const scratchScale = new Vector3()
 
 		// Generate instances for each vegetation type
 		vegetationModels.forEach((vegetationType, typeIndex) => {
@@ -121,11 +124,15 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 			})
 
 			// Add colliders for LOD 0 tiles only
+			// Decompose matrices here to avoid redundant work later
 			if (node.lod === 0 && vegetationType.colliderGeometry) {
 				vegetationMatrices.forEach((matrix) => {
+					matrix.decompose(scratchPosition, scratchQuaternion, scratchScale)
 					colliderData.push({
 						geometry: vegetationType.colliderGeometry,
-						matrix: matrix.clone(),
+						position: [scratchPosition.x, scratchPosition.y, scratchPosition.z],
+						quaternion: [scratchQuaternion.x, scratchQuaternion.y, scratchQuaternion.z, scratchQuaternion.w],
+						scale: scratchScale.x, // Assume uniform scale
 						typeIndex,
 					})
 				})
@@ -152,35 +159,19 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 		}
 	}, [vegetationInstances])
 
-	// Prepare collider instances for Rapier
-	const colliderData = useMemo(() => {
-		if (!vegetationInstances?.colliders || vegetationInstances.colliders.length === 0) {
-			return null
-		}
-
-		return vegetationInstances.colliders.map((collider, index) => {
-			const position = new Vector3()
-			const quaternion = new Quaternion()
-			const scale = new Vector3()
-			collider.matrix.decompose(position, quaternion, scale)
-
-			return {
-				key: `collider-${collider.typeIndex}-${index}`,
-				position: [position.x, position.y, position.z],
-				quaternion: [quaternion.x, quaternion.y, quaternion.z, quaternion.w],
-				scale: scale.x, // Assume uniform scale
-			}
-		})
-	}, [vegetationInstances])
-
 	// Vegetation is positioned in world space, not relative to tile
 	return (
 		<>
 			{vegetationInstances?.instances &&
 				vegetationInstances.instances.map(({ mesh, key }, index) => <primitive key={`vegetation-${node.key}-${key}-${index}`} object={mesh} />)}
-			{colliderData &&
-				colliderData.map((collider) => (
-					<RigidBody key={`${node.key}-${collider.key}`} type='fixed' position={collider.position} quaternion={collider.quaternion} colliders={false}>
+			{vegetationInstances?.colliders &&
+				vegetationInstances.colliders.map((collider, index) => (
+					<RigidBody
+						key={`${node.key}-collider-${collider.typeIndex}-${index}`}
+						type='fixed'
+						position={collider.position}
+						quaternion={collider.quaternion}
+						colliders={false}>
 						<CylinderCollider args={[1.5 * collider.scale, 0.3 * collider.scale]} />
 					</RigidBody>
 				))}

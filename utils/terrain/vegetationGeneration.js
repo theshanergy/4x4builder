@@ -33,6 +33,7 @@ const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex)
 
 	const dummy = _scratchDummy
 	const matrices = []
+	let matricesCount = 0
 
 	// Cell bounds
 	const halfCell = QUADTREE_MIN_SIZE / 2
@@ -85,7 +86,12 @@ const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex)
 		dummy.rotation.set(0, rotY, 0)
 		dummy.scale.setScalar(vegScale)
 		dummy.updateMatrix()
-		matrices.push(dummy.matrix.clone())
+		matrices[matricesCount++] = dummy.matrix.clone()
+	}
+
+	// Trim array to actual count if needed
+	if (matricesCount < matrices.length) {
+		matrices.length = matricesCount
 	}
 
 	return matrices
@@ -126,7 +132,11 @@ export const generateVegetationForType = (node, terrainHelpers, lodLevel, vegeta
 
 			// Generate vegetation for this cell and add to matrices
 			const cellMatrices = generateCellVegetation(cellX, cellZ, terrainHelpers, vegetationTypeConfig, typeIndex)
-			matrices.push(...cellMatrices)
+			
+			// Concat arrays more efficiently than spread operator
+			for (let i = 0; i < cellMatrices.length; i++) {
+				matrices.push(cellMatrices[i])
+			}
 		}
 	}
 
