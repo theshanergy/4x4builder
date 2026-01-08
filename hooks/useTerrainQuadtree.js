@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS } from '../config/lod'
+import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, MAX_QUADTREE_DEPTH } from '../config/lod'
 import { QuadtreeNode, getEdgeStitchInfo } from '../utils/terrain/quadtree'
 
 /**
@@ -53,7 +53,7 @@ const useTerrainQuadtree = () => {
 
 					// Create root if it doesn't exist
 					if (!quadtreeRoots.current.has(rootKey)) {
-						quadtreeRoots.current.set(rootKey, new QuadtreeNode(rootX, rootZ, QUADTREE_ROOT_SIZE, 0))
+						quadtreeRoots.current.set(rootKey, new QuadtreeNode(rootX, rootZ, QUADTREE_ROOT_SIZE, MAX_QUADTREE_DEPTH))
 					}
 				}
 			}

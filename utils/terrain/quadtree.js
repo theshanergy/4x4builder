@@ -2,33 +2,31 @@
 // Quadtree data structure for terrain level-of-detail management.
 // Handles spatial subdivision, view-dependent refinement, and neighbor queries.
 
-import { QUADTREE_ROOT_SIZE, TILE_RESOLUTION } from '../../config/lod'
+import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, TILE_RESOLUTION, MAX_QUADTREE_DEPTH } from '../../config/lod'
 
 /**
- * Represents a node in the terrain quadtree.
- * Each node covers a square region and can either:
- * - Render itself as a single tile (leaf)
- * - Subdivide into 4 child nodes (NW, NE, SW, SE)
- */
+	 * Represents a node in the terrain quadtree.
+	 * Each node covers a square region and can either:
+	 * - Render itself as a single tile (leaf)
+	 * - Subdivide into 4 child nodes (NW, NE, SW, SE)
+	 */
 export class QuadtreeNode {
 	/**
 	 * @param {number} centerX - World X position of node center
 	 * @param {number} centerZ - World Z position of node center
 	 * @param {number} size - Width/height of this node's region
-	 * @param {number} depth - How many levels down from root (0 = root)
+	 * @param {number} lod - Level of detail (0 = highest res/smallest tiles, MAX = lowest res/largest tiles)
 	 */
-	constructor(centerX, centerZ, size, depth = 0) {
+	constructor(centerX, centerZ, size, lod = MAX_QUADTREE_DEPTH) {
 		this.centerX = centerX
 		this.centerZ = centerZ
 		this.size = size
-		this.depth = depth
+		this.lod = lod
 		this.children = null // null = leaf node, array = subdivided
 
 		// Unique key for React reconciliation
-		this.key = `qt_${depth}_${Math.floor(centerX)}_${Math.floor(centerZ)}`
-	}
-
-	/**
+		this.key = `qt_${lod}_${Math.floor(centerX)}_${Math.floor(centerZ)}`
+	}	/**
 	 * Check if this node should subdivide based on distance to viewer.
 	 * Uses squared distance for performance.
 	 */
@@ -70,17 +68,17 @@ export class QuadtreeNode {
 	subdivide() {
 		const halfSize = this.size / 2
 		const quarterSize = halfSize / 2
-		const childDepth = this.depth + 1
+		const childLod = this.lod - 1 // Children have higher resolution (lower LOD number)
 
 		this.children = [
 			// NW (negative X, positive Z)
-			new QuadtreeNode(this.centerX - quarterSize, this.centerZ + quarterSize, halfSize, childDepth),
+			new QuadtreeNode(this.centerX - quarterSize, this.centerZ + quarterSize, halfSize, childLod),
 			// NE (positive X, positive Z)
-			new QuadtreeNode(this.centerX + quarterSize, this.centerZ + quarterSize, halfSize, childDepth),
+			new QuadtreeNode(this.centerX + quarterSize, this.centerZ + quarterSize, halfSize, childLod),
 			// SW (negative X, negative Z)
-			new QuadtreeNode(this.centerX - quarterSize, this.centerZ - quarterSize, halfSize, childDepth),
+			new QuadtreeNode(this.centerX - quarterSize, this.centerZ - quarterSize, halfSize, childLod),
 			// SE (positive X, negative Z)
-			new QuadtreeNode(this.centerX + quarterSize, this.centerZ - quarterSize, halfSize, childDepth),
+			new QuadtreeNode(this.centerX + quarterSize, this.centerZ - quarterSize, halfSize, childLod),
 		]
 	}
 
@@ -180,8 +178,8 @@ export const getEdgeStitchInfo = (node, allNodes, minSize) => {
 			// Calculate which node at this size would contain the probe point
 			const nodeX = Math.floor(x / checkSize) * checkSize + checkSize / 2
 			const nodeZ = Math.floor(z / checkSize) * checkSize + checkSize / 2
-			const depth = Math.log2(QUADTREE_ROOT_SIZE / checkSize)
-			const neighborKey = `qt_${depth}_${Math.floor(nodeX)}_${Math.floor(nodeZ)}`
+			const lod = Math.log2(checkSize / QUADTREE_MIN_SIZE) // LOD based on tile size
+			const neighborKey = `qt_${lod}_${Math.floor(nodeX)}_${Math.floor(nodeZ)}`
 
 			// Check if this coarser node exists and is a leaf
 			const neighbor = allNodes.get(neighborKey)
