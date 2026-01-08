@@ -1,8 +1,7 @@
 import { useMemo, useRef, useEffect } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { RepeatWrapping, MeshStandardMaterial, TextureLoader } from 'three'
-import useGameStore from '../store/gameStore'
-import { getBiome } from '../config/biomes'
+import { useBiomeTerrain } from './useBiome'
 
 // Uniform field definitions - maps layer properties to shader uniform names and values
 const UNIFORM_FIELDS = [
@@ -246,11 +245,12 @@ const generateNormalBlendingCode = (layers) => {
  */
 const useTerrainMaterial = () => {
 	const materialRef = useRef()
-	const currentBiome = useGameStore((state) => state.currentBiome)
 
 	// Get biome-specific terrain config
-	const biomeConfig = useMemo(() => getBiome(currentBiome), [currentBiome])
-	const TERRAIN_LAYERS = biomeConfig.terrain.layers	// Build texture paths array from layer config
+	const terrainConfig = useBiomeTerrain()
+	const TERRAIN_LAYERS = terrainConfig.layers
+
+	// Build texture paths array from layer config
 	const texturePaths = useMemo(() => TERRAIN_LAYERS.flatMap((layer) => [layer.textures.albedo, layer.textures.normal]), [TERRAIN_LAYERS])
 
 	// Load all layer textures

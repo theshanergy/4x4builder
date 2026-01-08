@@ -3,8 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
 import { BackSide, Vector3 } from 'three'
 
-import useGameStore from '../../../store/gameStore'
-import { getBiome } from '../../../config/biomes'
+import { useBiomeEnvironment } from '../../../hooks/useBiome'
 import skyVertexShader from '../../../shaders/sky.vert.glsl'
 import skyFragmentShader from '../../../shaders/sky.frag.glsl'
 
@@ -14,11 +13,9 @@ import skyFragmentShader from '../../../shaders/sky.frag.glsl'
 const AtmosphericSky = () => {
 	const meshRef = useRef()
 	const materialRef = useRef()
-	const currentBiome = useGameStore((state) => state.currentBiome)
-	
+
 	// Get biome-specific environment config
-	const biomeConfig = useMemo(() => getBiome(currentBiome), [currentBiome])
-	const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = biomeConfig.environment
+	const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = useBiomeEnvironment()
 
 	const uniforms = useMemo(
 		() => ({
@@ -28,7 +25,7 @@ const AtmosphericSky = () => {
 			uSkyColor: { value: skyColorZenith.clone() },
 			uSkyHorizonColor: { value: skyColorHorizon.clone() },
 		}),
-		[currentBiome, sunDirection, sunColor, skyColorZenith, skyColorHorizon]
+		[sunDirection, sunColor, skyColorZenith, skyColorHorizon]
 	)
 
 	const geometry = useMemo(() => {

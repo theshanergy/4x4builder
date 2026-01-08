@@ -4,7 +4,6 @@
 // Water is simply wherever terrain height < water level (no special casing)
 
 import { Vector3 } from 'three'
-import { getBiome, DEFAULT_BIOME } from '../../config/biomes'
 import { WATER_LEVEL } from '../../config/water'
 
 // Epsilon for numerical gradient approximation
@@ -15,14 +14,14 @@ const GRADIENT_EPSILON = 0.01
  * Uses a unified noise approach - one coherent function produces all terrain features.
  *
  * @param {Object} noise - Noise instance from noisejs
- * @param {string} biomeName - Biome identifier (optional, defaults to DEFAULT_BIOME)
+ * @param {Object} terrainConfig - Terrain configuration object from biome
+ * @param {Object} waterConfig - Water configuration object from biome (optional)
  * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and isWater functions
  */
-export const createTerrainHelpers = (noise, biomeName = DEFAULT_BIOME) => {
-	const biome = getBiome(biomeName)
+export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { body: { maxDepth: 50 } }) => {
 	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnProtectionRadius, spawnTransitionWidth, spawnFlatRadius, spawnTransitionDistance } =
-		biome.terrain
-	const WATER_BODY_CONFIG = biome.water.body
+		terrainConfig
+	const WATER_BODY_CONFIG = waterConfig.body
 
 	const flatRadiusSq = spawnFlatRadius * spawnFlatRadius
 	const transitionEndSq = spawnTransitionDistance * spawnTransitionDistance

@@ -2,8 +2,7 @@ import { useMemo } from 'react'
 import { Matrix4 } from 'three'
 import { useGLTF } from '@react-three/drei'
 
-import useGameStore from '../store/gameStore'
-import { getBiome } from '../config/biomes'
+import { useBiomeVegetation } from './useBiome'
 
 /**
  * useVegetationModels Hook
@@ -19,11 +18,8 @@ import { getBiome } from '../config/biomes'
  * @returns {Array|null} Array of vegetation type models, or null if not loaded
  */
 export const useVegetationModels = () => {
-	const currentBiome = useGameStore((state) => state.currentBiome)
-
 	// Get biome-specific vegetation config
-	const biomeConfig = useMemo(() => getBiome(currentBiome), [currentBiome])
-	const VEGETATION_TYPES = biomeConfig.vegetation
+	const VEGETATION_TYPES = useBiomeVegetation()
 
 	// Extract unique models
 	const UNIQUE_MODELS = useMemo(() => {
