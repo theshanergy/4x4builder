@@ -23,16 +23,16 @@ export default {
 
 	// Terrain configuration
 	terrain: {
-		// Height Scaling
-		baseHeightScale: 4,
+		// Height Scaling - increased for more dramatic mountains
+		baseHeightScale: 6,
 
-		// Noise Scales
+		// Noise Scales - adjusted for more rugged terrain
 		continentScale: 0.00007,
-		noiseScale: 0.04,
+		noiseScale: 0.06,
 		mountainScale: 0.001,
 
-		// Height Limits
-		maxMountainHeight: 400,
+		// Height Limits - taller peaks
+		maxMountainHeight: 600,
 
 		// Spawn Protection
 		spawnProtectionRadius: 400,
@@ -57,24 +57,28 @@ export default {
 				},
 			},
 			{
-				name: 'sand',
+				name: 'grass',
 				textures: {
-					albedo: '/assets/images/ground/sand.jpg',
-					normal: '/assets/images/ground/sand_normal.jpg',
+					albedo: '/assets/images/ground/wispy-grass-meadow_albedo.jpg',
+					normal: '/assets/images/ground/wispy-grass-meadow_normal.jpg',
 				},
-				textureScale: 0.4,
-				normalScale: 0.5,
+				textureScale: 0.5,
+				normalScale: 1.0,
 				height: {
 					min: -1,
-					max: 45,
+					max: 60,
 					transitionMin: 3,
-					transitionMax: 55,
+					transitionMax: 65,
 					influence: 1.0,
 				},
 				slope: {
-					max: 0.05,
-					influence: 0.9,
-					transition: 0.03,
+					max: 0.03,
+					influence: 0.8,
+					transition: 0.02,
+				},
+				lod: {
+					distance: 100,
+					levels: 3,
 				},
 			},
 			{
@@ -86,10 +90,10 @@ export default {
 				textureScale: 0.6,
 				normalScale: 1.0,
 				height: {
-					min: 30,
-					max: 55,
-					transitionMin: 30,
-					transitionMax: 55,
+					min: 50,
+					max: 150,
+					transitionMin: 45,
+					transitionMax: 155,
 					influence: 1.0,
 				},
 				slope: {
@@ -112,8 +116,8 @@ export default {
 				textureScale: 0.025,
 				normalScale: 0.5,
 				height: {
-					min: 220,
-					transitionMin: 55.0,
+					min: 280,
+					transitionMin: 150.0,
 					influence: 1.0,
 				},
 				lod: {
@@ -126,14 +130,89 @@ export default {
 
 	// Vegetation configuration
 	vegetation: [
+		// Large Pine Trees
 		{
-			name: 'pine',
+			name: 'pine_large',
 			model: '/assets/models/environment/pine_trees.glb',
 			meshes: {
 				lod0: 'SM_Pine01',
 				lod1: 'SM_Pine01_lod1',
 				lod2: 'SM_Pine01_lod2',
 				lod3: 'SM_Pine01_lod3',
+			},
+			collider: {
+				width: 0.4,
+				height: 10.0,
+				type: 'cylinder',
+			},
+			sphericalNormals: {
+				lod3: true,
+			},
+			maxLod: 3,
+			distance: {
+				min: 0,
+				max: 600,
+			},
+			scale: {
+				min: 1.2,
+				max: 2.2,
+			},
+			slope: {
+				min: 0,
+				max: 0.003,
+			},
+			height: {
+				min: 15,
+				max: 180,
+			},
+			density: 150,
+		},
+		// Large Pine Trees 02
+		{
+			name: 'pine_large_02',
+			model: '/assets/models/environment/pine_trees.glb',
+			meshes: {
+				lod0: 'SM_Pine02',
+				lod1: 'SM_Pine02_lod1',
+				lod2: 'SM_Pine02_lod2',
+				lod3: 'SM_Pine02_lod3',
+			},
+			collider: {
+				width: 0.4,
+				height: 10.0,
+				type: 'cylinder',
+			},
+			sphericalNormals: {
+				lod3: true,
+			},
+			maxLod: 3,
+			distance: {
+				min: 0,
+				max: 600,
+			},
+			scale: {
+				min: 1.2,
+				max: 2.2,
+			},
+			slope: {
+				min: 0,
+				max: 0.003,
+			},
+			height: {
+				min: 15,
+				max: 150,
+			},
+			density: 150,
+		},
+		// Dead Pine Trees (sparse)
+		{
+			name: 'pine_dead',
+			model: '/assets/models/environment/pine_trees.glb',
+			meshes: {
+				lod0: 'SM_PineDead01',
+				lod1: 'SM_PineDead01_lod1',
+				lod2: 'SM_PineDead01_lod2',
+				lod3: 'SM_PineDead01_lod3',
 			},
 			collider: {
 				width: 0.3,
@@ -150,17 +229,54 @@ export default {
 			},
 			scale: {
 				min: 1.0,
-				max: 2.0,
+				max: 1.8,
 			},
 			slope: {
 				min: 0,
-				max: 0.002,
+				max: 0.003,
+			},
+			height: {
+				min: 25,
+				max: 170,
+			},
+			density: 60,
+		},
+		// Pine Medium Trees (higher elevation)
+		{
+			name: 'pine_medium',
+			model: '/assets/models/environment/pine_trees.glb',
+			meshes: {
+				lod0: 'SM_PineMedium01',
+				lod1: 'SM_PineMedium01_lod1',
+				lod2: 'SM_PineMedium01_lod2',
+				lod3: 'SM_PineMedium01_lod3',
+			},
+			collider: {
+				width: 0.4,
+				height: 9.0,
+				type: 'cylinder',
+			},
+			sphericalNormals: {
+				lod3: true,
+			},
+			maxLod: 3,
+			distance: {
+				min: 0,
+				max: 550,
+			},
+			scale: {
+				min: 1.0,
+				max: 1.5,
+			},
+			slope: {
+				min: 0,
+				max: 0.004,
 			},
 			height: {
 				min: 10,
-				max: 50,
+				max: 180,
 			},
-			density: 200,
+			density: 80,
 		},
 	],
 
