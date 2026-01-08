@@ -1,5 +1,5 @@
 import { useMemo, useEffect, memo } from 'react'
-import { InstancedMesh } from 'three'
+import { InstancedMesh, Matrix4 } from 'three'
 
 import useGameStore from '../../../../store/gameStore'
 import { generateVegetationForType } from '../../../../utils/terrain/vegetationGeneration'
@@ -48,6 +48,9 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 
 		const allInstances = []
 
+		// Reusable scratch matrix for transform composition (performance optimization)
+		const composedMatrix = new Matrix4()
+
 		// Generate instances for each vegetation type
 		vegetationModels.forEach((vegetationType, typeIndex) => {
 			// Map quadtree depth to vegetation LOD level:
@@ -85,9 +88,13 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 				instancedMesh.receiveShadow = true
 				instancedMesh.frustumCulled = true
 
-				// Set all matrices
+				// Set all matrices, composing with the mesh's baked transform
 				vegetationMatrices.forEach((matrix, i) => {
-					instancedMesh.setMatrixAt(i, matrix)
+					// Compose: instance transform * mesh transform
+					// This applies the mesh's local transform (position/rotation/scale from GLTF)
+					// to each vegetation instance
+					composedMatrix.multiplyMatrices(matrix, meshData.transform)
+					instancedMesh.setMatrixAt(i, composedMatrix)
 				})
 				instancedMesh.instanceMatrix.needsUpdate = true
 

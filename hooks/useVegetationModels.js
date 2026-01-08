@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { VEGETATION_TYPES } from '../config/vegetation'
+import { Matrix4 } from 'three'
 
 // Extract unique models at module level (runs once)
 const UNIQUE_MODELS = (() => {
@@ -72,9 +73,16 @@ export const useVegetationModels = () => {
 						if (type.mesh && child.name !== type.mesh) {
 							return
 						}
+						
+						// Bake the mesh's local transform into a matrix
+						// This captures the mesh's position, rotation, and scale relative to its parent
+						const meshTransform = new Matrix4()
+						meshTransform.compose(child.position, child.quaternion, child.scale)
+						
 						meshes.push({
 							geometry: child.geometry,
 							material: child.material,
+							transform: meshTransform,
 						})
 					}
 				})
