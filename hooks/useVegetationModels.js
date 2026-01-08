@@ -55,13 +55,26 @@ export const useVegetationModels = () => {
 			}
 
 			const lods = {}
+			const lodLevels = ['lod0', 'lod1', 'lod2', 'lod3']
+			
+			// Track the last valid LOD for fallback
+			let lastValidMeshName = null
 
 			// Load each LOD level
-			type.meshNames.forEach((meshName, lodIndex) => {
-				const vegetation = gltf.scene.getObjectByName(meshName)
+			lodLevels.forEach((lodKey, lodIndex) => {
+				const meshName = type.meshes?.[lodKey]
+				
+				// Use provided mesh name or fall back to last valid LOD
+				const actualMeshName = meshName || lastValidMeshName
+				
+				if (!actualMeshName) {
+					return // No valid mesh for this LOD
+				}
+				
+				const vegetation = gltf.scene.getObjectByName(actualMeshName)
 
 				if (!vegetation) {
-					console.warn(`[useVegetationModels] Could not find ${meshName} in model for ${type.name}`)
+					console.warn(`[useVegetationModels] Could not find ${actualMeshName} in model for ${type.name}`)
 					return
 				}
 
@@ -89,6 +102,10 @@ export const useVegetationModels = () => {
 
 				if (meshes.length > 0) {
 					lods[lodIndex] = meshes
+					// Update last valid mesh for fallback
+					if (meshName) {
+						lastValidMeshName = meshName
+					}
 				}
 			})
 

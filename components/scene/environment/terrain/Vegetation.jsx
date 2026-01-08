@@ -56,20 +56,40 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 			// Terrain LOD: 0 = smallest/closest tiles, higher = larger/farther tiles
 			// Vegetation LOD: 0 = most detailed, 1 = medium, 2 = low detail
 
-			// Get available LOD indices for this vegetation type
+			// Get available LOD levels for this vegetation type (sorted ascending)
 			const availableLods = Object.keys(vegetationType.lods)
 				.map(Number)
 				.sort((a, b) => a - b)
-			const numLods = availableLods.length
-
-			// Map node LOD directly to vegetation LOD (both 0 = highest detail)
-			const lodLevel = availableLods[Math.min(numLods - 1, Math.max(0, node.lod))]
-
-			const lodMeshes = vegetationType.lods[lodLevel]
+			
+			// Determine which LOD to use:
+			// 1. If exact LOD exists, use it
+			// 2. If node.lod is higher than highest available, use highest (for very distant terrain)
+			// 3. If node.lod falls in a gap (e.g., lod2 is false but lod3 exists), don't render
+			let actualLod = node.lod
+			
+			if (!vegetationType.lods[actualLod]) {
+				// Exact LOD doesn't exist
+				const maxAvailableLod = availableLods[availableLods.length - 1]
+				
+				if (node.lod > maxAvailableLod) {
+					// Beyond highest available - use highest LOD for distant terrain
+					actualLod = maxAvailableLod
+				} else {
+					// In a gap (explicit false cutoff) - don't render
+					return
+				}
+			}
+			
+			const lodMeshes = vegetationType.lods[actualLod]
 			if (!lodMeshes?.length) return
 
+			// Check if this vegetation type should render at this LOD level
+			if (vegetationType.config.maxLod !== undefined && actualLod > vegetationType.config.maxLod) {
+				return // Beyond max LOD for this vegetation type
+			}
+
 			// Generate vegetation matrices for this type
-			const vegetationMatrices = generateVegetationForType(node, terrainHelpers, lodLevel, vegetationType.config, typeIndex)
+			const vegetationMatrices = generateVegetationForType(node, terrainHelpers, actualLod, vegetationType.config, typeIndex)
 
 			if (vegetationMatrices.length === 0) {
 				return
