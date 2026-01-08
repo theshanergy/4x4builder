@@ -27,7 +27,11 @@
  * - maxLod: Optional maximum LOD level (0-3) at which this vegetation renders
  *   - If not specified, renders at all LOD levels
  *   - Example: maxLod: 2 means only renders at LOD 0, 1, and 2 (not at LOD 3)
- * - density: Spawn probability per 100 square meters (e.g., 0.01 = ~1 per 500 sq m)
+ * - density: Items per square kilometer (1000m × 1000m). Use integers for intuitive control.
+ *   - 5 = very sparse (5 trees per sq km)
+ *   - 10 = sparse forest
+ *   - 50 = moderate forest
+ *   - 100 = dense forest
  */
 export const VEGETATION_TYPES = [
 	{
@@ -58,12 +62,12 @@ export const VEGETATION_TYPES = [
 		},
 		slope: {
 			min: 0, // Can spawn on flat ground
-			max: 0.25, // Up to 25% slope (0.75 normal Y)
+			max: 0.01, // Up to 0.1% slope (almost flat)
 		},
 		height: {
-			min: 0, // Above water level
+			min: 5, // Above water level
 			max: 60,
 		},
-		density: 0.1, // Items per 100 sq meters (~1 tree per 500 sq meters)
+		density: 150, // trees per square kilometer
 	},
 ]

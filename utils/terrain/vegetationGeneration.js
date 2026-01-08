@@ -40,25 +40,36 @@ const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex)
 	const minX = cellX - halfCell
 	const minZ = cellZ - halfCell
 
-	// Calculate expected count for this cell
-	// density = items per 100 square meters
-	const cellArea = QUADTREE_MIN_SIZE * QUADTREE_MIN_SIZE
-	const expectedCount = (cellArea / 100) * (density || 1.0)
-
 	// Deterministic seed based on cell grid position
 	const gridX = Math.floor(cellX / QUADTREE_MIN_SIZE)
 	const gridZ = Math.floor(cellZ / QUADTREE_MIN_SIZE)
 	const cellSeed = hashCoords(gridX, gridZ, 88888 + typeIndex * 1000)
 	const random = createSeededRandom(cellSeed)
 
-	// Slight natural variation in count
-	const count = Math.round(expectedCount * (0.8 + random() * 0.4))
-
 	// Convert slope range to normal Y threshold
 	const slopeMinNormalY = 1 - slope.max
 	const slopeMaxNormalY = 1 - slope.min
 
-	// Try to place vegetation
+	// Calculate expected count for this cell
+	// density = items per square kilometer (1,000,000 sq m)
+	// Each cell is 32m × 32m = 1,024 sq m
+	const cellArea = QUADTREE_MIN_SIZE * QUADTREE_MIN_SIZE
+	const expectedCount = (density || 1.0) * (cellArea / 1000000)
+
+	// Add natural variation (±20%)
+	const targetCount = expectedCount * (0.8 + random() * 0.4)
+
+	// Use Poisson sampling to determine actual count
+	// This handles fractional expectedCount values properly
+	let count = Math.floor(targetCount)
+	if (random() < targetCount - count) {
+		count++ // Probabilistically round up
+	}
+
+	// Skip if no vegetation for this cell
+	if (count === 0) return matrices
+
+	// Try to place vegetation (max 10 attempts per item)
 	const maxAttempts = count * 10
 	let attempts = 0
 
@@ -132,7 +143,7 @@ export const generateVegetationForType = (node, terrainHelpers, lodLevel, vegeta
 
 			// Generate vegetation for this cell and add to matrices
 			const cellMatrices = generateCellVegetation(cellX, cellZ, terrainHelpers, vegetationTypeConfig, typeIndex)
-			
+
 			// Concat arrays more efficiently than spread operator
 			for (let i = 0; i < cellMatrices.length; i++) {
 				matrices.push(cellMatrices[i])
