@@ -62,12 +62,12 @@ export const VEGETATION_TYPES = [
 		},
 		slope: {
 			min: 0, // Can spawn on flat ground
-			max: 0.01, // Up to 0.1% slope (almost flat)
+			max: 0.0025,
 		},
 		height: {
-			min: 5, // Above water level
-			max: 60,
+			min: 30, // Above water level
+			max: 65,
 		},
-		density: 150, // trees per square kilometer
+		density: 200, // trees per square kilometer
 	},
 ]

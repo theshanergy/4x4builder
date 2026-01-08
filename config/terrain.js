@@ -87,6 +87,31 @@ export const TERRAIN_LAYERS = [
 		},
 	},
 	{
+		name: 'dirt',
+		textures: {
+			albedo: '/assets/images/ground/dirt_01.png',
+			normal: '/assets/images/ground/dirt_01_nrm.png',
+		},
+		textureScale: 0.1,
+		normalScale: 1.0,
+		height: {
+			min: 30,
+			max: 55,
+			transitionMin: 30,
+			transitionMax: 55,
+			influence: 1.0,
+		},
+		slope: {
+			max: 0.005,
+			influence: 0.5,
+			transition: 0.01,
+		},
+		lod: {
+			distance: 300,
+			levels: 4,
+		},
+	},
+	{
 		name: 'snow',
 		textures: {
 			albedo: '/assets/images/ground/snow.jpg',
