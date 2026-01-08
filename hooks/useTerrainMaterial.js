@@ -244,8 +244,6 @@ const generateNormalBlendingCode = (layers) => {
  * @returns {THREE.MeshStandardMaterial} Shared terrain material instance
  */
 const useTerrainMaterial = () => {
-	const materialRef = useRef()
-
 	// Get biome-specific terrain config
 	const terrainConfig = useBiomeTerrain()
 	const TERRAIN_LAYERS = terrainConfig.layers
@@ -281,7 +279,7 @@ const useTerrainMaterial = () => {
 		const normalBlending = generateNormalBlendingCode(TERRAIN_LAYERS)
 
 		return { uniformDeclarations: declarations, uniforms, blendCalculations, samplingCode, colorBlending, normalBlending }
-	}, [])
+	}, [TERRAIN_LAYERS])
 
 	// Shader customization callback
 	const onBeforeCompile = useMemo(() => {
@@ -386,7 +384,7 @@ const useTerrainMaterial = () => {
 				#endif`
 			)
 		}
-	}, [layerTextures, shaderCode])
+	}, [layerTextures, shaderCode, TERRAIN_LAYERS])
 
 	// We don't need map/normalMap props since all layers are sampled in custom shader code
 	// But we need a normalMap to trigger USE_NORMALMAP define, so pass the first layer's normal
@@ -397,19 +395,19 @@ const useTerrainMaterial = () => {
 		if (!layerTextures || !baseNormal) return null
 		const mat = new MeshStandardMaterial({ normalMap: baseNormal })
 		mat.onBeforeCompile = onBeforeCompile
-		materialRef.current = mat
+		mat.needsUpdate = true
 		return mat
 	}, [layerTextures, baseNormal, onBeforeCompile])
 
-	// Dispose material on unmount
+	// Dispose material when it changes
 	useEffect(() => {
+		const currentMaterial = material
 		return () => {
-			if (materialRef.current) {
-				materialRef.current.dispose()
-				materialRef.current = null
+			if (currentMaterial) {
+				currentMaterial.dispose()
 			}
 		}
-	}, [])
+	}, [material])
 
 	return material
 }
