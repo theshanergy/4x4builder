@@ -46,7 +46,7 @@ export const TERRAIN_CONFIG = {
  * - textures: Paths to albedo and normal textures
  * - textureScale: World-space texture tiling scale
  * - normalScale: Normal map intensity (optional, default 1.0)
- * - lod: LOD configuration { distance, levels }
+ * - lod: LOD configuration { distance, levels, scaleFactor } - scaleFactor optional (default 2.0)
  * - height: Height blending { min, max, influence } - all optional
  * - slope: Slope blending { min, max, influence, range } - all optional (0=flat, 1=steep)
  *
@@ -89,10 +89,10 @@ export const TERRAIN_LAYERS = [
 	{
 		name: 'dirt',
 		textures: {
-			albedo: '/assets/images/ground/dirt_01.png',
-			normal: '/assets/images/ground/dirt_01_nrm.png',
+			albedo: '/assets/images/ground/brown_mud_dry_diff_1k.jpg',
+			normal: '/assets/images/ground/brown_mud_dry_nor_gl_1k.jpg',
 		},
-		textureScale: 0.1,
+		textureScale: 0.6,
 		normalScale: 1.0,
 		height: {
 			min: 30,
@@ -104,11 +104,12 @@ export const TERRAIN_LAYERS = [
 		slope: {
 			max: 0.005,
 			influence: 0.5,
-			transition: 0.01,
+			transition: 0.005,
 		},
 		lod: {
-			distance: 300,
+			distance: 70,
 			levels: 4,
+			scaleFactor: 3.5,
 		},
 	},
 	{

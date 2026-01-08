@@ -9,6 +9,7 @@ const UNIFORM_FIELDS = [
 	{ key: 'NormalScale', path: 'normalScale', condition: (layer) => layer.normalScale !== undefined },
 	{ key: 'LODDistance', path: 'lod.distance', condition: (layer) => layer.lod },
 	{ key: 'LODLevels', path: 'lod.levels', condition: (layer) => layer.lod },
+	{ key: 'LODScaleFactor', path: 'lod.scaleFactor', condition: (layer) => layer.lod, default: 2.0 },
 	{ key: 'HeightMin', path: 'height.min', condition: (layer) => layer.height?.min !== undefined },
 	{ key: 'HeightMax', path: 'height.max', condition: (layer) => layer.height?.max !== undefined },
 	{ key: 'HeightTransitionMin', path: 'height.transitionMin', condition: (layer) => layer.height?.min !== undefined, default: 20.0 },
@@ -153,7 +154,7 @@ const generateSamplingCode = (layer, index) => {
 	// World-space UV mapping
 	if (layer.lod) {
 		code += `
-		vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}LODDistance, ${prefix}LODLevels);
+		vec3 lodInfo${index} = getDistanceLODBlend(vWorldPos, ${prefix}LODDistance, ${prefix}LODLevels, ${prefix}LODScaleFactor);
 		float scaleLower${index} = ${prefix}TextureScale / lodInfo${index}.x;
 		float scaleUpper${index} = ${prefix}TextureScale / lodInfo${index}.y;
 		float lodBlend${index} = lodInfo${index}.z;
@@ -335,7 +336,7 @@ const useTerrainMaterial = () => {
 			}
 
 			// Calculate LOD blend info - returns vec3(lowerScale, upperScale, blendFactor)
-				vec3 getDistanceLODBlend(vec3 worldPos, float distanceFactor, float lodLevels) {
+				vec3 getDistanceLODBlend(vec3 worldPos, float distanceFactor, float lodLevels, float scaleFactor) {
 					float dist = length(worldPos - cameraPosition);
 					// Calculate continuous LOD level
 					float lodContinuous = dist / distanceFactor;
@@ -351,7 +352,7 @@ const useTerrainMaterial = () => {
 					blend = smoothstep(0.0, 1.0, blend);
 
 					// Return scales for both LODs and blend factor
-					return vec3(pow(2.0, lodLower), pow(2.0, lodUpper), blend);
+					return vec3(pow(scaleFactor, lodLower), pow(scaleFactor, lodUpper), blend);
 				}
 
 `
