@@ -6,6 +6,9 @@
  * - model: Path to the GLB model file
  * - meshes: Object with LOD level mesh names (lod0, lod1, lod2, lod3)
  *   - If a level is not provided, the next highest LOD is used by default
+ * - collider: Optional mesh name from the model to use as collision geometry
+ *   - Only added on LOD 0 tiles for performance
+ *   - If not specified, no collision is added
  * - sphericalNormals: Object with LOD level boolean flags (lod0, lod1, lod2, lod3)
  *   - If true, generates spherical-ish normals from UV coordinates for more natural lighting
  *   - If false or not specified, uses original mesh normals
@@ -33,6 +36,7 @@ export const VEGETATION_TYPES = [
 			lod2: 'SM_Pine01_lod2',
 			lod3: 'SM_Pine01_lod3',
 		},
+		collider: 'UCX_SM_Pine01', // Optional: mesh name for collision (LOD 0 only)
 		sphericalNormals: {
 			lod3: true, // Use spherical normals for billboard LOD
 		},

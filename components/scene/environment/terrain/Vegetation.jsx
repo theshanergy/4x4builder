@@ -1,5 +1,6 @@
 import { useMemo, useEffect, memo } from 'react'
-import { InstancedMesh, Matrix4 } from 'three'
+import { InstancedMesh, Matrix4, Vector3, Quaternion } from 'three'
+import { RigidBody, CylinderCollider } from '@react-three/rapier'
 
 import useGameStore from '../../../../store/gameStore'
 import { generateVegetationForType } from '../../../../utils/terrain/vegetationGeneration'
@@ -46,6 +47,7 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 		if (!vegetationModels || !showVegetation || !terrainHelpers) return null
 
 		const allInstances = []
+		const colliderData = []
 
 		// Reusable scratch matrix for transform composition (performance optimization)
 		const composedMatrix = new Matrix4()
@@ -60,17 +62,17 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 			const availableLods = Object.keys(vegetationType.lods)
 				.map(Number)
 				.sort((a, b) => a - b)
-			
+
 			// Determine which LOD to use:
 			// 1. If exact LOD exists, use it
 			// 2. If node.lod is higher than highest available, use highest (for very distant terrain)
 			// 3. If node.lod falls in a gap (e.g., lod2 is false but lod3 exists), don't render
 			let actualLod = node.lod
-			
+
 			if (!vegetationType.lods[actualLod]) {
 				// Exact LOD doesn't exist
 				const maxAvailableLod = availableLods[availableLods.length - 1]
-				
+
 				if (node.lod > maxAvailableLod) {
 					// Beyond highest available - use highest LOD for distant terrain
 					actualLod = maxAvailableLod
@@ -79,7 +81,7 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 					return
 				}
 			}
-			
+
 			const lodMeshes = vegetationType.lods[actualLod]
 			if (!lodMeshes?.length) return
 
@@ -117,17 +119,31 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 					key: `${vegetationType.name}-${meshIndex}`,
 				})
 			})
+
+			// Add colliders for LOD 0 tiles only
+			if (node.lod === 0 && vegetationType.colliderGeometry) {
+				vegetationMatrices.forEach((matrix) => {
+					colliderData.push({
+						geometry: vegetationType.colliderGeometry,
+						matrix: matrix.clone(),
+						typeIndex,
+					})
+				})
+			}
 		})
 
-		return allInstances.length > 0 ? allInstances : null
-	}, [node.key, node.size, vegetationModels, terrainHelpers, showVegetation])
+		return {
+			instances: allInstances.length > 0 ? allInstances : null,
+			colliders: colliderData.length > 0 ? colliderData : null,
+		}
+	}, [node.key, node.size, node.lod, vegetationModels, terrainHelpers, showVegetation])
 
 	// Cleanup vegetation instances
 	useEffect(() => {
 		return () => {
 			// Dispose instances when component unmounts or vegetationInstances change
-			if (vegetationInstances) {
-				vegetationInstances.forEach(({ mesh }) => {
+			if (vegetationInstances?.instances) {
+				vegetationInstances.instances.forEach(({ mesh }) => {
 					// Note: Don't dispose geometry/material as they're shared from GLTF
 					// Just let Three.js handle the cleanup
 					mesh.dispose()
@@ -136,8 +152,40 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 		}
 	}, [vegetationInstances])
 
+	// Prepare collider instances for Rapier
+	const colliderData = useMemo(() => {
+		if (!vegetationInstances?.colliders || vegetationInstances.colliders.length === 0) {
+			return null
+		}
+
+		return vegetationInstances.colliders.map((collider, index) => {
+			const position = new Vector3()
+			const quaternion = new Quaternion()
+			const scale = new Vector3()
+			collider.matrix.decompose(position, quaternion, scale)
+
+			return {
+				key: `collider-${collider.typeIndex}-${index}`,
+				position: [position.x, position.y, position.z],
+				quaternion: [quaternion.x, quaternion.y, quaternion.z, quaternion.w],
+				scale: scale.x, // Assume uniform scale
+			}
+		})
+	}, [vegetationInstances])
+
 	// Vegetation is positioned in world space, not relative to tile
-	return <>{vegetationInstances && vegetationInstances.map(({ mesh, key }, index) => <primitive key={`vegetation-${node.key}-${key}-${index}`} object={mesh} />)}</>
+	return (
+		<>
+			{vegetationInstances?.instances &&
+				vegetationInstances.instances.map(({ mesh, key }, index) => <primitive key={`vegetation-${node.key}-${key}-${index}`} object={mesh} />)}
+			{colliderData &&
+				colliderData.map((collider) => (
+					<RigidBody key={`${node.key}-${collider.key}`} type='fixed' position={collider.position} quaternion={collider.quaternion} colliders={false}>
+						<CylinderCollider args={[1.5 * collider.scale, 0.3 * collider.scale]} />
+					</RigidBody>
+				))}
+		</>
+	)
 }, arePropsEqual)
 
 export default Vegetation
