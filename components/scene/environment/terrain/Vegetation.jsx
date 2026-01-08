@@ -125,11 +125,11 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 
 			// Add colliders for LOD 0 tiles only
 			// Decompose matrices here to avoid redundant work later
-			if (node.lod === 0 && vegetationType.colliderGeometry) {
+			if (node.lod === 0 && vegetationType.config.collider) {
 				vegetationMatrices.forEach((matrix) => {
 					matrix.decompose(scratchPosition, scratchQuaternion, scratchScale)
 					colliderData.push({
-						geometry: vegetationType.colliderGeometry,
+						collider: vegetationType.config.collider,
 						position: [scratchPosition.x, scratchPosition.y, scratchPosition.z],
 						quaternion: [scratchQuaternion.x, scratchQuaternion.y, scratchQuaternion.z, scratchQuaternion.w],
 						scale: scratchScale.x, // Assume uniform scale
@@ -165,16 +165,21 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 			{vegetationInstances?.instances &&
 				vegetationInstances.instances.map(({ mesh, key }, index) => <primitive key={`vegetation-${node.key}-${key}-${index}`} object={mesh} />)}
 			{vegetationInstances?.colliders &&
-				vegetationInstances.colliders.map((collider, index) => (
-					<RigidBody
-						key={`${node.key}-collider-${collider.typeIndex}-${index}`}
-						type='fixed'
-						position={collider.position}
-						quaternion={collider.quaternion}
-						colliders={false}>
-						<CylinderCollider args={[1.5 * collider.scale, 0.3 * collider.scale]} />
-					</RigidBody>
-				))}
+				vegetationInstances.colliders.map((data, index) => {
+					const { collider, position, quaternion, scale, typeIndex } = data
+					const scaledWidth = collider.width * scale
+					const scaledHeight = collider.height * scale
+
+					// Offset position so collider bottom sits at terrain surface
+					// Cylinder/Capsule position is the center, so we add half height to Y
+					const offsetPosition = [position[0], position[1] + scaledHeight / 2, position[2]]
+
+					return (
+						<RigidBody key={`${node.key}-collider-${typeIndex}-${index}`} type='fixed' position={offsetPosition} quaternion={quaternion} colliders={false}>
+							{collider.type === 'cylinder' && <CylinderCollider args={[scaledHeight / 2, scaledWidth]} />}
+						</RigidBody>
+					)
+				})}
 		</>
 	)
 }, arePropsEqual)

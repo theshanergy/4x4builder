@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
+import { Matrix4 } from 'three'
 import { useGLTF } from '@react-three/drei'
+
 import { VEGETATION_TYPES } from '../config/vegetation'
-import { Matrix4, Vector3 } from 'three'
 
 // Extract unique models at module level (runs once)
 const UNIQUE_MODELS = (() => {
@@ -59,17 +60,6 @@ export const useVegetationModels = () => {
 
 			// Track the last valid LOD for fallback
 			let lastValidMeshName = null
-
-			// Load collider mesh if specified
-			let colliderGeometry = null
-			if (type.collider) {
-				const colliderMesh = gltf.scene.getObjectByName(type.collider)
-				if (colliderMesh && colliderMesh.isMesh) {
-					colliderGeometry = colliderMesh.geometry.clone()
-				} else {
-					console.warn(`[useVegetationModels] Could not find collider mesh ${type.collider} for ${type.name}`)
-				}
-			}
 
 			// Load each LOD level
 			lodLevels.forEach((lodKey, lodIndex) => {
@@ -160,7 +150,6 @@ export const useVegetationModels = () => {
 				name: type.name,
 				config: type,
 				lods,
-				colliderGeometry,
 			}
 		}).filter(Boolean)
 

@@ -6,7 +6,10 @@
  * - model: Path to the GLB model file
  * - meshes: Object with LOD level mesh names (lod0, lod1, lod2, lod3)
  *   - If a level is not provided, the next highest LOD is used by default
- * - collider: Optional mesh name from the model to use as collision geometry
+ * - collider: Optional collider configuration object
+ *   - width: Width of the collider (scaled with vegetation)
+ *   - height: Height of the collider (scaled with vegetation)
+ *   - type: Collider type ('cylinder', 'box', 'capsule')
  *   - Only added on LOD 0 tiles for performance
  *   - If not specified, no collision is added
  * - sphericalNormals: Object with LOD level boolean flags (lod0, lod1, lod2, lod3)
@@ -36,7 +39,11 @@ export const VEGETATION_TYPES = [
 			lod2: 'SM_Pine01_lod2',
 			lod3: 'SM_Pine01_lod3',
 		},
-		collider: 'UCX_SM_Pine01', // Optional: mesh name for collision (LOD 0 only)
+		collider: {
+			width: 0.3, // Cylinder radius (scaled with vegetation)
+			height: 8.0, // Cylinder height (scaled with vegetation)
+			type: 'cylinder', // Collider type: 'cylinder', 'box', or 'capsule'
+		},
 		sphericalNormals: {
 			lod3: true, // Use spherical normals for billboard LOD
 		},
