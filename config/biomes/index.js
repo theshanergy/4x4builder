@@ -8,6 +8,7 @@
 import desert from './desert'
 import mountain from './mountain'
 import winter from './winter'
+import { validateBiome } from './schema'
 
 export const BIOMES = {
 	desert,
@@ -24,7 +25,17 @@ export const DEFAULT_BIOME = 'desert'
  * @returns {Object} Biome configuration object
  */
 export function getBiome(name) {
-	return BIOMES[name] || BIOMES[DEFAULT_BIOME]
+	const biome = BIOMES[name] || BIOMES[DEFAULT_BIOME]
+
+	// Validate biome configuration in development
+	if (import.meta.env.DEV) {
+		const validation = validateBiome(biome)
+		if (!validation.valid) {
+			console.warn(`Biome "${name}" has validation errors:`, validation.errors)
+		}
+	}
+
+	return biome
 }
 
 /**
