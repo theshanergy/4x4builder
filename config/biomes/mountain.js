@@ -1,15 +1,14 @@
 /**
- * Grassland Biome Configuration
- * 
- * A temperate grassland environment with rolling hills, green vegetation,
- * and moderate terrain features.
+ * Mountain Biome Configuration
+ *
+ * A cold, rugged environment with high elevations and sparse vegetation.
  */
 
 import { Vector3, Color } from 'three'
 
 export default {
-	name: 'Grassland',
-	description: 'Rolling hills with green grass and moderate terrain',
+	name: 'Mountain',
+	description: 'A cold, rugged environment with high elevations and sparse vegetation.',
 
 	// Environment configuration
 	environment: {

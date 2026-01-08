@@ -1,20 +1,22 @@
 /**
  * Biome Configuration System
- * 
+ *
  * Each biome defines a complete set of environment, terrain, vegetation, and water settings.
  * Import individual biome modules and export them as a collection.
  */
 
-import grassland from './grassland'
+import desert from './desert'
+import mountain from './mountain'
 import winter from './winter'
 
 export const BIOMES = {
-	grassland,
+	desert,
+	mountain,
 	winter,
 }
 
 // Default biome
-export const DEFAULT_BIOME = 'grassland'
+export const DEFAULT_BIOME = 'desert'
 
 /**
  * Get biome configuration by name
