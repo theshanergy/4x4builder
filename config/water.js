@@ -1,25 +1,7 @@
-// Water level constant
+// Water level constant (does not vary by biome)
 export const WATER_LEVEL = -1
 
-// Water body configuration (for procedural lakes/seas)
-export const WATER_BODY_CONFIG = {
-	// Maximum depth below WATER_LEVEL for deep water
-	maxDepth: 50,
-}
-
-// Per-tile water depth configuration
-export const WATER_DEPTH_CONFIG = {
-	// Depth thresholds for wave modulation (in world units)
-	shorelineDepthThreshold: 2.5, // Waves nearly flat below this depth
-	shallowDepthThreshold: 20.0, // Full wave amplitude above this depth
-
-	// Visual depth effects
-	maxVisibleDepth: 8.0, // Depth at which water reaches full opacity/color
-	edgeFadeDistance: 0.1, // Distance over which water fades to transparent at edges (prevents sawtoothing)
-	waterColor: [0.0, 0.12, 0.06], // Base water color (RGB 0-1), appears lighter/turquoise in shallow areas
-}
-
-// Buoyancy configuration
+// Buoyancy configuration (does not vary by biome)
 export const BUOYANCY_CONFIG = {
 	// Physics parameters
 	floatFactor: 1.1, // Multiplier of gravity to determine max buoyancy (1.1 = slightly buoyant)

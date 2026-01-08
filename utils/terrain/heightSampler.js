@@ -4,8 +4,8 @@
 // Water is simply wherever terrain height < water level (no special casing)
 
 import { Vector3 } from 'three'
-import { TERRAIN_CONFIG } from '../../config/terrain'
-import { WATER_LEVEL, WATER_BODY_CONFIG } from '../../config/water'
+import { getBiome, DEFAULT_BIOME } from '../../config/biomes'
+import { WATER_LEVEL } from '../../config/water'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
@@ -15,10 +15,14 @@ const GRADIENT_EPSILON = 0.01
  * Uses a unified noise approach - one coherent function produces all terrain features.
  *
  * @param {Object} noise - Noise instance from noisejs
+ * @param {string} biomeName - Biome identifier (optional, defaults to DEFAULT_BIOME)
  * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and isWater functions
  */
-export const createTerrainHelpers = (noise) => {
-	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnProtectionRadius, spawnTransitionWidth, spawnFlatRadius, spawnTransitionDistance } = TERRAIN_CONFIG
+export const createTerrainHelpers = (noise, biomeName = DEFAULT_BIOME) => {
+	const biome = getBiome(biomeName)
+	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnProtectionRadius, spawnTransitionWidth, spawnFlatRadius, spawnTransitionDistance } =
+		biome.terrain
+	const WATER_BODY_CONFIG = biome.water.body
 
 	const flatRadiusSq = spawnFlatRadius * spawnFlatRadius
 	const transitionEndSq = spawnTransitionDistance * spawnTransitionDistance
@@ -133,7 +137,7 @@ export const createTerrainHelpers = (noise) => {
 			const t = (dist - spawnFlatRadius) / (spawnTransitionDistance - spawnFlatRadius)
 			const blend = t * t * t * (t * (t * 6 - 15) + 10)
 			const blendedHeight = height * blend
-			
+
 			// Prevent transition from pushing beaches below water
 			// If natural terrain would be a beach (slightly above water), preserve that
 			const waterThresholdNormalized = WATER_LEVEL / baseHeightScale

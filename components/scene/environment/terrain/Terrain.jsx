@@ -15,11 +15,14 @@ const Terrain = () => {
 	// Use quadtree LOD system
 	const leafTiles = useTerrainQuadtree()
 
+	// Get current biome
+	const currentBiome = useGameStore((state) => state.currentBiome)
+
 	// Generate noise instance with fixed seed for consistency
 	const noise = useMemo(() => new Noise(1234), [])
 
 	// Create shared terrain helpers (height/normal sampling)
-	const terrainHelpers = useMemo(() => createTerrainHelpers(noise), [noise])
+	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, currentBiome), [noise, currentBiome])
 
 	// Register terrain functions in the game store
 	useEffect(() => {

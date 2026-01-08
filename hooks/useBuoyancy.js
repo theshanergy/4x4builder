@@ -40,8 +40,7 @@ const useBuoyancy = (vehicleRef) => {
 
 			// Calculate effective buoyancy capability (decreases as it fills with water)
 			// Interpolate between floatFactor and minBuoyancy based on waterIntake
-			const currentFloatFactor =
-				BUOYANCY_CONFIG.floatFactor * (1 - waterIntake.current) + BUOYANCY_CONFIG.minBuoyancy * waterIntake.current
+			const currentFloatFactor = BUOYANCY_CONFIG.floatFactor * (1 - waterIntake.current) + BUOYANCY_CONFIG.minBuoyancy * waterIntake.current
 
 			// Submersion ratio (0 to 1)
 			const submersionRatio = Math.min(1, submersionDepth / BUOYANCY_CONFIG.maxDepth)

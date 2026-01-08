@@ -2,8 +2,9 @@ import { useMemo, useRef, useEffect } from 'react'
 import { useLoader, useFrame, useThree } from '@react-three/fiber'
 import { TextureLoader, RepeatWrapping, ShaderMaterial, Color, Vector3, Matrix4, Plane, Vector4, PerspectiveCamera, WebGLRenderTarget, FrontSide } from 'three'
 
-import { WATER_LEVEL, WATER_DEPTH_CONFIG } from '../config/water'
-import { sunDirection, sunColor, skyColorZenith, skyColorHorizon } from '../config/environment'
+import useGameStore from '../store/gameStore'
+import { WATER_LEVEL } from '../config/water'
+import { getBiome } from '../config/biomes'
 import { getWaveUniforms } from '../utils/water/wavePhysics'
 
 import waterVertexShader from '../shaders/water.vert.glsl'
@@ -13,7 +14,9 @@ import waterFragmentShader from '../shaders/water.frag.glsl'
  * Create the shared water material with reflection support.
  * This material is used by all water tiles.
  */
-const createWaterMaterial = (waterNormals, renderTarget, textureMatrix) => {
+const createWaterMaterial = (waterNormals, renderTarget, textureMatrix, waterConfig, envConfig) => {
+	const WATER_DEPTH_CONFIG = waterConfig.depth
+	const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = envConfig
 	const waveUniforms = getWaveUniforms()
 
 	const material = new ShaderMaterial({
@@ -70,6 +73,12 @@ const createWaterMaterial = (waterNormals, renderTarget, textureMatrix) => {
  */
 const useWaterMaterial = () => {
 	const { gl, scene, camera } = useThree()
+	const currentBiome = useGameStore((state) => state.currentBiome)
+
+	// Get biome-specific configs
+	const biomeConfig = useMemo(() => getBiome(currentBiome), [currentBiome])
+	const waterConfig = biomeConfig.water
+	const envConfig = biomeConfig.environment
 
 	// Load water normal texture
 	const waterNormals = useLoader(TextureLoader, '/assets/images/ground/water_normal.jpg')
@@ -114,8 +123,8 @@ const useWaterMaterial = () => {
 	// Create shared water material
 	const waterMaterial = useMemo(() => {
 		const refs = reflectionRefs.current
-		return createWaterMaterial(waterNormals, refs.renderTarget, refs.textureMatrix)
-	}, [waterNormals])
+		return createWaterMaterial(waterNormals, refs.renderTarget, refs.textureMatrix, waterConfig, envConfig)
+	}, [waterNormals, currentBiome, waterConfig, envConfig])
 
 	// Store water material ref for cleanup
 	const waterMaterialRef = useRef(waterMaterial)
@@ -143,6 +152,9 @@ const useWaterMaterial = () => {
 		if (!waterMaterial) return
 
 		const refs = reflectionRefs.current
+
+		// Get current environment config for reflection clear color
+		const { skyColorHorizon } = envConfig
 
 		// Update time uniform (always needed for wave animation)
 		waterMaterial.uniforms.time.value += delta

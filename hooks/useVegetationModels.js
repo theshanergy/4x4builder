@@ -2,24 +2,13 @@ import { useMemo } from 'react'
 import { Matrix4 } from 'three'
 import { useGLTF } from '@react-three/drei'
 
-import { VEGETATION_TYPES } from '../config/vegetation'
-
-// Extract unique models at module level (runs once)
-const UNIQUE_MODELS = (() => {
-	const models = new Set()
-	VEGETATION_TYPES.forEach((type) => models.add(type.model))
-	return Array.from(models)
-})()
-
-// Preload all models immediately to ensure they're cached
-UNIQUE_MODELS.forEach((modelPath) => {
-	useGLTF.preload(modelPath)
-})
+import useGameStore from '../store/gameStore'
+import { getBiome } from '../config/biomes'
 
 /**
  * useVegetationModels Hook
  *
- * Loads and caches vegetation models at different LOD levels based on VEGETATION_TYPES config.
+ * Loads and caches vegetation models at different LOD levels based on biome vegetation config.
  * Each unique model is loaded only once and shared across all vegetation types that use it.
  * Returns an array of vegetation type objects, each containing:
  * - name: The vegetation type name
@@ -30,6 +19,19 @@ UNIQUE_MODELS.forEach((modelPath) => {
  * @returns {Array|null} Array of vegetation type models, or null if not loaded
  */
 export const useVegetationModels = () => {
+	const currentBiome = useGameStore((state) => state.currentBiome)
+
+	// Get biome-specific vegetation config
+	const biomeConfig = useMemo(() => getBiome(currentBiome), [currentBiome])
+	const VEGETATION_TYPES = biomeConfig.vegetation
+
+	// Extract unique models
+	const UNIQUE_MODELS = useMemo(() => {
+		const models = new Set()
+		VEGETATION_TYPES.forEach((type) => models.add(type.model))
+		return Array.from(models)
+	}, [VEGETATION_TYPES])
+
 	// Load all unique models using multiple hook calls (required by React hooks rules)
 	// useGLTF returns cached results after preload, so this is efficient
 	const gltfResults = UNIQUE_MODELS.map((modelPath) => useGLTF(modelPath))
@@ -153,9 +155,6 @@ export const useVegetationModels = () => {
 			}
 		}).filter(Boolean)
 
-		if (vegetationModels.length > 0) {
-			console.log('[useVegetationModels] Loaded vegetation types:', vegetationModels.map((v) => v.name).join(', '))
-		}
 		return vegetationModels
 	}, [gltfs])
 }

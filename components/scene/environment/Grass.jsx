@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion, CatmullRomCurve3, DoubleSide, Color, BufferGeometry, BufferAttribute, Object3D, InstancedMesh, ShaderMaterial, Frustum, Matrix4 } from 'three'
 
 import useGameStore from '../../../store/gameStore'
-import { sunDirection, sunColor } from '../../../config/environment'
+import { getBiome } from '../../../config/biomes'
 import grassVertexShader from '../../../shaders/grass.vert.glsl'
 import grassFragmentShader from '../../../shaders/grass.frag.glsl'
 import { createSeededRandom, hashCoords } from '../../../utils/seededRandom'
@@ -308,6 +308,12 @@ const Grass = memo(() => {
 	// Get terrain functions from store
 	const getTerrainHeight = useGameStore((state) => state.getTerrainHeight)
 	const getTerrainNormal = useGameStore((state) => state.getTerrainNormal)
+	const currentBiome = useGameStore((state) => state.currentBiome)
+
+	// Get biome-specific environment config
+	const biomeConfig = useMemo(() => getBiome(currentBiome), [currentBiome])
+	const envConfig = biomeConfig.environment
+	const { sunDirection, sunColor } = envConfig
 
 	// Check if grass should be disabled
 	const isMobile = useGameStore((state) => state.isMobile)
@@ -355,7 +361,7 @@ const Grass = memo(() => {
 			side: DoubleSide,
 			transparent: true,
 		})
-	}, [])
+	}, [currentBiome, sunDirection, sunColor])
 
 	// Animate wind on the shared material
 	useFrame((state) => {
