@@ -10,61 +10,6 @@ import waterVertexShader from '../shaders/water.vert.glsl'
 import waterFragmentShader from '../shaders/water.frag.glsl'
 
 /**
- * Create the shared water material with reflection support.
- * This material is used by all water tiles.
- */
-const createWaterMaterial = (waterNormals, renderTarget, textureMatrix, waterConfig, envConfig) => {
-	const WATER_DEPTH_CONFIG = waterConfig
-	const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = envConfig
-	const waveUniforms = getWaveUniforms()
-
-	const material = new ShaderMaterial({
-		vertexShader: waterVertexShader,
-		fragmentShader: waterFragmentShader,
-		uniforms: {
-			// Water rendering uniforms
-			normalSampler: { value: waterNormals },
-			mirrorSampler: { value: renderTarget.texture },
-			textureMatrix: { value: textureMatrix },
-			alpha: { value: 1.0 },
-			time: { value: 0 },
-			size: { value: 10.0 },
-			distortionScale: { value: 8.0 },
-			sunColor: { value: sunColor.clone() },
-			sunDirection: { value: sunDirection.clone() },
-			eye: { value: new Vector3() },
-			waterColor: { value: new Color(WATER_DEPTH_CONFIG.waterColor[0], WATER_DEPTH_CONFIG.waterColor[1], WATER_DEPTH_CONFIG.waterColor[2]) },
-
-			// Sky colors for reflection fallback
-			skyColor: { value: skyColorZenith.clone() },
-			skyHorizonColor: { value: skyColorHorizon.clone() },
-
-			// Wave uniforms
-			waveA: { value: waveUniforms.waveA },
-			waveB: { value: waveUniforms.waveB },
-			waveC: { value: waveUniforms.waveC },
-			offsetX: { value: 0 },
-			offsetZ: { value: 0 },
-
-			// Depth-based wave modulation
-			shorelineDepthThreshold: { value: WATER_DEPTH_CONFIG.shorelineDepthThreshold },
-			shallowDepthThreshold: { value: WATER_DEPTH_CONFIG.shallowDepthThreshold },
-
-			// Depth-based visual effects
-			maxVisibleDepth: { value: WATER_DEPTH_CONFIG.maxVisibleDepth },
-			edgeFadeDistance: { value: WATER_DEPTH_CONFIG.edgeFadeDistance },
-		},
-		lights: false,
-		fog: false,
-		side: FrontSide,
-		transparent: true,
-		depthWrite: false,
-	})
-
-	return material
-}
-
-/**
  * Custom hook to create and manage water material with reflections.
  * Handles material creation, reflection rendering, and cleanup.
  *
@@ -120,7 +65,51 @@ const useWaterMaterial = () => {
 	// Create shared water material
 	const waterMaterial = useMemo(() => {
 		const refs = reflectionRefs.current
-		return createWaterMaterial(waterNormals, refs.renderTarget, refs.textureMatrix, waterConfig, envConfig)
+		const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = envConfig
+		const waveUniforms = getWaveUniforms()
+
+		return new ShaderMaterial({
+			vertexShader: waterVertexShader,
+			fragmentShader: waterFragmentShader,
+			uniforms: {
+				// Water rendering uniforms
+				normalSampler: { value: waterNormals },
+				mirrorSampler: { value: refs.renderTarget.texture },
+				textureMatrix: { value: refs.textureMatrix },
+				alpha: { value: 1.0 },
+				time: { value: 0 },
+				size: { value: 10.0 },
+				distortionScale: { value: 8.0 },
+				sunColor: { value: sunColor.clone() },
+				sunDirection: { value: sunDirection.clone() },
+				eye: { value: new Vector3() },
+				waterColor: { value: new Color(waterConfig.waterColor[0], waterConfig.waterColor[1], waterConfig.waterColor[2]) },
+
+				// Sky colors for reflection fallback
+				skyColor: { value: skyColorZenith.clone() },
+				skyHorizonColor: { value: skyColorHorizon.clone() },
+
+				// Wave uniforms
+				waveA: { value: waveUniforms.waveA },
+				waveB: { value: waveUniforms.waveB },
+				waveC: { value: waveUniforms.waveC },
+				offsetX: { value: 0 },
+				offsetZ: { value: 0 },
+
+				// Depth-based wave modulation
+				shorelineDepthThreshold: { value: waterConfig.shorelineDepthThreshold },
+				shallowDepthThreshold: { value: waterConfig.shallowDepthThreshold },
+
+				// Depth-based visual effects
+				maxVisibleDepth: { value: waterConfig.maxVisibleDepth },
+				edgeFadeDistance: { value: waterConfig.edgeFadeDistance },
+			},
+			lights: false,
+			fog: false,
+			side: FrontSide,
+			transparent: true,
+			depthWrite: false,
+		})
 	}, [waterNormals, waterConfig, envConfig])
 
 	// Store water material ref for cleanup
