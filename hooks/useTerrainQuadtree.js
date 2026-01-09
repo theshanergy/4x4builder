@@ -22,12 +22,18 @@ const useTerrainQuadtree = () => {
 
 		// Use a smaller threshold for updates
 		const updateThreshold = QUADTREE_MIN_SIZE / 2
-		const dx = centerPosition.x - (lastUpdatePosition.current.x || 0)
-		const dz = centerPosition.z - (lastUpdatePosition.current.z || 0)
-		const movedDistance = Math.sqrt(dx * dx + dz * dz)
+		const isFirstUpdate = lastUpdatePosition.current.x === null
 
-		// Only update if moved enough
-		if (movedDistance < updateThreshold && lastUpdatePosition.current.x !== null) {
+		// Calculate movement distance only if we have a previous position
+		let movedDistance = Infinity
+		if (!isFirstUpdate) {
+			const dx = centerPosition.x - lastUpdatePosition.current.x
+			const dz = centerPosition.z - lastUpdatePosition.current.z
+			movedDistance = Math.sqrt(dx * dx + dz * dz)
+		}
+
+		// Only update if: first update or moved enough
+		if (!isFirstUpdate && movedDistance < updateThreshold) {
 			return
 		}
 		lastUpdatePosition.current.x = centerPosition.x
@@ -35,12 +41,22 @@ const useTerrainQuadtree = () => {
 
 		// Determine which quadtree roots we need based on player position
 		const rootsNeeded = new Set()
-		const viewRange = QUADTREE_ROOT_SIZE * 2
+		const viewRange = 2 // Number of root tiles in each direction from center
 
-		for (let rx = -viewRange; rx <= viewRange; rx += QUADTREE_ROOT_SIZE) {
-			for (let rz = -viewRange; rz <= viewRange; rz += QUADTREE_ROOT_SIZE) {
-				const rootX = Math.floor((centerPosition.x + rx) / QUADTREE_ROOT_SIZE) * QUADTREE_ROOT_SIZE + QUADTREE_ROOT_SIZE / 2
-				const rootZ = Math.floor((centerPosition.z + rz) / QUADTREE_ROOT_SIZE) * QUADTREE_ROOT_SIZE + QUADTREE_ROOT_SIZE / 2
+		// Calculate the root tile the camera is currently in
+		const centerRootX = Math.floor(centerPosition.x / QUADTREE_ROOT_SIZE)
+		const centerRootZ = Math.floor(centerPosition.z / QUADTREE_ROOT_SIZE)
+
+		// Generate roots in a grid around the camera's current root
+		for (let rx = -viewRange; rx <= viewRange; rx++) {
+			for (let rz = -viewRange; rz <= viewRange; rz++) {
+				// Calculate root tile coordinates
+				const rootTileX = centerRootX + rx
+				const rootTileZ = centerRootZ + rz
+
+				// Convert tile coordinates to world center position
+				const rootX = rootTileX * QUADTREE_ROOT_SIZE + QUADTREE_ROOT_SIZE / 2
+				const rootZ = rootTileZ * QUADTREE_ROOT_SIZE + QUADTREE_ROOT_SIZE / 2
 
 				// Check if this root is within reasonable view distance
 				const distX = centerPosition.x - rootX
