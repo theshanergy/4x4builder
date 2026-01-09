@@ -23,6 +23,9 @@ export default {
 
 	// Terrain configuration
 	terrain: {
+		// Deterministic seed for terrain generation
+		seed: 5678,
+
 		// Height Scaling - increased for more dramatic mountains
 		baseHeightScale: 6,
 
@@ -34,14 +37,10 @@ export default {
 		// Height Limits - taller peaks
 		maxMountainHeight: 600,
 
-		// Spawn Protection
-		spawnProtectionRadius: 400,
-		spawnTransitionWidth: 300,
-
-		// Spawn Area
-		spawnFlatRadius: 16,
-		spawnTransitionDistance: 2500,
-
+		// Spawn Area - flat safe zone that transitions to natural terrain
+		spawnRadius: 200,
+		spawnTransitionRadius: 2500,
+		
 		// Terrain Layers
 		layers: [
 			{

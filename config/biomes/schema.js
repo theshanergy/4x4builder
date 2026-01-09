@@ -56,15 +56,14 @@
 
 /**
  * @typedef {Object} BiomeTerrain
+ * @property {number} seed - Deterministic seed for terrain noise generation
  * @property {number} baseHeightScale - Base multiplier for terrain height
  * @property {number} continentScale - Scale factor for continent-level terrain features
  * @property {number} noiseScale - Scale factor for detail noise
  * @property {number} mountainScale - Scale factor for mountain features
  * @property {number} maxMountainHeight - Maximum height for mountains (in world units)
- * @property {number} spawnProtectionRadius - Radius around spawn point with reduced terrain height
- * @property {number} spawnTransitionWidth - Width of transition zone for spawn protection
- * @property {number} spawnFlatRadius - Radius of completely flat area around spawn
- * @property {number} spawnTransitionDistance - Distance over which spawn flattening transitions out
+ * @property {number} spawnRadius - Radius of flat, safe spawn area (guaranteed land)
+ * @property {number} spawnTransitionRadius - Distance over which spawn area transitions to natural terrain
  * @property {TerrainLayer[]} layers - Array of terrain layers, processed in order
  */
 
@@ -182,24 +181,12 @@ export function validateBiome(biome) {
 		if (!biome.environment.sunDirection) errors.push('Environment must have sunDirection')
 		if (!biome.environment.sunColor) errors.push('Environment must have sunColor')
 		if (!biome.environment.skyColorZenith) errors.push('Environment must have skyColorZenith')
-		if (!biome.environment.skyColorHorizon)
-			errors.push('Environment must have skyColorHorizon')
+		if (!biome.environment.skyColorHorizon) errors.push('Environment must have skyColorHorizon')
 	}
 
 	// Validate terrain
 	if (biome.terrain) {
-		const required = [
-			'baseHeightScale',
-			'continentScale',
-			'noiseScale',
-			'mountainScale',
-			'maxMountainHeight',
-			'spawnProtectionRadius',
-			'spawnTransitionWidth',
-			'spawnFlatRadius',
-			'spawnTransitionDistance',
-			'layers',
-		]
+		const required = ['baseHeightScale', 'continentScale', 'noiseScale', 'mountainScale', 'maxMountainHeight', 'spawnRadius', 'spawnTransitionRadius', 'layers']
 		required.forEach((prop) => {
 			if (biome.terrain[prop] === undefined) {
 				errors.push(`Terrain must have ${prop}`)
@@ -211,12 +198,9 @@ export function validateBiome(biome) {
 			biome.terrain.layers.forEach((layer, idx) => {
 				if (!layer.name) errors.push(`Layer ${idx} must have a name`)
 				if (!layer.textures) errors.push(`Layer ${idx} must have textures`)
-				if (layer.textures && !layer.textures.albedo)
-					errors.push(`Layer ${idx} must have albedo texture`)
-				if (layer.textures && !layer.textures.normal)
-					errors.push(`Layer ${idx} must have normal texture`)
-				if (layer.textureScale === undefined)
-					errors.push(`Layer ${idx} must have textureScale`)
+				if (layer.textures && !layer.textures.albedo) errors.push(`Layer ${idx} must have albedo texture`)
+				if (layer.textures && !layer.textures.normal) errors.push(`Layer ${idx} must have normal texture`)
+				if (layer.textureScale === undefined) errors.push(`Layer ${idx} must have textureScale`)
 			})
 		}
 	}
@@ -243,16 +227,9 @@ export function validateBiome(biome) {
 	if (biome.water) {
 		if (!biome.water.body) errors.push('Water must have body configuration')
 		if (!biome.water.depth) errors.push('Water must have depth configuration')
-		if (biome.water.body && biome.water.body.maxDepth === undefined)
-			errors.push('Water body must have maxDepth')
+		if (biome.water.body && biome.water.body.maxDepth === undefined) errors.push('Water body must have maxDepth')
 		if (biome.water.depth) {
-			const depthRequired = [
-				'shorelineDepthThreshold',
-				'shallowDepthThreshold',
-				'maxVisibleDepth',
-				'edgeFadeDistance',
-				'waterColor',
-			]
+			const depthRequired = ['shorelineDepthThreshold', 'shallowDepthThreshold', 'maxVisibleDepth', 'edgeFadeDistance', 'waterColor']
 			depthRequired.forEach((prop) => {
 				if (biome.water.depth[prop] === undefined) {
 					errors.push(`Water depth must have ${prop}`)
@@ -290,10 +267,8 @@ export async function createDefaultBiome(name) {
 			noiseScale: 0.04,
 			mountainScale: 0.001,
 			maxMountainHeight: 400,
-			spawnProtectionRadius: 400,
-			spawnTransitionWidth: 300,
-			spawnFlatRadius: 16,
-			spawnTransitionDistance: 2500,
+			spawnRadius: 200,
+			spawnTransitionRadius: 2500,
 			layers: [],
 		},
 		vegetation: [],

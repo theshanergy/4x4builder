@@ -19,12 +19,11 @@ const GRADIENT_EPSILON = 0.01
  * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and isWater functions
  */
 export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { body: { maxDepth: 50 } }) => {
-	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnProtectionRadius, spawnTransitionWidth, spawnFlatRadius, spawnTransitionDistance } =
-		terrainConfig
+	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnRadius, spawnTransitionRadius } = terrainConfig
 	const WATER_BODY_CONFIG = waterConfig.body
 
-	const flatRadiusSq = spawnFlatRadius * spawnFlatRadius
-	const transitionEndSq = spawnTransitionDistance * spawnTransitionDistance
+	const spawnRadiusSq = spawnRadius * spawnRadius
+	const transitionEndSq = spawnTransitionRadius * spawnTransitionRadius
 
 	/**
 	 * Smoothstep interpolation (cubic hermite)
@@ -47,12 +46,13 @@ export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { body:
 	 */
 	const getNormalizedHeight = (x, z) => {
 		const distSq = x * x + z * z
-		const dist = Math.sqrt(distSq)
 
 		// === SPAWN AREA: Flat spawn zone (check first for early return) ===
-		if (distSq < flatRadiusSq) {
+		if (distSq < spawnRadiusSq) {
 			return 0
 		}
+
+		const dist = Math.sqrt(distSq)
 
 		// === LAYER 1: Continental shape (very large scale) ===
 		// Domain warp for organic coastlines
@@ -68,20 +68,16 @@ export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { body:
 		// Bias terrain upward to reduce lake coverage (shift from ~50% water to ~20% water)
 		continental += 0.1
 
+		// Spawn area land guarantee - ensure spawn zone is always on land
+		if (dist < spawnRadius) {
+			continental = Math.max(continental, 0.3)
+		}
+
 		// Vary shoreline sharpness along the coast using continental noise
 		// This creates organic variation - some areas have sharp cliffs, others gentle slopes
 		const shorelineVariation = noise.perlin2(x * continentScale * 0.4 + 500, z * continentScale * 0.4 + 500)
 		const shorelineSharpness = 1.85 + shorelineVariation * 5.0 // Range (gentler to sharper)
 		continental = Math.sign(continental) * Math.pow(Math.abs(continental), 1.0 / shorelineSharpness)
-
-		// Spawn protection - lift terrain near origin to guarantee land
-		if (dist < spawnProtectionRadius) {
-			continental = Math.max(continental, 0.3)
-		} else if (dist < spawnProtectionRadius + spawnTransitionWidth) {
-			const t = (dist - spawnProtectionRadius) / spawnTransitionWidth
-			const blend = smoothstep(t)
-			continental = Math.max(continental, 0.3 * (1 - blend))
-		}
 
 		// === LAYER 2: Base terrain variation ===
 		const baseNoise =
@@ -131,21 +127,11 @@ export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { body:
 
 		height += mountainHeight
 
-		// === SPAWN AREA: Smooth transition ===
+		// === SPAWN AREA: Smooth transition from flat spawn to natural terrain ===
 		if (distSq < transitionEndSq) {
-			const t = (dist - spawnFlatRadius) / (spawnTransitionDistance - spawnFlatRadius)
-			const blend = t * t * t * (t * (t * 6 - 15) + 10)
-			const blendedHeight = height * blend
-
-			// Prevent transition from pushing beaches below water
-			// If natural terrain would be a beach (slightly above water), preserve that
-			const waterThresholdNormalized = WATER_LEVEL / baseHeightScale
-			if (height > waterThresholdNormalized && blendedHeight < waterThresholdNormalized) {
-				// Beach preservation: keep terrain at least at water level
-				height = waterThresholdNormalized
-			} else {
-				height = blendedHeight
-			}
+			const t = (dist - spawnRadius) / (spawnTransitionRadius - spawnRadius)
+			const blend = t * t * t * (t * (t * 6 - 15) + 10) // Quintic smoothstep
+			height *= blend // Blend from 0 (flat) to full terrain height
 		}
 
 		return height

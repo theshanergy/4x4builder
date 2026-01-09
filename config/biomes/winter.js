@@ -24,6 +24,9 @@ export default {
 
 	// Terrain configuration
 	terrain: {
+		// Deterministic seed for terrain generation
+		seed: 9012,
+
 		// Height Scaling - slightly more dramatic mountains
 		baseHeightScale: 4.5,
 
@@ -35,15 +38,11 @@ export default {
 		// Height Limits
 		maxMountainHeight: 500,
 
-		// Spawn Protection
-		spawnProtectionRadius: 400,
-		spawnTransitionWidth: 300,
-
-		// Spawn Area
-		spawnFlatRadius: 16,
-		spawnTransitionDistance: 2500,
-
-		// Terrain Layers - winter themed
+		// Spawn Area - flat safe zone that transitions to natural terrain
+		spawnRadius: 200,
+		spawnTransitionRadius: 2500,
+		
+		// Terrain Layers
 		layers: [
 			{
 				name: 'snow',

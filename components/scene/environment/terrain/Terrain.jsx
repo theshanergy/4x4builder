@@ -20,8 +20,8 @@ const Terrain = () => {
 	const terrainConfig = useBiomeTerrain()
 	const waterConfig = useBiomeWater()
 
-	// Generate noise instance with fixed seed for consistency
-	const noise = useMemo(() => new Noise(1234), [])
+	// Generate noise instance with seed from biome config
+	const noise = useMemo(() => new Noise(terrainConfig.seed), [terrainConfig.seed])
 
 	// Create shared terrain helpers (height/normal sampling)
 	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, terrainConfig, waterConfig), [noise, terrainConfig, waterConfig])
