@@ -1,4 +1,4 @@
-import vehicleConfigs from '../../vehicleConfigs'
+import vehicleConfigs from '../../config/vehicles'
 import useGameStore from '../../store/gameStore'
 import Logo from './Logo'
 

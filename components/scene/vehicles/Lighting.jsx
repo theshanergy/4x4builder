@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import useGameStore from '../../../store/gameStore'
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 import LightBar from './LightBar'
 
 const mirrorPosition = (pos) => [-pos[0], pos[1], pos[2]]

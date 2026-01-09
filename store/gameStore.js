@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import { Vector3 } from 'three'
-import vehicleConfigs from '../vehicleConfigs'
+import vehicleConfigs from '../config/vehicles'
 import { DEFAULT_BIOME, BIOMES } from '../config/biomes'
 
 // Compatibility shim for legacy localStorage data, mapping old vehicle id field to body

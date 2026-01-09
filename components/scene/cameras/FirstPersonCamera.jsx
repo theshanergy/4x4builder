@@ -3,7 +3,7 @@ import { Vector3, MathUtils, Quaternion, Matrix4 } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
 import useGameStore from '../../../store/gameStore'
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 
 const UP_VECTOR = new Vector3(0, 1, 0)
 

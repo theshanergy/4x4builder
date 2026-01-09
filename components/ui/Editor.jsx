@@ -1,4 +1,4 @@
-import vehicleConfigs from '../../vehicleConfigs'
+import vehicleConfigs from '../../config/vehicles'
 import EditorSection from './EditorSection'
 import useGameStore from '../../store/gameStore'
 import { getBiomeList } from '../../config/biomes'

@@ -5,7 +5,7 @@ import { Vector3, Quaternion } from 'three'
 import { shallow } from 'zustand/shallow'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 import useVehicleSync from '../../../hooks/useVehicleSync'
 import useVehiclePhysics from '../../../hooks/useVehiclePhysics'
 import useVehicleBroadcast from '../../../hooks/useVehicleBroadcast'
