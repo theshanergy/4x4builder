@@ -118,9 +118,10 @@
 /**
  * @typedef {Object} VegetationConfig
  * @property {string} name - Unique identifier for this vegetation type
- * @property {string} model - Path to the 3D model file (GLB/GLTF)
- * @property {VegetationMeshes} meshes - Mesh names for different LOD levels
- * @property {VegetationCollider} collider - Physics collider configuration
+ * @property {string} [model] - Path to the 3D model file (GLB/GLTF) - required if not using meshFactory
+ * @property {Function} [meshFactory] - Factory function that returns {geometry, material} - required if not using model
+ * @property {VegetationMeshes} [meshes] - Mesh names for different LOD levels (required for model-based vegetation)
+ * @property {VegetationCollider} [collider] - Physics collider configuration (required for model-based vegetation)
  * @property {VegetationSphericalNormals} [sphericalNormals] - LOD levels using spherical normals
  * @property {number} maxLod - Maximum LOD level (0-3)
  * @property {VegetationDistance} distance - Distance constraints from spawn
@@ -224,9 +225,11 @@ export function validateBiome(biome) {
 	if (Array.isArray(biome.vegetation)) {
 		biome.vegetation.forEach((veg, idx) => {
 			if (!veg.name) errors.push(`Vegetation ${idx} must have a name`)
-			if (!veg.model) errors.push(`Vegetation ${idx} must have a model path`)
-			if (!veg.meshes) errors.push(`Vegetation ${idx} must have meshes`)
-			if (!veg.collider) errors.push(`Vegetation ${idx} must have collider`)
+			// Must have either model (GLTF) or meshFactory (mesh factory function)
+			if (!veg.model && !veg.meshFactory) errors.push(`Vegetation ${idx} must have either a model path or meshFactory`)
+			// Model-based vegetation requires meshes and collider
+			if (veg.model && !veg.meshes) errors.push(`Vegetation ${idx} must have meshes`)
+			if (veg.model && !veg.collider) errors.push(`Vegetation ${idx} must have collider`)
 			if (veg.maxLod === undefined) errors.push(`Vegetation ${idx} must have maxLod`)
 			if (!veg.distance) errors.push(`Vegetation ${idx} must have distance`)
 			if (!veg.scale) errors.push(`Vegetation ${idx} must have scale`)

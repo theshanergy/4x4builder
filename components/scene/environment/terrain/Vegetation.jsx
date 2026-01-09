@@ -34,7 +34,7 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props
  * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
  * @param {Object} props.terrainHelpers - Height/normal sampling functions
- * @param {Array} props.vegetationModels - Array of vegetation type models from useVegetationModels
+ * @param {Array} props.vegetationModels - Array of vegetation type models from useVegetation
  */
 const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 	// Check if vegetation should be disabled

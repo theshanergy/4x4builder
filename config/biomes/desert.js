@@ -5,6 +5,7 @@
  */
 
 import { Vector3, Color } from 'three'
+import { createGrassMesh } from '../../utils/vegetation/grassMesh'
 
 export default {
 	name: 'Desert',
@@ -99,7 +100,31 @@ export default {
 	},
 
 	// Vegetation configuration
-	vegetation: [],
+	vegetation: [
+		{
+			name: 'grass',
+			meshFactory: createGrassMesh, // Use procedural grass mesh factory
+			distance: {
+				min: 1, // Start placing outside flat spawn area
+				max: 100, // Match original viewDistance
+			},
+			scale: {
+				min: 1.0,
+				max: 1.2,
+			},
+			slope: {
+				min: 0.0,
+				max: 0.5, // Only on relatively flat areas (inverted from original 0.85 threshold)
+			},
+			height: {
+				min: -1,
+				max: 100,
+			},
+			density: 5000,
+			maxLod: 1,
+			collider: null, // No collider needed for grass
+		},
+	],
 
 	// Water configuration (appearance only)
 	water: {

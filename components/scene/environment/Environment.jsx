@@ -4,7 +4,6 @@ import Sun from './Sun'
 import Sky from './Sky'
 import Hawk from './Hawk'
 import Terrain from './terrain/Terrain'
-import Grass from './Grass'
 
 // Environment component
 const SceneEnvironment = memo(() => {
@@ -21,9 +20,6 @@ const SceneEnvironment = memo(() => {
 
 			{/* Terrain */}
 			<Terrain />
-
-			{/* Grass */}
-			<Grass />
 		</>
 	)
 })

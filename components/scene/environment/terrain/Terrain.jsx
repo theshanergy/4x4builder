@@ -5,7 +5,7 @@ import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
 import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
 import useWaterMaterial from '../../../../hooks/useWaterMaterial'
 import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
-import { useVegetationModels } from '../../../../hooks/useVegetationModels'
+import useVegetation from '../../../../hooks/useVegetation'
 import useGameStore from '../../../../store/gameStore'
 import { useBiomeTerrain, useBiomeWater } from '../../../../hooks/useBiome'
 import TerrainCollider from './TerrainCollider'
@@ -39,7 +39,7 @@ const Terrain = () => {
 	const waterMaterial = useWaterMaterial()
 
 	// Load vegetation models (LOD 0-3)
-	const vegetationModels = useVegetationModels()
+	const vegetationModels = useVegetation()
 
 	return (
 		<group name='Terrain'>

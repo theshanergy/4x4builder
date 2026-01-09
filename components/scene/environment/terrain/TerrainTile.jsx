@@ -68,7 +68,7 @@ const arePropsEqual = (prevProps, nextProps) => {
  * @param {Object} props.edgeStitchInfo - Edge stitching configuration
  * @param {THREE.Material} props.terrainMaterial - Shared terrain material instance
  * @param {THREE.Material} props.waterMaterial - Shared water material instance
- * @param {Object} props.vegetationModels - Vegetation LOD models from useVegetationModels
+ * @param {Object} props.vegetationModels - Vegetation LOD models from useVegetation
  */
 const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMaterial, waterMaterial, vegetationModels }) => {
 	const { centerX, centerZ } = node

@@ -5,10 +5,11 @@ import { useGLTF } from '@react-three/drei'
 import { useBiomeVegetation } from './useBiome'
 
 /**
- * useVegetationModels Hook
+ * useVegetation Hook
  *
  * Loads and caches vegetation models at different LOD levels based on biome vegetation config.
  * Each unique model is loaded only once and shared across all vegetation types that use it.
+ * Can accept both GLTF model paths and mesh factory functions (for procedural vegetation).
  * Returns an array of vegetation type objects, each containing:
  * - name: The vegetation type name
  * - config: The original vegetation config
@@ -17,18 +18,22 @@ import { useBiomeVegetation } from './useBiome'
  *
  * @returns {Array|null} Array of vegetation type models, or null if not loaded
  */
-export const useVegetationModels = () => {
+const useVegetation = () => {
 	// Get biome-specific vegetation config
 	const VEGETATION_TYPES = useBiomeVegetation()
 
-	// Extract unique models
+	// Extract unique GLTF models (filter out meshFactory-based vegetation)
 	const UNIQUE_MODELS = useMemo(() => {
 		const models = new Set()
-		VEGETATION_TYPES.forEach((type) => models.add(type.model))
+		VEGETATION_TYPES.forEach((type) => {
+			if (type.model && typeof type.model === 'string') {
+				models.add(type.model)
+			}
+		})
 		return Array.from(models)
 	}, [VEGETATION_TYPES])
 
-	// Load all unique models using multiple hook calls (required by React hooks rules)
+	// Load all unique GLTF models using multiple hook calls (required by React hooks rules)
 	// useGLTF returns cached results after preload, so this is efficient
 	const gltfResults = UNIQUE_MODELS.map((modelPath) => useGLTF(modelPath))
 
@@ -36,8 +41,8 @@ export const useVegetationModels = () => {
 	const gltfs = useMemo(() => gltfResults, [gltfResults.map((g) => g.scene).join(',')])
 
 	return useMemo(() => {
-		// Check if all models are loaded
-		if (gltfs.some((gltf) => !gltf || !gltf.scene)) return null
+		// Check if all GLTF models are loaded
+		if (UNIQUE_MODELS.length > 0 && gltfs.some((gltf) => !gltf || !gltf.scene)) return null
 
 		// Create a map of model path to GLTF for quick lookup
 		const modelMap = new Map()
@@ -47,13 +52,46 @@ export const useVegetationModels = () => {
 
 		// Process each vegetation type
 		const vegetationModels = VEGETATION_TYPES.map((type) => {
+			const lods = {}
+
+			// Handle meshFactory-based vegetation (e.g., procedural grass)
+			if (type.meshFactory) {
+				// Call the factory function to get geometry and material
+				const { geometry, material } = type.meshFactory()
+
+				if (!geometry || !material) {
+					console.warn(`[useVegetation] meshFactory for ${type.name} did not return geometry/material`)
+					return null
+				}
+
+				// Use the same mesh for all LOD levels (can be optimized later)
+				const meshData = [
+					{
+						geometry,
+						material,
+						transform: new Matrix4(), // Identity matrix
+					},
+				]
+
+				// Populate all LOD levels with the same mesh
+				for (let i = 0; i <= 3; i++) {
+					lods[i] = meshData
+				}
+
+				return {
+					name: type.name,
+					config: type,
+					lods,
+				}
+			}
+
+			// Handle GLTF model-based vegetation
 			const gltf = modelMap.get(type.model)
 			if (!gltf) {
-				console.warn(`[useVegetationModels] Could not load model for ${type.name}`)
+				console.warn(`[useVegetation] Could not load model for ${type.name}`)
 				return null
 			}
 
-			const lods = {}
 			const lodLevels = ['lod0', 'lod1', 'lod2', 'lod3']
 
 			// Track the last valid LOD for fallback
@@ -73,7 +111,7 @@ export const useVegetationModels = () => {
 				const vegetation = gltf.scene.getObjectByName(actualMeshName)
 
 				if (!vegetation) {
-					console.warn(`[useVegetationModels] Could not find ${actualMeshName} in model for ${type.name}`)
+					console.warn(`[useVegetation] Could not find ${actualMeshName} in model for ${type.name}`)
 					return
 				}
 
@@ -152,5 +190,7 @@ export const useVegetationModels = () => {
 		}).filter(Boolean)
 
 		return vegetationModels
-	}, [gltfs])
+	}, [gltfs, VEGETATION_TYPES])
 }
+
+export default useVegetation
