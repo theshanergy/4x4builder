@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { RepeatWrapping, MeshStandardMaterial, TextureLoader } from 'three'
 import { useBiomeTerrain } from './useBiome'
