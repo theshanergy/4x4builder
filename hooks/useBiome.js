@@ -1,62 +1,18 @@
-import { useMemo, useSyncExternalStore } from 'react'
+import { useMemo } from 'react'
 import useGameStore from '../store/gameStore'
 import { getBiome } from '../config/biomes'
 
 /**
- * Biome subscription system for HMR support.
- * When biome files are hot-reloaded, we need to notify subscribers to re-render.
- */
-let biomeVersion = 0
-const listeners = new Set()
-
-const subscribe = (callback) => {
-	listeners.add(callback)
-	return () => listeners.delete(callback)
-}
-
-const getSnapshot = () => biomeVersion
-
-/**
- * Notify all subscribers that biome configs have changed.
- * Call this when biome files are hot-reloaded.
- */
-export const invalidateBiomeCache = () => {
-	biomeVersion++
-	listeners.forEach((listener) => listener())
-}
-
-// Set up HMR for biome files
-if (import.meta.hot) {
-	import.meta.hot.accept('../config/biomes/index.js', () => {
-		invalidateBiomeCache()
-	})
-	import.meta.hot.accept('../config/biomes/desert.js', () => {
-		invalidateBiomeCache()
-	})
-	import.meta.hot.accept('../config/biomes/mountain.js', () => {
-		invalidateBiomeCache()
-	})
-	import.meta.hot.accept('../config/biomes/winter.js', () => {
-		invalidateBiomeCache()
-	})
-}
-
-/**
  * Hook to get the current biome configuration.
- * Automatically updates when:
- * - The biome selection changes in the store
- * - Biome config files are hot-reloaded during development
+ * Automatically updates when the biome selection changes in the store.
  *
  * @returns {Object} The current biome configuration object
  */
 export const useBiome = () => {
 	const currentBiome = useGameStore((state) => state.currentBiome)
 
-	// Subscribe to biome version for HMR updates
-	useSyncExternalStore(subscribe, getSnapshot)
-
-	// Get biome config - memoized on biome name + version
-	return useMemo(() => getBiome(currentBiome), [currentBiome, biomeVersion])
+	// Get biome config - memoized on biome name
+	return useMemo(() => getBiome(currentBiome), [currentBiome])
 }
 
 /**

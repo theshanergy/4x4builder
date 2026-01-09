@@ -16,7 +16,7 @@ const Terrain = () => {
 	// Use quadtree LOD system
 	const leafTiles = useTerrainQuadtree()
 
-	// Get current biome configs (triggers re-render on biome change or HMR)
+	// Get current biome configs
 	const terrainConfig = useBiomeTerrain()
 	const waterConfig = useBiomeWater()
 
