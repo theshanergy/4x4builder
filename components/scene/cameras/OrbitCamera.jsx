@@ -5,7 +5,7 @@ import { OrbitControls } from '@react-three/drei'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import { dampVector3 } from '../../../utils/dampVector3'
-import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
+import useElevationBounds from '../../../hooks/useElevationBounds'
 
 // Orbit camera controller
 const OrbitCamera = ({ followSpeed, minGroundDistance, transitionFromInfo }) => {
@@ -32,8 +32,8 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, transitionFromInfo }) => 
 		}
 	}, [transitionFromInfo, camera])
 
-	// Use shared ground avoidance hook with target reference for midpoint sampling
-	const checkGroundAvoidance = useGroundAvoidance(cameraPosition, minGroundDistance, targetWithOffset)
+	//
+	const checkElevationBounds = useElevationBounds(cameraPosition, minGroundDistance, targetWithOffset)
 
 	// Initialize controls target to vehicle position to prevent swooping from origin
 	useEffect(() => {
@@ -87,10 +87,10 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, transitionFromInfo }) => 
 
 		orbitControlsRef.current.update()
 
-		// Ground avoidance logic - only when physics is enabled
+		// Elevation bounds logic - only when physics is enabled
 		if (physicsEnabled) {
 			camera.getWorldPosition(cameraPosition.current)
-			checkGroundAvoidance()
+			checkElevationBounds()
 
 			// Apply ground avoidance adjustment to camera if needed
 			if (cameraPosition.current.y !== camera.position.y) {

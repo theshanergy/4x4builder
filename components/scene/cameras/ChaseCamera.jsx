@@ -3,7 +3,7 @@ import { Vector3, MathUtils, Quaternion } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
 import { dampVector3 } from '../../../utils/dampVector3'
-import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
+import useElevationBounds from '../../../hooks/useElevationBounds'
 
 // Chase camera controller
 const ChaseCamera = ({ target }) => {
@@ -22,8 +22,8 @@ const ChaseCamera = ({ target }) => {
 	const idealOffset = useRef(new Vector3())
 	const idealLookAt = useRef(new Vector3())
 
-	// Use shared ground avoidance hook - pass idealLookAt as target for midpoint sampling
-	const checkGroundAvoidance = useGroundAvoidance(currentPosition, minGroundDistance, idealLookAt)
+	// Elevation bounds check
+	const checkElevationBounds = useElevationBounds(currentPosition, minGroundDistance, idealLookAt)
 
 	useFrame((state, delta) => {
 		if (!target) return
@@ -58,8 +58,8 @@ const ChaseCamera = ({ target }) => {
 			lastFov.current = newFov
 		}
 
-		// Ground avoidance logic using shared hook
-		checkGroundAvoidance()
+		// Elevation bounds logic using shared hook
+		checkElevationBounds()
 
 		// Update camera position
 		camera.position.copy(currentPosition.current)

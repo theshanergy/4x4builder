@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { MathUtils, Vector3, Euler } from 'three'
 import DroneAudio from './DroneAudio'
 import { useDroneInput } from '../../../hooks/useDroneInput'
-import { useGroundAvoidance } from '../../../hooks/useGroundAvoidance'
+import useElevationBounds from '../../../hooks/useElevationBounds'
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 
 // Visual drone model with arms and spinning propellers
@@ -38,8 +38,8 @@ const Drone = ({ onPositionUpdate, onRotationUpdate }) => {
 		rotationReturnSpeed: 2, // Speed at which camera returns to default angle when unlocked
 
 		// Limits
-		minGroundDistance: 1.0,
-		maxCeilingElevation: 200, // Maximum height above ground (meters)
+		minElevation: 1.0,
+		maxElevation: 200, // Maximum height above terrain (meters)
 
 		// Default pitch
 		defaultPitch: defaultPitch.current,
@@ -68,8 +68,8 @@ const Drone = ({ onPositionUpdate, onRotationUpdate }) => {
 		hasLaunched.current = true
 	}, [])
 
-	// Ground avoidance
-	const checkGroundAvoidance = useGroundAvoidance(position, config.minGroundDistance)
+	// Elevation bounds - handles both ground avoidance and ceiling limit
+	const checkElevationBounds = useElevationBounds(position, config.minElevation, config.maxElevation, null, velocity)
 
 	// Input handling
 	const { processInput } = useDroneInput(config, euler)
@@ -132,21 +132,8 @@ const Drone = ({ onPositionUpdate, onRotationUpdate }) => {
 		position.current.y += velocity.current.y * dt
 		position.current.z += velocity.current.z * dt
 
-		// Ground avoidance - stop downward velocity if we hit ground
-		const prevY = position.current.y
-		checkGroundAvoidance()
-		if (position.current.y > prevY && velocity.current.y < 0) {
-			velocity.current.y = 0
-		}
-
-		// Ceiling limit - prevent drone from going too high relative to vehicle
-		const maxAllowedY = vehicleState.position.y + config.maxCeilingElevation
-		if (position.current.y > maxAllowedY) {
-			position.current.y = maxAllowedY
-			if (velocity.current.y > 0) {
-				velocity.current.y = 0
-			}
-		}
+		// Enforce elevation bounds (ground and ceiling)
+		checkElevationBounds()
 
 		// Notify parent of position and rotation updates
 		if (onPositionUpdate) {
