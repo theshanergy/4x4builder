@@ -225,17 +225,12 @@ export function validateBiome(biome) {
 
 	// Validate water
 	if (biome.water) {
-		if (!biome.water.body) errors.push('Water must have body configuration')
-		if (!biome.water.depth) errors.push('Water must have depth configuration')
-		if (biome.water.body && biome.water.body.maxDepth === undefined) errors.push('Water body must have maxDepth')
-		if (biome.water.depth) {
-			const depthRequired = ['shorelineDepthThreshold', 'shallowDepthThreshold', 'maxVisibleDepth', 'edgeFadeDistance', 'waterColor']
-			depthRequired.forEach((prop) => {
-				if (biome.water.depth[prop] === undefined) {
-					errors.push(`Water depth must have ${prop}`)
-				}
-			})
-		}
+		const waterRequired = ['maxDepth', 'shorelineDepthThreshold', 'shallowDepthThreshold', 'maxVisibleDepth', 'edgeFadeDistance', 'waterColor']
+		waterRequired.forEach((prop) => {
+			if (biome.water[prop] === undefined) {
+				errors.push(`Water must have ${prop}`)
+			}
+		})
 	}
 
 	return {
@@ -273,16 +268,12 @@ export async function createDefaultBiome(name) {
 		},
 		vegetation: [],
 		water: {
-			body: {
-				maxDepth: 50,
-			},
-			depth: {
-				shorelineDepthThreshold: 2.5,
-				shallowDepthThreshold: 20.0,
-				maxVisibleDepth: 8.0,
-				edgeFadeDistance: 0.1,
-				waterColor: [0.0, 0.12, 0.06],
-			},
+			maxDepth: 50,
+			shorelineDepthThreshold: 2.5,
+			shallowDepthThreshold: 20.0,
+			maxVisibleDepth: 8.0,
+			edgeFadeDistance: 0.1,
+			waterColor: [0.0, 0.12, 0.06],
 		},
 	}
 }

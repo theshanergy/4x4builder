@@ -18,9 +18,9 @@ const GRADIENT_EPSILON = 0.01
  * @param {Object} waterConfig - Water configuration object from biome (optional)
  * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and isWater functions
  */
-export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { body: { maxDepth: 50 } }) => {
+export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { maxDepth: 50 }) => {
 	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnRadius, spawnTransitionRadius } = terrainConfig
-	const WATER_BODY_CONFIG = waterConfig.body
+	const WATER_BODY_CONFIG = waterConfig
 
 	const spawnRadiusSq = spawnRadius * spawnRadius
 	const transitionEndSq = spawnTransitionRadius * spawnTransitionRadius

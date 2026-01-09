@@ -40,7 +40,7 @@ export default {
 		// Spawn Area - flat safe zone that transitions to natural terrain
 		spawnRadius: 200,
 		spawnTransitionRadius: 2500,
-		
+
 		// Terrain Layers
 		layers: [
 			{
@@ -281,18 +281,11 @@ export default {
 
 	// Water configuration (appearance only)
 	water: {
-		// Water body configuration
-		body: {
-			maxDepth: 50,
-		},
-
-		// Per-tile water depth configuration
-		depth: {
-			shorelineDepthThreshold: 2.5,
-			shallowDepthThreshold: 20.0,
-			maxVisibleDepth: 8.0,
-			edgeFadeDistance: 0.1,
-			waterColor: [0.0, 0.12, 0.06],
-		},
+		maxDepth: 50,
+		shorelineDepthThreshold: 2.5,
+		shallowDepthThreshold: 20.0,
+		maxVisibleDepth: 8.0,
+		edgeFadeDistance: 0.1,
+		waterColor: [0.0, 0.12, 0.06],
 	},
 }

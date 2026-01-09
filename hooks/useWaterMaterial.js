@@ -14,7 +14,7 @@ import waterFragmentShader from '../shaders/water.frag.glsl'
  * This material is used by all water tiles.
  */
 const createWaterMaterial = (waterNormals, renderTarget, textureMatrix, waterConfig, envConfig) => {
-	const WATER_DEPTH_CONFIG = waterConfig.depth
+	const WATER_DEPTH_CONFIG = waterConfig
 	const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = envConfig
 	const waveUniforms = getWaveUniforms()
 
