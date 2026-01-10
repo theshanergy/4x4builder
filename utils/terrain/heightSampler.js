@@ -123,8 +123,8 @@ export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { maxDe
 			const fadeFactor = (baseHeight - waterThreshold) / safetyMargin
 			height += Math.max(0, baseNoise) * 0.5 * fadeFactor // Only additive noise near water
 		}
-		// Below water threshold: no noise, lakes stay smooth
 
+		// Below water threshold: no noise, lakes stay smooth
 		height += mountainHeight
 
 		// === SPAWN AREA: Smooth transition from flat spawn to natural terrain ===
@@ -151,10 +151,10 @@ export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { maxDe
 		const dist = Math.sqrt(x * x + z * z)
 		const epsilon = dist > 500 ? GRADIENT_EPSILON * 4 : GRADIENT_EPSILON
 
-		const hL = getNormalizedHeight(x - epsilon, z) * baseHeightScale
-		const hR = getNormalizedHeight(x + epsilon, z) * baseHeightScale
-		const hD = getNormalizedHeight(x, z - epsilon) * baseHeightScale
-		const hU = getNormalizedHeight(x, z + epsilon) * baseHeightScale
+		const hL = getWorldHeight(x - epsilon, z)
+		const hR = getWorldHeight(x + epsilon, z)
+		const hD = getWorldHeight(x, z - epsilon)
+		const hU = getWorldHeight(x, z + epsilon)
 
 		const dhdx = (hR - hL) / (2 * epsilon)
 		const dhdz = (hU - hD) / (2 * epsilon)
@@ -169,24 +169,10 @@ export const createTerrainHelpers = (noise, terrainConfig, waterConfig = { maxDe
 		return getWorldHeight(x, z) < WATER_LEVEL
 	}
 
-	/**
-	 * Get continental value (for external use).
-	 * This is just the large-scale noise that drives land/water distribution.
-	 */
-	const getContinental = (x, z) => {
-		const warpX = noise.perlin2(x * continentScale * 0.7 + 50, z * continentScale * 0.7 + 50) * 800
-		const warpZ = noise.perlin2(x * continentScale * 0.7 + 150, z * continentScale * 0.7 + 150) * 800
-		const wx = x + warpX
-		const wz = z + warpZ
-
-		return noise.perlin2(wx * continentScale, wz * continentScale) * 0.7 + noise.perlin2(wx * continentScale * 2.5, wz * continentScale * 2.5) * 0.3
-	}
-
 	return {
 		getNormalizedHeight,
 		getWorldHeight,
 		getNormal,
-		getContinental,
 		isWater,
 		baseHeightScale,
 	}
