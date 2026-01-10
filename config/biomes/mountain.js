@@ -5,6 +5,7 @@
  */
 
 import { Vector3, Color } from 'three'
+import { createGrassMesh } from '../../utils/vegetation/grassMesh'
 
 export default {
 	name: 'Mountain',
@@ -61,49 +62,22 @@ export default {
 					albedo: '/assets/images/ground/wispy-grass-meadow_albedo.jpg',
 					normal: '/assets/images/ground/wispy-grass-meadow_normal.jpg',
 				},
-				textureScale: 0.5,
+				textureScale: 0.2,
 				normalScale: 1.0,
 				height: {
 					min: -1,
-					max: 60,
-					transitionMin: 3,
-					transitionMax: 65,
+					transitionMin: 1.0,
 					influence: 1.0,
 				},
 				slope: {
 					max: 0.03,
-					influence: 0.8,
+					influence: 0.6,
 					transition: 0.02,
 				},
 				lod: {
 					distance: 100,
 					levels: 3,
-				},
-			},
-			{
-				name: 'dirt',
-				textures: {
-					albedo: '/assets/images/ground/brown_mud_dry_diff_1k.jpg',
-					normal: '/assets/images/ground/brown_mud_dry_nor_gl_1k.jpg',
-				},
-				textureScale: 0.6,
-				normalScale: 1.0,
-				height: {
-					min: 50,
-					max: 150,
-					transitionMin: 45,
-					transitionMax: 155,
-					influence: 1.0,
-				},
-				slope: {
-					max: 0.005,
-					influence: 0.5,
-					transition: 0.005,
-				},
-				lod: {
-					distance: 70,
-					levels: 4,
-					scaleFactor: 3.5,
+					scaleFactor: 3,
 				},
 			},
 			{
@@ -115,8 +89,8 @@ export default {
 				textureScale: 0.025,
 				normalScale: 0.5,
 				height: {
-					min: 280,
-					transitionMin: 150.0,
+					min: 300,
+					transitionMin: 80.0,
 					influence: 1.0,
 				},
 				lod: {
@@ -129,6 +103,29 @@ export default {
 
 	// Vegetation configuration
 	vegetation: [
+		{
+			name: 'grass',
+			meshFactory: createGrassMesh, // Use procedural grass mesh factory
+			distance: {
+				min: 1, // Start placing outside flat spawn area
+				max: 100, // Match original viewDistance
+			},
+			scale: {
+				min: 1.0,
+				max: 1.2,
+			},
+			slope: {
+				min: 0.0,
+				max: 0.5, // Only on relatively flat areas (inverted from original 0.85 threshold)
+			},
+			height: {
+				min: -1,
+				max: 100,
+			},
+			density: 100000,
+			maxLod: 1,
+			collider: null, // No collider needed for grass
+		},
 		// Large Pine Trees
 		{
 			name: 'pine_large',

@@ -131,23 +131,13 @@
  */
 
 /**
- * @typedef {Object} WaterBody
+ * @typedef {Object} BiomeWater
  * @property {number} maxDepth - Maximum depth of water bodies
- */
-
-/**
- * @typedef {Object} WaterDepth
  * @property {number} shorelineDepthThreshold - Depth threshold for shoreline detection
  * @property {number} shallowDepthThreshold - Depth threshold for shallow water
  * @property {number} maxVisibleDepth - Maximum visible depth for rendering
  * @property {number} edgeFadeDistance - Distance over which water edges fade
  * @property {number[]} waterColor - RGB color values for water (0.0 to 1.0)
- */
-
-/**
- * @typedef {Object} BiomeWater
- * @property {WaterBody} body - Water body configuration
- * @property {WaterDepth} depth - Water depth and appearance configuration
  */
 
 /**
@@ -214,7 +204,6 @@ export function validateBiome(biome) {
 			// Model-based vegetation requires meshes and collider
 			if (veg.model && !veg.meshes) errors.push(`Vegetation ${idx} must have meshes`)
 			if (veg.model && !veg.collider) errors.push(`Vegetation ${idx} must have collider`)
-			if (veg.maxLod === undefined) errors.push(`Vegetation ${idx} must have maxLod`)
 			if (!veg.distance) errors.push(`Vegetation ${idx} must have distance`)
 			if (!veg.scale) errors.push(`Vegetation ${idx} must have scale`)
 			if (!veg.slope) errors.push(`Vegetation ${idx} must have slope`)
@@ -228,9 +217,20 @@ export function validateBiome(biome) {
 		const waterRequired = ['maxDepth', 'shorelineDepthThreshold', 'shallowDepthThreshold', 'maxVisibleDepth', 'edgeFadeDistance', 'waterColor']
 		waterRequired.forEach((prop) => {
 			if (biome.water[prop] === undefined) {
-				errors.push(`Water must have ${prop}`)
+				errors.push(`Water.${prop} is required`)
 			}
 		})
+		// Validate waterColor is an array with 3 numbers
+		if (Array.isArray(biome.water.waterColor)) {
+			if (biome.water.waterColor.length !== 3) {
+				errors.push(`Water.waterColor must have exactly 3 values (RGB)`)
+			}
+			biome.water.waterColor.forEach((val, idx) => {
+				if (typeof val !== 'number' || val < 0 || val > 1) {
+					errors.push(`Water.waterColor[${idx}] must be a number between 0 and 1`)
+				}
+			})
+		}
 	}
 
 	return {
