@@ -151,13 +151,16 @@ const createGrassPatchGeometry = (config, patchSize = 0.5, bladeCount = 50) => {
  * Factory function that creates a grass patch mesh for use in the vegetation system.
  * Returns geometry and material that can be instanced across the terrain.
  *
+ * @param {Object} options - Configuration options
+ * @param {string} options.colorHex - Hex color for grass blades (default: '#c1ad79' for desert)
  * @returns {{ geometry: BufferGeometry, material: MeshStandardMaterial }}
  */
-export const createGrassMesh = () => {
+export const createGrassMesh = (options = {}) => {
+	const { colorHex = '#c1ad79' } = options
 	const geometry = createGrassPatchGeometry(BLADE_CONFIG)
 
 	const material = new MeshStandardMaterial({
-		color: new Color('#c1ad79'),
+		color: new Color(colorHex),
 		side: DoubleSide,
 		roughness: 1.0,
 		metalness: 0.0,

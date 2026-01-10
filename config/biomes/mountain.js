@@ -105,7 +105,7 @@ export default {
 	vegetation: [
 		{
 			name: 'grass',
-			meshFactory: createGrassMesh, // Use procedural grass mesh factory
+			meshFactory: () => createGrassMesh({ colorHex: '#3f4722' }), // Use procedural grass mesh factory with mountain green
 			distance: {
 				min: 1, // Start placing outside flat spawn area
 				max: 100, // Match original viewDistance
