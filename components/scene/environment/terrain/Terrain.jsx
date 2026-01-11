@@ -7,7 +7,8 @@ import useWaterMaterial from '../../../../hooks/useWaterMaterial'
 import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
 import useVegetation from '../../../../hooks/useVegetation'
 import useGameStore from '../../../../store/gameStore'
-import { useBiomeTerrain, useBiomeWater } from '../../../../hooks/useBiome'
+import TERRAIN_CONFIG from '../../../../config/terrain'
+import WATER_CONFIG from '../../../../config/water'
 import TerrainCollider from './TerrainCollider'
 import TerrainTile from './TerrainTile'
 
@@ -16,15 +17,11 @@ const Terrain = () => {
 	// Use quadtree LOD system
 	const leafTiles = useTerrainQuadtree()
 
-	// Get current biome configs
-	const terrainConfig = useBiomeTerrain()
-	const waterConfig = useBiomeWater()
-
-	// Generate noise instance with seed from biome config
-	const noise = useMemo(() => new Noise(terrainConfig.seed), [terrainConfig.seed])
+	// Generate noise instance with seed from config
+	const noise = useMemo(() => new Noise(TERRAIN_CONFIG.seed), [TERRAIN_CONFIG.seed])
 
 	// Create shared terrain helpers (height/normal sampling)
-	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, terrainConfig, waterConfig), [noise, terrainConfig, waterConfig])
+	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, TERRAIN_CONFIG, WATER_CONFIG), [noise, TERRAIN_CONFIG, WATER_CONFIG])
 
 	// Register terrain functions in the game store
 	useEffect(() => {

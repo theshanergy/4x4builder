@@ -1,9 +1,10 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Environment } from '@react-three/drei'
-import { BackSide, Vector3 } from 'three'
+import { BackSide } from 'three'
 
-import { useBiomeEnvironment } from '../../../hooks/useBiome'
+import ENVIRONMENT_CONFIG from '../../../config/environment'
+
 import skyVertexShader from '../../../shaders/sky.vert.glsl'
 import skyFragmentShader from '../../../shaders/sky.frag.glsl'
 
@@ -14,8 +15,8 @@ const AtmosphericSky = () => {
 	const meshRef = useRef()
 	const materialRef = useRef()
 
-	// Get biome-specific environment config
-	const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = useBiomeEnvironment()
+	// Get environment config
+	const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = ENVIRONMENT_CONFIG
 
 	const uniforms = useMemo(
 		() => ({

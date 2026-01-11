@@ -1,5 +1,5 @@
 import { Vector3, Vector2 } from 'three'
-import { WATER_LEVEL } from '../../config/water'
+import WATER_CONFIG from '../../config/water'
 
 // Gerstner wave configuration
 export const WAVES = [
@@ -78,5 +78,5 @@ export const getWaveInfo = (x, z, time, depth = Infinity) => {
  */
 export const getWaterHeight = (x, z, time, depth = Infinity) => {
 	const waveInfo = getWaveInfo(x, z, time, depth)
-	return WATER_LEVEL + waveInfo.position.y
+	return WATER_CONFIG.level + waveInfo.position.y
 }

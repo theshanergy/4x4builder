@@ -1,38 +1,39 @@
 import { useRef, useMemo } from 'react'
 import { useFrame, useLoader } from '@react-three/fiber'
 import { Vector3, NormalBlending, TextureLoader, Quaternion } from 'three'
-import { WATER_LEVEL } from '../../../config/water'
+import WATER_CONFIG from '../../../config/water'
 
 // Configuration values only - no behavior
-const WATER_CONFIG = {
-	maxParticles: 500,
-	spawnMin: 1,
-	spawnMax: 16,
-	spawnMultiplier: 0.5,
-	maxSpeed: 2.0,
-	speedMultiplier: 0.15,
-	upwardVariance: 1.5,
-	randomness: 0.2,
-	lifetimeMin: 0.4,
-	lifetimeMax: 0.8,
-	sizeMin: 0.05,
-	sizeRange: 0.15,
-}
-
-const DUST_CONFIG = {
-	maxParticles: 500,
-	spawnMin: 1,
-	spawnMax: 4,
-	spawnMultiplier: 0.3,
-	maxSpeed: 1.5,
-	speedMultiplier: 0.08,
-	upwardMultiplier: 0.4,
-	upwardVariance: 0.5,
-	randomness: 0.3,
-	lifetimeMin: 1.5,
-	lifetimeMax: 3.5,
-	sizeMin: 1.5,
-	sizeRange: 2.5,
+const PARTICLE_CONFIG = {
+	water: {
+		maxParticles: 500,
+		spawnMin: 1,
+		spawnMax: 16,
+		spawnMultiplier: 0.5,
+		maxSpeed: 2.0,
+		speedMultiplier: 0.15,
+		upwardVariance: 1.5,
+		randomness: 0.2,
+		lifetimeMin: 0.4,
+		lifetimeMax: 0.8,
+		sizeMin: 0.05,
+		sizeRange: 0.15,
+	},
+	dust: {
+		maxParticles: 500,
+		spawnMin: 1,
+		spawnMax: 4,
+		spawnMultiplier: 0.3,
+		maxSpeed: 1.5,
+		speedMultiplier: 0.08,
+		upwardMultiplier: 0.4,
+		upwardVariance: 0.5,
+		randomness: 0.3,
+		lifetimeMin: 1.5,
+		lifetimeMax: 3.5,
+		sizeMin: 1.5,
+		sizeRange: 2.5,
+	},
 }
 
 // Shared vertex shader
@@ -103,8 +104,8 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 	const dustGeomRef = useRef()
 
 	// Particle systems
-	const waterSystem = useRef(createParticleSystem(WATER_CONFIG.maxParticles))
-	const dustSystem = useRef(createParticleSystem(DUST_CONFIG.maxParticles))
+	const waterSystem = useRef(createParticleSystem(PARTICLE_CONFIG.water.maxParticles))
+	const dustSystem = useRef(createParticleSystem(PARTICLE_CONFIG.dust.maxParticles))
 
 	// Track wheel state
 	const prevWheelRotations = useRef(wheelRefs.map(() => 0))
@@ -117,13 +118,13 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 
 	// Spawn water particles at water surface intersection
 	const spawnWaterParticles = (system, angularVel, wheelCenterY, spawnX, spawnZ) => {
-		const cfg = WATER_CONFIG
+		const cfg = PARTICLE_CONFIG.water
 		const spinRate = Math.abs(angularVel)
 		const spinDir = angularVel >= 0 ? 1 : -1
 		const count = Math.min(cfg.spawnMax, Math.max(cfg.spawnMin, (spinRate * cfg.spawnMultiplier) | 0))
 
 		// Calculate tangent direction at water intersection
-		const depthBelowCenter = wheelCenterY - WATER_LEVEL
+		const depthBelowCenter = wheelCenterY - WATER_CONFIG.level
 		const horizontalOffset = Math.sqrt(Math.max(0, wheelRadius * wheelRadius - depthBelowCenter * depthBelowCenter))
 		const tangentUp = horizontalOffset / wheelRadius
 		const tangentForward = depthBelowCenter / wheelRadius
@@ -141,7 +142,7 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 			const lateralOffset = (Math.random() - 0.5) * wheelWidth
 			const i3 = i * 3
 			system.positions[i3] = spawnX + forwardDir.x * horizontalOffset * spinDir + rightDir.x * lateralOffset
-			system.positions[i3 + 1] = WATER_LEVEL
+			system.positions[i3 + 1] = WATER_CONFIG.level
 			system.positions[i3 + 2] = spawnZ + forwardDir.z * horizontalOffset * spinDir + rightDir.z * lateralOffset
 
 			// Velocity follows wheel tangent at intersection point
@@ -156,7 +157,7 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 
 	// Spawn dust particles behind wheel
 	const spawnDustParticles = (system, angularVel, spawnX, spawnY, spawnZ) => {
-		const cfg = DUST_CONFIG
+		const cfg = PARTICLE_CONFIG.dust
 		const spinRate = Math.abs(angularVel)
 		const spinDir = angularVel >= 0 ? 1 : -1
 		const count = Math.min(cfg.spawnMax, Math.max(cfg.spawnMin, (spinRate * cfg.spawnMultiplier) | 0))
@@ -191,7 +192,7 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 	const updateWaterSystem = (system, geomRef, delta) => {
 		if (system.activeCount === 0) return
 
-		const cfg = WATER_CONFIG
+		const cfg = PARTICLE_CONFIG.water
 		let activeCount = 0
 
 		for (let i = 0; i < cfg.maxParticles; i++) {
@@ -233,7 +234,7 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 	const updateDustSystem = (system, geomRef, delta) => {
 		if (system.activeCount === 0) return
 
-		const cfg = DUST_CONFIG
+		const cfg = PARTICLE_CONFIG.dust
 		let activeCount = 0
 
 		for (let i = 0; i < cfg.maxParticles; i++) {
@@ -305,8 +306,8 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 			const wheelCenterY = tempVec.y
 			const wheelBottomY = wheelCenterY - wheelRadius
 			const wheelTopY = wheelCenterY + wheelRadius
-			const inWater = wheelBottomY < WATER_LEVEL
-			const fullySubmerged = wheelTopY < WATER_LEVEL
+			const inWater = wheelBottomY < WATER_CONFIG.level
+			const fullySubmerged = wheelTopY < WATER_CONFIG.level
 			const onGround = controller.wheelIsInContact(wi)
 
 			// Water spray when partially submerged
@@ -333,9 +334,9 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 			{/* Water particles */}
 			<points frustumCulled={false}>
 				<bufferGeometry ref={waterGeomRef}>
-					<bufferAttribute attach='attributes-position' count={WATER_CONFIG.maxParticles} array={waterSystem.current.positions} itemSize={3} />
-					<bufferAttribute attach='attributes-size' count={WATER_CONFIG.maxParticles} array={waterSystem.current.sizes} itemSize={1} />
-					<bufferAttribute attach='attributes-opacity' count={WATER_CONFIG.maxParticles} array={waterSystem.current.opacities} itemSize={1} />
+					<bufferAttribute attach='attributes-position' count={PARTICLE_CONFIG.water.maxParticles} array={waterSystem.current.positions} itemSize={3} />
+					<bufferAttribute attach='attributes-size' count={PARTICLE_CONFIG.water.maxParticles} array={waterSystem.current.sizes} itemSize={1} />
+					<bufferAttribute attach='attributes-opacity' count={PARTICLE_CONFIG.water.maxParticles} array={waterSystem.current.opacities} itemSize={1} />
 				</bufferGeometry>
 				<shaderMaterial transparent depthWrite={false} blending={NormalBlending} vertexShader={PARTICLE_VERTEX_SHADER} fragmentShader={WATER_FRAGMENT_SHADER} />
 			</points>
@@ -343,9 +344,9 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 			{/* Dust particles */}
 			<points frustumCulled={false}>
 				<bufferGeometry ref={dustGeomRef}>
-					<bufferAttribute attach='attributes-position' count={DUST_CONFIG.maxParticles} array={dustSystem.current.positions} itemSize={3} />
-					<bufferAttribute attach='attributes-size' count={DUST_CONFIG.maxParticles} array={dustSystem.current.sizes} itemSize={1} />
-					<bufferAttribute attach='attributes-opacity' count={DUST_CONFIG.maxParticles} array={dustSystem.current.opacities} itemSize={1} />
+					<bufferAttribute attach='attributes-position' count={PARTICLE_CONFIG.dust.maxParticles} array={dustSystem.current.positions} itemSize={3} />
+					<bufferAttribute attach='attributes-size' count={PARTICLE_CONFIG.dust.maxParticles} array={dustSystem.current.sizes} itemSize={1} />
+					<bufferAttribute attach='attributes-opacity' count={PARTICLE_CONFIG.dust.maxParticles} array={dustSystem.current.opacities} itemSize={1} />
 				</bufferGeometry>
 				<shaderMaterial
 					transparent

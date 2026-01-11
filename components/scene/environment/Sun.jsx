@@ -2,15 +2,15 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
-import { useBiomeEnvironment } from '../../../hooks/useBiome'
+import ENVIRONMENT_CONFIG from '../../../config/environment'
 
 // Sun directional sun that follows camera target
 const Sun = () => {
 	const sunRef = useRef()
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 
-	// Get biome-specific environment config
-	const { sunDirection, sunColor } = useBiomeEnvironment()
+	// Get environment config
+	const { sunDirection, sunColor } = ENVIRONMENT_CONFIG
 
 	useFrame(() => {
 		const sun = sunRef.current

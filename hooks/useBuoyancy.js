@@ -1,7 +1,9 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3, Quaternion } from 'three'
-import { WATER_LEVEL, BUOYANCY_CONFIG } from '../config/water'
+
+import WATER_CONFIG from '../config/water'
+import BUOYANCY_CONFIG from '../config/buoyancy'
 import { vehicleState } from '../store/gameStore'
 
 /**
@@ -25,7 +27,7 @@ const useBuoyancy = (vehicleRef) => {
 		if (!vehicle) return
 
 		const vehiclePos = vehicle.translation()
-		const submersionDepth = WATER_LEVEL - vehiclePos.y
+		const submersionDepth = WATER_CONFIG.level - vehiclePos.y
 
 		if (submersionDepth > 0) {
 			vehicleState.isInWater = true

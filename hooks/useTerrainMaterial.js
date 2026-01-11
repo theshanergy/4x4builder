@@ -1,7 +1,8 @@
 import { useMemo, useEffect } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { RepeatWrapping, MeshStandardMaterial, TextureLoader } from 'three'
-import { useBiomeTerrain } from './useBiome'
+
+import TERRAIN_CONFIG from '../config/terrain'
 
 // Uniform field definitions - maps layer properties to shader uniform names and values
 const UNIFORM_FIELDS = [
@@ -244,8 +245,8 @@ const generateNormalBlendingCode = (layers) => {
  * @returns {THREE.MeshStandardMaterial} Shared terrain material instance
  */
 const useTerrainMaterial = () => {
-	// Get biome-specific terrain config
-	const terrainConfig = useBiomeTerrain()
+	// Get terrain config
+	const terrainConfig = TERRAIN_CONFIG
 	const TERRAIN_LAYERS = terrainConfig.layers
 
 	// Build texture paths array from layer config

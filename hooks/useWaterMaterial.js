@@ -2,8 +2,8 @@ import { useMemo, useRef, useEffect } from 'react'
 import { useLoader, useFrame, useThree } from '@react-three/fiber'
 import { TextureLoader, RepeatWrapping, ShaderMaterial, Color, Vector3, Matrix4, Plane, Vector4, PerspectiveCamera, WebGLRenderTarget, FrontSide } from 'three'
 
-import { WATER_LEVEL } from '../config/water'
-import { useBiomeWater, useBiomeEnvironment } from './useBiome'
+import WATER_CONFIG from '../config/water'
+import ENVIRONMENT_CONFIG from '../config/environment'
 import { getWaveUniforms } from '../utils/water/wavePhysics'
 
 import waterVertexShader from '../shaders/water.vert.glsl'
@@ -17,10 +17,6 @@ import waterFragmentShader from '../shaders/water.frag.glsl'
  */
 const useWaterMaterial = () => {
 	const { gl, scene, camera } = useThree()
-
-	// Get biome-specific configs
-	const waterConfig = useBiomeWater()
-	const envConfig = useBiomeEnvironment()
 
 	// Load water normal texture
 	const waterNormals = useLoader(TextureLoader, '/assets/images/ground/water_normal.jpg')
@@ -36,7 +32,7 @@ const useWaterMaterial = () => {
 		mirrorCamera: null,
 		textureMatrix: null,
 		// Scratch vectors for reflection calculation
-		mirrorWorldPosition: new Vector3(0, WATER_LEVEL, 0),
+		mirrorWorldPosition: new Vector3(0, WATER_CONFIG.level, 0),
 		cameraWorldPosition: new Vector3(),
 		normal: new Vector3(0, 1, 0), // Water surface normal (up)
 		view: new Vector3(),
@@ -65,7 +61,7 @@ const useWaterMaterial = () => {
 	// Create shared water material
 	const waterMaterial = useMemo(() => {
 		const refs = reflectionRefs.current
-		const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = envConfig
+		const { sunDirection, sunColor, skyColorZenith, skyColorHorizon } = ENVIRONMENT_CONFIG
 		const waveUniforms = getWaveUniforms()
 
 		return new ShaderMaterial({
@@ -83,7 +79,7 @@ const useWaterMaterial = () => {
 				sunColor: { value: sunColor.clone() },
 				sunDirection: { value: sunDirection.clone() },
 				eye: { value: new Vector3() },
-				waterColor: { value: new Color(waterConfig.waterColor[0], waterConfig.waterColor[1], waterConfig.waterColor[2]) },
+				waterColor: { value: new Color(WATER_CONFIG.waterColor[0], WATER_CONFIG.waterColor[1], WATER_CONFIG.waterColor[2]) },
 
 				// Sky colors for reflection fallback
 				skyColor: { value: skyColorZenith.clone() },
@@ -97,12 +93,12 @@ const useWaterMaterial = () => {
 				offsetZ: { value: 0 },
 
 				// Depth-based wave modulation
-				shorelineDepthThreshold: { value: waterConfig.shorelineDepthThreshold },
-				shallowDepthThreshold: { value: waterConfig.shallowDepthThreshold },
+				shorelineDepthThreshold: { value: WATER_CONFIG.shorelineDepthThreshold },
+				shallowDepthThreshold: { value: WATER_CONFIG.shallowDepthThreshold },
 
 				// Depth-based visual effects
-				maxVisibleDepth: { value: waterConfig.maxVisibleDepth },
-				edgeFadeDistance: { value: waterConfig.edgeFadeDistance },
+				maxVisibleDepth: { value: WATER_CONFIG.maxVisibleDepth },
+				edgeFadeDistance: { value: WATER_CONFIG.edgeFadeDistance },
 			},
 			lights: false,
 			fog: false,
@@ -110,7 +106,7 @@ const useWaterMaterial = () => {
 			transparent: true,
 			depthWrite: false,
 		})
-	}, [waterNormals, waterConfig, envConfig])
+	}, [waterNormals, WATER_CONFIG, ENVIRONMENT_CONFIG])
 
 	// Store water material ref for cleanup
 	const waterMaterialRef = useRef(waterMaterial)
@@ -140,7 +136,7 @@ const useWaterMaterial = () => {
 		const refs = reflectionRefs.current
 
 		// Get current environment config for reflection clear color
-		const { skyColorHorizon } = envConfig
+		const { skyColorHorizon } = ENVIRONMENT_CONFIG
 
 		// Update time uniform (always needed for wave animation)
 		waterMaterial.uniforms.time.value += delta
@@ -151,7 +147,7 @@ const useWaterMaterial = () => {
 		waterMaterial.uniforms.eye.value.copy(cameraWorldPosition)
 
 		// Skip reflection if camera is very far from water (> 1000 units)
-		const distanceToWater = Math.abs(cameraWorldPosition.y - WATER_LEVEL)
+		const distanceToWater = Math.abs(cameraWorldPosition.y - WATER_CONFIG.level)
 		if (distanceToWater > 1000) return
 
 		// Throttle reflection rendering
@@ -172,8 +168,8 @@ const useWaterMaterial = () => {
 
 		const { renderTarget, mirrorCamera, textureMatrix, mirrorWorldPosition, normal, view, target, lookAtPosition, rotationMatrix, mirrorPlane, clipPlane, q } = refs
 
-		// Water surface is at Y = WATER_LEVEL, facing up
-		mirrorWorldPosition.set(cameraWorldPosition.x, WATER_LEVEL, cameraWorldPosition.z)
+		// Water surface is at Y = WATER_CONFIG.level, facing up
+		mirrorWorldPosition.set(cameraWorldPosition.x, WATER_CONFIG.level, cameraWorldPosition.z)
 		normal.set(0, 1, 0)
 
 		// Check if camera is above water (only render reflection from above)

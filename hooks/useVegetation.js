@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Matrix4 } from 'three'
 import { useGLTF } from '@react-three/drei'
 
-import { useBiomeVegetation } from './useBiome'
+import VEGETATION_CONFIG from '../config/vegetation'
 
 /**
  * useVegetation Hook
@@ -19,19 +19,16 @@ import { useBiomeVegetation } from './useBiome'
  * @returns {Array|null} Array of vegetation type models, or null if not loaded
  */
 const useVegetation = () => {
-	// Get biome-specific vegetation config
-	const VEGETATION_TYPES = useBiomeVegetation()
-
 	// Extract unique GLTF models (filter out meshFactory-based vegetation)
 	const UNIQUE_MODELS = useMemo(() => {
 		const models = new Set()
-		VEGETATION_TYPES.forEach((type) => {
+		VEGETATION_CONFIG.forEach((type) => {
 			if (type.model && typeof type.model === 'string') {
 				models.add(type.model)
 			}
 		})
 		return Array.from(models)
-	}, [VEGETATION_TYPES])
+	}, [VEGETATION_CONFIG])
 
 	// Load all unique GLTF models using multiple hook calls (required by React hooks rules)
 	// useGLTF returns cached results after preload, so this is efficient
@@ -51,7 +48,7 @@ const useVegetation = () => {
 		})
 
 		// Process each vegetation type
-		const vegetationModels = VEGETATION_TYPES.map((type) => {
+		const vegetationModels = VEGETATION_CONFIG.map((type) => {
 			const lods = {}
 
 			// Handle meshFactory-based vegetation (e.g., procedural grass)
@@ -190,7 +187,7 @@ const useVegetation = () => {
 		}).filter(Boolean)
 
 		return vegetationModels
-	}, [gltfs, VEGETATION_TYPES])
+	}, [gltfs, VEGETATION_CONFIG])
 }
 
 export default useVegetation

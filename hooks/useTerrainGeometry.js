@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { BufferGeometry, BufferAttribute } from 'three'
 import { TILE_RESOLUTION } from '../config/lod'
-import { WATER_LEVEL } from '../config/water'
+import WATER_CONFIG from '../config/water'
 
 /**
  * Create geometry for a quadtree terrain tile.
@@ -156,8 +156,8 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				worldZForUV[vertIndex] = uvWorldZ
 
 				// Calculate water depth
-				if (height < WATER_LEVEL) {
-					depths[vertIndex] = WATER_LEVEL - height
+				if (height < WATER_CONFIG.level) {
+					depths[vertIndex] = WATER_CONFIG.level - height
 					hasWater = true
 				} else {
 					depths[vertIndex] = 0
@@ -290,7 +290,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				const localZ = worldZForUV[i] - originZ - halfSize
 
 				waterPositions[posIndex] = localX
-				waterPositions[posIndex + 1] = WATER_LEVEL
+				waterPositions[posIndex + 1] = WATER_CONFIG.level
 				waterPositions[posIndex + 2] = localZ
 
 				// Normal pointing up (waves added in shader)
