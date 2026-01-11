@@ -21,7 +21,7 @@ const Terrain = () => {
 	const noise = useMemo(() => new Noise(TERRAIN_CONFIG.seed), [TERRAIN_CONFIG.seed])
 
 	// Create shared terrain helpers (height/normal sampling)
-	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, TERRAIN_CONFIG, WATER_CONFIG), [noise, TERRAIN_CONFIG, WATER_CONFIG])
+	const terrainHelpers = useMemo(() => createTerrainHelpers(noise), [noise])
 
 	// Register terrain functions in the game store
 	useEffect(() => {
