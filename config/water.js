@@ -19,3 +19,13 @@ export const BUOYANCY_CONFIG = {
 	// Flow parameters
 	flowForce: 8.0, // Multiplier for flow force strength
 }
+
+// Water appearance configuration (from the desert biome)
+export const WATER_CONFIG = {
+	maxDepth: 50,
+	shorelineDepthThreshold: 2.5,
+	shallowDepthThreshold: 20.0,
+	maxVisibleDepth: 8.0,
+	edgeFadeDistance: 0.1,
+	waterColor: [0.0, 0.12, 0.06],
+}

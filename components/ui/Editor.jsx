@@ -1,7 +1,6 @@
 import vehicleConfigs from '../../config/vehicles'
 import EditorSection from './EditorSection'
 import useGameStore from '../../store/gameStore'
-import { getBiomeList } from '../../config/biomes'
 
 import VehicleIcon from '../../assets/images/icons/Vehicle.svg'
 import SuspensionIcon from '../../assets/images/icons/Suspension.svg'
@@ -21,8 +20,6 @@ function Editor() {
 	const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
 	const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 	const setCameraAutoRotate = useGameStore((state) => state.setCameraAutoRotate)
-	const currentBiome = useGameStore((state) => state.currentBiome)
-	const setBiome = useGameStore((state) => state.setBiome)
 
 	// Memoize vehicle config to avoid repeated lookups
 	const vehicleConfig = currentVehicle.body ? vehicleConfigs.vehicles[currentVehicle.body] : null
@@ -285,23 +282,6 @@ function Editor() {
 
 			{/* Scene */}
 			<EditorSection title='Scene' icon={<GearIcon className='icon' />}>
-				{/* Biome */}
-				<div className='field field-biome'>
-					<label>Biome</label>
-					<select
-						value={currentBiome}
-						onChange={(e) => {
-							setBiome(e.target.value)
-							e.target.blur()
-						}}>
-						{getBiomeList().map((biome) => (
-							<option key={biome.id} value={biome.id}>
-								{biome.name}
-							</option>
-						))}
-					</select>
-				</div>
-
 				{/* Auto Rotate */}
 				<div className='field field-camera-autorotate'>
 					<input type='checkbox' id='camera-autorotate' checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} />

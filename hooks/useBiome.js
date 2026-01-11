@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import useGameStore from '../store/gameStore'
-import { getBiome } from '../config/biomes'
+import { ENVIRONMENT_CONFIG } from '../config/environment'
+import { TERRAIN_CONFIG, VEGETATION_CONFIG } from '../config/terrain'
+import { WATER_CONFIG } from '../config/water'
 
 /**
  * Hook to get the current biome configuration.
@@ -9,10 +10,15 @@ import { getBiome } from '../config/biomes'
  * @returns {Object} The current biome configuration object
  */
 export const useBiome = () => {
-	const currentBiome = useGameStore((state) => state.currentBiome)
-
-	// Get biome config - memoized on biome name
-	return useMemo(() => getBiome(currentBiome), [currentBiome])
+	return useMemo(
+		() => ({
+			environment: ENVIRONMENT_CONFIG,
+			terrain: TERRAIN_CONFIG,
+			vegetation: VEGETATION_CONFIG,
+			water: WATER_CONFIG,
+		}),
+		[]
+	)
 }
 
 /**

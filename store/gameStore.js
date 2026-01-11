@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { produce } from 'immer'
 import { Vector3 } from 'three'
 import vehicleConfigs from '../config/vehicles'
-import { DEFAULT_BIOME, BIOMES } from '../config/biomes'
 
 // Compatibility shim for legacy localStorage data, mapping old vehicle id field to body
 const preprocessVehicleConfig = (config) => {
@@ -80,25 +79,6 @@ const useGameStore = create((set, get) => {
 		getTerrainNormal: null,
 		setTerrainHeightFunction: (fn) => set({ getTerrainHeight: fn }),
 		setTerrainNormalFunction: (fn) => set({ getTerrainNormal: fn }),
-
-		// Biome state
-		currentBiome: (() => {
-			const storedBiome = localStorage.getItem('currentBiome')
-			return storedBiome || DEFAULT_BIOME
-		})(),
-		setBiome: (biomeName) =>
-			set((state) => {
-				// Validate biome exists
-				if (!BIOMES[biomeName]) {
-					console.warn(`Biome "${biomeName}" not found, using default`)
-					return state
-				}
-
-				// Store in localStorage
-				localStorage.setItem('currentBiome', biomeName)
-
-				return { currentBiome: biomeName }
-			}),
 
 		// Saved vehicles
 		savedVehicles: (() => {
