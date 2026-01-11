@@ -18,7 +18,7 @@ const UPDATE_THRESHOLD = QUADTREE_MIN_SIZE / 2
  * Uses key-based re-creation since HeightfieldCollider doesn't support dynamic height updates.
  */
 const TerrainCollider = ({ terrainHelpers }) => {
-	const { getNormalizedHeight, baseHeightScale } = terrainHelpers
+	const { getHeight } = terrainHelpers
 
 	// Track current collider center position (snapped to grid)
 	const [colliderCenter, setColliderCenter] = useState({ x: 0, z: 0 })
@@ -36,13 +36,15 @@ const TerrainCollider = ({ terrainHelpers }) => {
 				const worldX = centerX + localX - halfSize
 				const worldZ = centerZ + localZ - halfSize
 
-				const normalizedHeight = getNormalizedHeight(worldX, worldZ)
-				heightSamples.push(normalizedHeight)
+				const height = getHeight(worldX, worldZ)
+				heightSamples.push(height)
 			}
 		}
 
-		return [TILE_RESOLUTION, TILE_RESOLUTION, heightSamples, { x: QUADTREE_MIN_SIZE, y: baseHeightScale, z: QUADTREE_MIN_SIZE }]
-	}, [colliderCenter, getNormalizedHeight, baseHeightScale])
+		// Scale parameter: size of the heightfield in world units
+		// Heights are already in world space, so Y scale is simply the max expected height range
+		return [TILE_RESOLUTION, TILE_RESOLUTION, heightSamples, { x: QUADTREE_MIN_SIZE, y: 1, z: QUADTREE_MIN_SIZE }]
+	}, [colliderCenter, getHeight])
 
 	// Update collider position based on vehicle position
 	useFrame(() => {

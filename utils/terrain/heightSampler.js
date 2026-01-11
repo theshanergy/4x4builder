@@ -16,7 +16,7 @@ const GRADIENT_EPSILON = 0.01
  * Uses a unified noise approach - one coherent function produces all terrain features.
  *
  * @param {Object} noise - Noise instance from noisejs
- * @returns {Object} Object with getNormalizedHeight, getWorldHeight, getNormal, and isWater functions
+ * @returns {Object} Object with getHeight, getNormal, and isWater functions
  */
 export const createTerrainHelpers = (noise) => {
 	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnRadius, spawnTransitionRadius } = TERRAIN_CONFIG
@@ -39,11 +39,16 @@ export const createTerrainHelpers = (noise) => {
 	 * Water is simply wherever terrain height < water level.
 	 * This eliminates shoreline artifacts from discontinuous functions.
 	 *
+	 * Each layer handles its own scaling:
+	 * - Layer 1 (Continental): Scaled to create proper water depth range
+	 * - Layer 2 (Base terrain): Scaled by baseHeightScale for rolling hills
+	 * - Layer 3 (Mountains): Scaled by maxMountainHeight for peaks
+	 *
 	 * @param {number} x - World X coordinate
 	 * @param {number} z - World Z coordinate
-	 * @returns {number} Normalized height value
+	 * @returns {number} Height value in world units
 	 */
-	const getNormalizedHeight = (x, z) => {
+	const getHeight = (x, z) => {
 		const distSq = x * x + z * z
 
 		// === SPAWN AREA: Flat spawn zone (check first for early return) ===
@@ -78,11 +83,13 @@ export const createTerrainHelpers = (noise) => {
 		const shorelineSharpness = 1.85 + shorelineVariation * 5.0 // Range (gentler to sharper)
 		continental = Math.sign(continental) * Math.pow(Math.abs(continental), 1.0 / shorelineSharpness)
 
-		// === LAYER 2: Base terrain variation ===
+		// === LAYER 2: Base terrain variation (rolling hills) ===
+		// Normalized noise (-1 to 1 range) scaled by baseHeightScale
 		const baseNoise =
-			noise.perlin2(x * noiseScale, z * noiseScale) * 0.6 +
+			(noise.perlin2(x * noiseScale, z * noiseScale) * 0.6 +
 			noise.perlin2(x * noiseScale * 2.2, z * noiseScale * 2.2) * 0.3 +
-			noise.perlin2(x * noiseScale * 4.5, z * noiseScale * 4.5) * 0.1
+			noise.perlin2(x * noiseScale * 4.5, z * noiseScale * 4.5) * 0.1) *
+			baseHeightScale
 
 		// === LAYER 3: Mountains (only where continental is high) ===
 		const inlandFactor = smoothstep(continental / 0.6)
@@ -94,25 +101,23 @@ export const createTerrainHelpers = (noise) => {
 		const mountainMask = noise.perlin2(x * mountainScale * 0.3 + 500, z * mountainScale * 0.3 + 500)
 		const mountainFactor = smoothstep((mountainMask + 0.3) / 0.8) * inlandFactor
 
-		const mountainHeight = ridgeNoise * mountainFactor * (maxMountainHeight / baseHeightScale)
+		// Mountains scaled by maxMountainHeight directly (no baseHeightScale needed)
+		const mountainHeight = ridgeNoise * mountainFactor * maxMountainHeight
 
 		// === COMBINE: Continental drives overall elevation ===
 		// Continental value directly sets base elevation (can go negative for lakes)
 		// Only add base noise variation when we're safely above water (prevents tiny lakes)
 		// Base noise adds rolling hills on land, mountains add peaks on high ground
-		// Continental multiplier calculated from desired max depth:
-		// maxDepth (in world units) / baseHeightScale gives normalized depth needed
-		const continentalMultiplier = (WATER_CONFIG.maxDepth + Math.abs(WATER_CONFIG.level)) / baseHeightScale
+		// Continental multiplier calculated from desired max depth (in world units)
+		const continentalMultiplier = WATER_CONFIG.maxDepth + Math.abs(WATER_CONFIG.level)
 		const baseHeight = continental * continentalMultiplier
 		let height = baseHeight
 
 		// Only apply fine-grained terrain variation well above water level
 		// Use a smooth fade so terrain doesn't suddenly become flat near water
-		// Water level is -1 (scaled by baseHeightScale=4, so -0.25 in normalized space)
-		// We want base terrain to be at least 0.2 above water before adding variation
-		const waterThreshold = -0.25 // WATER_CONFIG.level / baseHeightScale
-		const safetyMargin = 0.5 // Extra margin to prevent noise from creating tiny lakes
-		const minSafeHeight = waterThreshold + safetyMargin // -0.25 + 0.5 = 0.25
+		const waterThreshold = WATER_CONFIG.level // Water level in world units
+		const safetyMargin = 2.0 // Extra margin in world units to prevent noise from creating tiny lakes
+		const minSafeHeight = waterThreshold + safetyMargin
 
 		if (baseHeight > minSafeHeight) {
 			// Safely above water - apply full noise variation
@@ -137,23 +142,16 @@ export const createTerrainHelpers = (noise) => {
 	}
 
 	/**
-	 * Get terrain height in world units.
-	 */
-	const getWorldHeight = (x, z) => {
-		return getNormalizedHeight(x, z) * baseHeightScale
-	}
-
-	/**
 	 * Get terrain normal using numerical gradient.
 	 */
 	const getNormal = (x, z, target = new Vector3()) => {
 		const dist = Math.sqrt(x * x + z * z)
 		const epsilon = dist > 500 ? GRADIENT_EPSILON * 4 : GRADIENT_EPSILON
 
-		const hL = getWorldHeight(x - epsilon, z)
-		const hR = getWorldHeight(x + epsilon, z)
-		const hD = getWorldHeight(x, z - epsilon)
-		const hU = getWorldHeight(x, z + epsilon)
+		const hL = getHeight(x - epsilon, z)
+		const hR = getHeight(x + epsilon, z)
+		const hD = getHeight(x, z - epsilon)
+		const hU = getHeight(x, z + epsilon)
 
 		const dhdx = (hR - hL) / (2 * epsilon)
 		const dhdz = (hU - hD) / (2 * epsilon)
@@ -165,14 +163,12 @@ export const createTerrainHelpers = (noise) => {
 	 * Check if a position is in water (terrain below water level).
 	 */
 	const isWater = (x, z) => {
-		return getWorldHeight(x, z) < WATER_CONFIG.level
+		return getHeight(x, z) < WATER_CONFIG.level
 	}
 
 	return {
-		getNormalizedHeight,
-		getWorldHeight,
+		getHeight,
 		getNormal,
 		isWater,
-		baseHeightScale,
 	}
 }

@@ -28,7 +28,7 @@ const _normalScratch = new Vector3()
  * @returns {Array} Array of matrices for this cell
  */
 const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex) => {
-	const { getWorldHeight, getNormal } = terrainHelpers
+	const { getHeight, getNormal } = terrainHelpers
 	const { scale, slope, height, density } = config
 
 	const dummy = _scratchDummy
@@ -81,7 +81,7 @@ const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex)
 		const vegZ = minZ + random() * QUADTREE_MIN_SIZE
 
 		// Height check
-		const vegY = getWorldHeight(vegX, vegZ)
+		const vegY = getHeight(vegX, vegZ)
 		if (vegY < height.min || vegY > height.max) continue
 
 		// Slope check

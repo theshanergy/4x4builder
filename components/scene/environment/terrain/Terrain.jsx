@@ -8,7 +8,6 @@ import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
 import useVegetation from '../../../../hooks/useVegetation'
 import useGameStore from '../../../../store/gameStore'
 import TERRAIN_CONFIG from '../../../../config/terrain'
-import WATER_CONFIG from '../../../../config/water'
 import TerrainCollider from './TerrainCollider'
 import TerrainTile from './TerrainTile'
 
@@ -25,7 +24,7 @@ const Terrain = () => {
 
 	// Register terrain functions in the game store
 	useEffect(() => {
-		useGameStore.getState().setTerrainHeightFunction(terrainHelpers.getWorldHeight)
+		useGameStore.getState().setTerrainHeightFunction(terrainHelpers.getHeight)
 		useGameStore.getState().setTerrainNormalFunction(terrainHelpers.getNormal)
 	}, [terrainHelpers])
 

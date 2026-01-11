@@ -9,13 +9,12 @@ import WATER_CONFIG from '../config/water'
  * Also generates water geometry if terrain is below water level.
  *
  * @param {Object} node - Quadtree node with size, centerX, centerZ
- * @param {Object} terrainHelpers - Object with getRawHeight, getNormal, and baseHeightScale
+ * @param {Object} terrainHelpers - Object with getHeight and getNormal
  * @param {Object} edgeStitchInfo - Edge stitching configuration per direction
  * @returns {Object} Object containing { terrainGeometry, waterGeometry } (waterGeometry may be null)
  */
 const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 	return useMemo(() => {
-		const { baseHeightScale } = terrainHelpers
 		const { size, centerX, centerZ } = node
 		const resolution = TILE_RESOLUTION
 		const segments = resolution
@@ -35,7 +34,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		let hasWater = false
 
 		// Cache for height samples - avoids recomputing for normal calculation
-		// Layout: heightCache[j * sampleCount + i] = normalized height at grid position (i, j)
+		// Layout: heightCache[j * sampleCount + i] = world height at grid position (i, j)
 		const heightCache = new Float32Array(totalSamples)
 
 		// Track interpolated world coordinates for UVs
@@ -64,18 +63,18 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				const x1 = x0 + neighborStep
 				const t = (worldX - x0) / neighborStep
 
-				const h0 = terrainHelpers.getNormalizedHeight(x0, worldZ)
-				const h1 = terrainHelpers.getNormalizedHeight(x1, worldZ)
-				return (h0 * (1 - t) + h1 * t) * baseHeightScale
+				const h0 = terrainHelpers.getHeight(x0, worldZ)
+				const h1 = terrainHelpers.getHeight(x1, worldZ)
+				return h0 * (1 - t) + h1 * t
 			} else {
 				const gridZ = worldZ / neighborStep
 				const z0 = Math.floor(gridZ) * neighborStep
 				const z1 = z0 + neighborStep
 				const t = (worldZ - z0) / neighborStep
 
-				const h0 = terrainHelpers.getNormalizedHeight(worldX, z0)
-				const h1 = terrainHelpers.getNormalizedHeight(worldX, z1)
-				return (h0 * (1 - t) + h1 * t) * baseHeightScale
+				const h0 = terrainHelpers.getHeight(worldX, z0)
+				const h1 = terrainHelpers.getHeight(worldX, z1)
+				return h0 * (1 - t) + h1 * t
 			}
 		}
 
@@ -121,7 +120,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				if (stitchInfo) {
 					// Apply cached stitch parameters
 					height = getStitchedHeight(worldX, worldZ, stitchInfo.step, stitchInfo.axis)
-					heightCache[vertIndex] = height / baseHeightScale
+					heightCache[vertIndex] = height
 
 					// Snap UVs to coarse neighbor's grid points
 					// Water shader uses UVs for wave calculations
@@ -132,9 +131,8 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 					}
 				} else {
 					// No stitching needed - sample directly
-					const normalizedHeight = terrainHelpers.getNormalizedHeight(worldX, worldZ)
-					heightCache[vertIndex] = normalizedHeight
-					height = normalizedHeight * baseHeightScale
+					height = terrainHelpers.getHeight(worldX, worldZ)
+					heightCache[vertIndex] = height
 				}
 				const posIndex = vertIndex * 3
 				const uvIndex = vertIndex * 2
@@ -191,35 +189,35 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				// normals match between adjacent tiles. Interior uses cached heights.
 				if (onWestEdge) {
 					// Sample one step outside tile boundary to the west
-					hL = terrainHelpers.getNormalizedHeight(worldX - step, worldZ) * baseHeightScale
-					hR = heightCache[rowOffset + 1] * baseHeightScale
+					hL = terrainHelpers.getHeight(worldX - step, worldZ)
+					hR = heightCache[rowOffset + 1]
 					dx = 2 * step
 				} else if (onEastEdge) {
 					// Sample one step outside tile boundary to the east
-					hL = heightCache[rowOffset + segments - 1] * baseHeightScale
-					hR = terrainHelpers.getNormalizedHeight(worldX + step, worldZ) * baseHeightScale
+					hL = heightCache[rowOffset + segments - 1]
+					hR = terrainHelpers.getHeight(worldX + step, worldZ)
 					dx = 2 * step
 				} else {
 					// Interior vertex - use cached heights
-					hL = heightCache[rowOffset + i - 1] * baseHeightScale
-					hR = heightCache[rowOffset + i + 1] * baseHeightScale
+					hL = heightCache[rowOffset + i - 1]
+					hR = heightCache[rowOffset + i + 1]
 					dx = 2 * step
 				}
 
 				if (onSouthEdge) {
 					// Sample one step outside tile boundary to the south
-					hD = terrainHelpers.getNormalizedHeight(worldX, worldZ - step) * baseHeightScale
-					hU = heightCache[sampleCount + i] * baseHeightScale
+					hD = terrainHelpers.getHeight(worldX, worldZ - step)
+					hU = heightCache[sampleCount + i]
 					dz = 2 * step
 				} else if (onNorthEdge) {
 					// Sample one step outside tile boundary to the north
-					hD = heightCache[(segments - 1) * sampleCount + i] * baseHeightScale
-					hU = terrainHelpers.getNormalizedHeight(worldX, worldZ + step) * baseHeightScale
+					hD = heightCache[(segments - 1) * sampleCount + i]
+					hU = terrainHelpers.getHeight(worldX, worldZ + step)
 					dz = 2 * step
 				} else {
 					// Interior vertex - use cached heights
-					hD = heightCache[(j - 1) * sampleCount + i] * baseHeightScale
-					hU = heightCache[(j + 1) * sampleCount + i] * baseHeightScale
+					hD = heightCache[(j - 1) * sampleCount + i]
+					hU = heightCache[(j + 1) * sampleCount + i]
 					dz = 2 * step
 				}
 
