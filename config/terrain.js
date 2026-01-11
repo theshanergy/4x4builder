@@ -2,12 +2,12 @@ const TERRAIN_CONFIG = {
 	// Deterministic seed for terrain generation
 	seed: 1234,
 
-	// Height Scaling
-	baseHeightScale: 4,
+	// Base Terrain Layer (rolling hills)
+	baseFrequency: 0.04,
+	baseAmplitude: 4,
 
-	// Noise Scales
+	// Other Noise Scales
 	continentScale: 0.00007,
-	noiseScale: 0.04,
 	mountainScale: 0.001,
 
 	// Height Limits

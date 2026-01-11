@@ -19,7 +19,7 @@ const GRADIENT_EPSILON = 0.01
  * @returns {Object} Object with getHeight, getNormal, and isWater functions
  */
 export const createTerrainHelpers = (noise) => {
-	const { baseHeightScale, noiseScale, continentScale, mountainScale, maxMountainHeight, spawnRadius, spawnTransitionRadius } = TERRAIN_CONFIG
+	const { baseFrequency, baseAmplitude, continentScale, mountainScale, maxMountainHeight, spawnRadius, spawnTransitionRadius } = TERRAIN_CONFIG
 
 	const spawnRadiusSq = spawnRadius * spawnRadius
 	const transitionEndSq = spawnTransitionRadius * spawnTransitionRadius
@@ -41,7 +41,7 @@ export const createTerrainHelpers = (noise) => {
 	 *
 	 * Each layer handles its own scaling:
 	 * - Layer 1 (Continental): Scaled to create proper water depth range
-	 * - Layer 2 (Base terrain): Scaled by baseHeightScale for rolling hills
+	 * - Layer 2 (Base terrain): Frequency and amplitude for rolling hills
 	 * - Layer 3 (Mountains): Scaled by maxMountainHeight for peaks
 	 *
 	 * @param {number} x - World X coordinate
@@ -84,12 +84,12 @@ export const createTerrainHelpers = (noise) => {
 		continental = Math.sign(continental) * Math.pow(Math.abs(continental), 1.0 / shorelineSharpness)
 
 		// === LAYER 2: Base terrain variation (rolling hills) ===
-		// Normalized noise (-1 to 1 range) scaled by baseHeightScale
+		// Normalized noise (-1 to 1 range) scaled by baseAmplitude
 		const baseNoise =
-			(noise.perlin2(x * noiseScale, z * noiseScale) * 0.6 +
-			noise.perlin2(x * noiseScale * 2.2, z * noiseScale * 2.2) * 0.3 +
-			noise.perlin2(x * noiseScale * 4.5, z * noiseScale * 4.5) * 0.1) *
-			baseHeightScale
+			(noise.perlin2(x * baseFrequency, z * baseFrequency) * 0.6 +
+				noise.perlin2(x * baseFrequency * 2.2, z * baseFrequency * 2.2) * 0.3 +
+				noise.perlin2(x * baseFrequency * 4.5, z * baseFrequency * 4.5) * 0.1) *
+			baseAmplitude
 
 		// === LAYER 3: Mountains (only where continental is high) ===
 		const inlandFactor = smoothstep(continental / 0.6)
