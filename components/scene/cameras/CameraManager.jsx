@@ -42,12 +42,11 @@ export const CameraMode = {
 const CAMERA_MODES = [CameraMode.ORBIT, CameraMode.CHASE, CameraMode.FIRST_PERSON, CameraMode.DRONE]
 
 // Main camera manager - handles switching between camera modes
-const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
+const CameraManager = () => {
 	const cameraMode = useGameStore((state) => state.cameraMode)
 	const setCameraMode = useGameStore((state) => state.setCameraMode)
 	const infoMode = useGameStore((state) => state.infoMode)
 	const prevInfoMode = useRef(infoMode)
-	const camera = useThree((state) => state.camera)
 
 	// Get target object for cameras to follow
 	const target = useVehicleGroup()
@@ -93,7 +92,7 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 			return <DroneCamera />
 		case CameraMode.ORBIT:
 		default:
-			return <OrbitCamera followSpeed={followSpeed} minGroundDistance={minGroundDistance} transitionFromInfo={prevInfoMode.current} />
+			return <OrbitCamera transitionFromInfo={prevInfoMode.current} />
 	}
 }
 

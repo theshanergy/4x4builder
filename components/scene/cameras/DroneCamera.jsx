@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { Vector3, MathUtils, Euler } from 'three'
+import { Vector3, MathUtils } from 'three'
 import { useThree, useFrame } from '@react-three/fiber'
 import Drone from '../drone/Drone'
 

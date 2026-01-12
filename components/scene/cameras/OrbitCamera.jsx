@@ -8,7 +8,7 @@ import { dampVector3 } from '../../../utils/dampVector3'
 import useElevationBounds from '../../../hooks/useElevationBounds'
 
 // Orbit camera controller
-const OrbitCamera = ({ followSpeed, minGroundDistance, transitionFromInfo }) => {
+const OrbitCamera = ({ transitionFromInfo }) => {
 	const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
 	const camera = useThree((state) => state.camera)
@@ -19,7 +19,12 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, transitionFromInfo }) => 
 	const targetFov = 24 // Default FOV for orbit camera
 	const lastFov = useRef(camera.fov)
 
-	// Transition state
+	// Elevation bounds check
+	const followSpeed = 8
+	const minGroundDistance = 0.5
+	const maxGroundDistance = null // No upper limit
+
+	// Transition stateaw
 	const isTransitioning = useRef(false)
 	const transitionStartTime = useRef(0)
 	const startPos = useRef(new Vector3())
@@ -32,8 +37,8 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, transitionFromInfo }) => 
 		}
 	}, [transitionFromInfo, camera])
 
-	//
-	const checkElevationBounds = useElevationBounds(cameraPosition, minGroundDistance, targetWithOffset)
+	// Elevation bounds check
+	const checkElevationBounds = useElevationBounds(cameraPosition, minGroundDistance, maxGroundDistance, targetWithOffset)
 
 	// Initialize controls target to vehicle position to prevent swooping from origin
 	useEffect(() => {

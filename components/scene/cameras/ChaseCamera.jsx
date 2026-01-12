@@ -3,7 +3,6 @@ import { Vector3, MathUtils, Quaternion } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
 import { dampVector3 } from '../../../utils/dampVector3'
-import useElevationBounds from '../../../hooks/useElevationBounds'
 
 // Chase camera controller
 const ChaseCamera = ({ target }) => {
@@ -12,7 +11,6 @@ const ChaseCamera = ({ target }) => {
 	const currentPosition = useRef(camera.position.clone())
 	const currentLookAt = useRef(new Vector3(0, 0, -10).applyQuaternion(camera.quaternion).add(camera.position))
 
-	const minGroundDistance = 0.5
 	const targetFov = 24 // Default FOV for chase camera
 	const lastFov = useRef(camera.fov)
 
@@ -22,9 +20,6 @@ const ChaseCamera = ({ target }) => {
 	const idealOffset = useRef(new Vector3())
 	const idealLookAt = useRef(new Vector3())
 
-	// Elevation bounds check
-	const checkElevationBounds = useElevationBounds(currentPosition, minGroundDistance, idealLookAt)
-
 	useFrame((state, delta) => {
 		if (!target) return
 
@@ -33,7 +28,7 @@ const ChaseCamera = ({ target }) => {
 		target.getWorldQuaternion(tempQuat.current)
 
 		// Calculate ideal camera position (behind and up)
-		idealOffset.current.set(0, 3.5, -8)
+		idealOffset.current.set(0, 3, -10)
 		idealOffset.current.applyQuaternion(tempQuat.current)
 		idealOffset.current.add(tempVec.current)
 
@@ -57,9 +52,6 @@ const ChaseCamera = ({ target }) => {
 			camera.updateProjectionMatrix()
 			lastFov.current = newFov
 		}
-
-		// Elevation bounds logic using shared hook
-		checkElevationBounds()
 
 		// Update camera position
 		camera.position.copy(currentPosition.current)
