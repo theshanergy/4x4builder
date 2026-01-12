@@ -69,14 +69,6 @@ export const createTerrainHelpers = (noise) => {
 		// Ranges roughly -1 to 1, centered around 0
 		let continental = noise.perlin2(wx * continentScale, wz * continentScale) * 0.7 + noise.perlin2(wx * continentScale * 2.5, wz * continentScale * 2.5) * 0.3
 
-		// Bias terrain upward to reduce lake coverage (shift from ~50% water to ~20% water)
-		continental += 0.1
-
-		// Spawn area land guarantee - ensure spawn zone is always on land
-		if (dist < spawnRadius) {
-			continental = Math.max(continental, 0.3)
-		}
-
 		// Vary shoreline sharpness along the coast using continental noise
 		// This creates organic variation - some areas have sharp cliffs, others gentle slopes
 		const shorelineVariation = noise.perlin2(x * continentScale * 0.4 + 500, z * continentScale * 0.4 + 500)
