@@ -1,28 +1,24 @@
-// Unified terrain height sampler
-// Single coherent noise function produces all terrain features:
-// continents, mountains, valleys - without separate "feature" systems
-// Water is simply wherever terrain height < water level (no special casing)
+// Terrain Height Sampler
+// Generates terrain with a central valley and mountains on the sides.
+// Mountains appear in bands based on Z distance from origin.
 
 import { Vector3 } from 'three'
 
 import TERRAIN_CONFIG from '../../config/terrain'
 import WATER_CONFIG from '../../config/water'
+import { getRiverDepthFactor, getNearestValley } from './rivers'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
 
 /**
  * Creates terrain helper functions for height and normal sampling.
- * Uses a unified noise approach - one coherent function produces all terrain features.
  *
  * @param {Object} noise - Noise instance from noisejs
  * @returns {Object} Object with getHeight, getNormal, and isWater functions
  */
 export const createTerrainHelpers = (noise) => {
-	const { baseFrequency, baseAmplitude, continentScale, mountainScale, maxMountainHeight, spawnRadius, spawnTransitionRadius } = TERRAIN_CONFIG
-
-	const spawnRadiusSq = spawnRadius * spawnRadius
-	const transitionEndSq = spawnTransitionRadius * spawnTransitionRadius
+	const { baseFrequency, baseAmplitude, maxMountainHeight, mountainScale, mountainStartDistance, mountainTransitionWidth, spawnRadius } = TERRAIN_CONFIG
 
 	/**
 	 * Smoothstep interpolation (cubic hermite)
@@ -33,16 +29,12 @@ export const createTerrainHelpers = (noise) => {
 	}
 
 	/**
-	 * Get unified terrain height at any world position.
+	 * Get terrain height at any world position.
 	 *
-	 * Single continuous function - no land/water branching.
-	 * Water is simply wherever terrain height < water level.
-	 * This eliminates shoreline artifacts from discontinuous functions.
-	 *
-	 * Each layer handles its own scaling:
-	 * - Layer 1 (Continental): Scaled to create proper water depth range
-	 * - Layer 2 (Base terrain): Frequency and amplitude for rolling hills
-	 * - Layer 3 (Mountains): Scaled by maxMountainHeight for peaks
+	 * Layers:
+	 * - Base terrain: Rolling hills from FBM noise
+	 * - Mountains: Appear in bands based on Z distance, using ridge noise
+	 * - River carving: Cuts channels through terrain
 	 *
 	 * @param {number} x - World X coordinate
 	 * @param {number} z - World Z coordinate
@@ -50,84 +42,63 @@ export const createTerrainHelpers = (noise) => {
 	 */
 	const getHeight = (x, z) => {
 		const distSq = x * x + z * z
-
-		// === SPAWN AREA: Flat spawn zone (check first for early return) ===
-		if (distSq < spawnRadiusSq) {
-			return 0
-		}
-
 		const dist = Math.sqrt(distSq)
 
-		// === LAYER 1: Continental shape (very large scale) ===
-		// Domain warp for organic coastlines
-		const warpX = noise.perlin2(x * continentScale * 0.7 + 50, z * continentScale * 0.7 + 50) * 800
-		const warpZ = noise.perlin2(x * continentScale * 0.7 + 150, z * continentScale * 0.7 + 150) * 800
-		const wx = x + warpX
-		const wz = z + warpZ
-
-		// Continental noise - this is the primary driver of elevation
-		// Ranges roughly -1 to 1, centered around 0
-		let continental = noise.perlin2(wx * continentScale, wz * continentScale) * 0.7 + noise.perlin2(wx * continentScale * 2.5, wz * continentScale * 2.5) * 0.3
-
-		// Vary shoreline sharpness along the coast using continental noise
-		// This creates organic variation - some areas have sharp cliffs, others gentle slopes
-		const shorelineVariation = noise.perlin2(x * continentScale * 0.4 + 500, z * continentScale * 0.4 + 500)
-		const shorelineSharpness = 1.85 + shorelineVariation * 5.0 // Range (gentler to sharper)
-		continental = Math.sign(continental) * Math.pow(Math.abs(continental), 1.0 / shorelineSharpness)
-
-		// === LAYER 2: Base terrain variation (rolling hills) ===
-		// Normalized noise (-1 to 1 range) scaled by baseAmplitude
+		// === BASE TERRAIN: Rolling hills ===
 		const baseNoise =
 			(noise.perlin2(x * baseFrequency, z * baseFrequency) * 0.6 +
 				noise.perlin2(x * baseFrequency * 2.2, z * baseFrequency * 2.2) * 0.3 +
 				noise.perlin2(x * baseFrequency * 4.5, z * baseFrequency * 4.5) * 0.1) *
 			baseAmplitude
 
-		// === LAYER 3: Mountains (only where continental is high) ===
-		const inlandFactor = smoothstep(continental / 0.6)
+		// Regional height modulation - creates dispersed flatter areas
+		const regionNoise = noise.perlin2(x * 0.0003 + 100, z * 0.0003 + 100)
+		const regionModifier = 0.1 + (regionNoise + 1) * 0.45
 
-		const ridge1 = 1 - Math.abs(noise.perlin2(x * mountainScale, z * mountainScale))
-		const ridge2 = 1 - Math.abs(noise.perlin2(x * mountainScale * 1.8 + 100, z * mountainScale * 1.8 + 100))
-		const ridgeNoise = ridge1 * ridge1 * 0.6 + ridge2 * ridge2 * 0.4
+		let height = baseNoise * regionModifier
 
-		const mountainMask = noise.perlin2(x * mountainScale * 0.3 + 500, z * mountainScale * 0.3 + 500)
-		const mountainFactor = smoothstep((mountainMask + 0.3) / 0.8) * inlandFactor
+		// === MOUNTAINS: Based on distance from nearest valley center ===
+		const { distanceToValley: distFromValley } = getNearestValley(x, z, noise)
 
-		// Mountains scaled by maxMountainHeight directly (no baseHeightScale needed)
-		const mountainHeight = ridgeNoise * mountainFactor * maxMountainHeight
+		if (distFromValley > mountainStartDistance) {
+			let mountainBlend = 1
 
-		// === COMBINE: Continental drives overall elevation ===
-		// Continental value directly sets base elevation (can go negative for lakes)
-		// Only add base noise variation when we're safely above water (prevents tiny lakes)
-		// Base noise adds rolling hills on land, mountains add peaks on high ground
-		// Continental multiplier calculated from desired max depth (in world units)
-		const continentalMultiplier = WATER_CONFIG.maxDepth + Math.abs(WATER_CONFIG.level)
-		const baseHeight = continental * continentalMultiplier
-		let height = baseHeight
+			const mountainFullDist = mountainStartDistance + mountainTransitionWidth
+			if (distFromValley < mountainFullDist) {
+				// Smooth blend in transition zone
+				const t = (distFromValley - mountainStartDistance) / mountainTransitionWidth
+				mountainBlend = smoothstep(t)
+			}
 
-		// Only apply fine-grained terrain variation well above water level
-		// Use a smooth fade so terrain doesn't suddenly become flat near water
-		const waterThreshold = WATER_CONFIG.level // Water level in world units
-		const safetyMargin = 2.0 // Extra margin in world units to prevent noise from creating tiny lakes
-		const minSafeHeight = waterThreshold + safetyMargin
+			// Ridge noise for sharp peaks (original approach)
+			const ridge1 = 1 - Math.abs(noise.perlin2(x * mountainScale, z * mountainScale))
+			const ridge2 = 1 - Math.abs(noise.perlin2(x * mountainScale * 1.8 + 100, z * mountainScale * 1.8 + 100))
+			const ridgeNoise = ridge1 * ridge1 * 0.6 + ridge2 * ridge2 * 0.4
 
-		if (baseHeight > minSafeHeight) {
-			// Safely above water - apply full noise variation
-			height += baseNoise * 0.5
-		} else if (baseHeight > waterThreshold) {
-			// Near water - fade out noise to prevent creating tiny lakes
-			const fadeFactor = (baseHeight - waterThreshold) / safetyMargin
-			height += Math.max(0, baseNoise) * 0.5 * fadeFactor // Only additive noise near water
+			// Mountain mask - controls where mountains appear within the band
+			const mountainMask = noise.perlin2(x * mountainScale * 0.3 + 500, z * mountainScale * 0.3 + 500)
+			const mountainFactor = smoothstep((mountainMask + 0.3) / 0.8)
+
+			const mountainHeight = ridgeNoise * mountainFactor * mountainBlend * maxMountainHeight
+			height += mountainHeight
 		}
 
-		// Below water threshold: no noise, lakes stay smooth
-		height += mountainHeight
+		// === RIVER CARVING: Cut channels through terrain ===
+		const riverDepthFactor = getRiverDepthFactor(x, z, noise)
+		if (riverDepthFactor > 0) {
+			const riverDepth = 2.5
+			const varianceRetention = 1 - riverDepthFactor * 0.95
+			const carvedHeight = height * varianceRetention - riverDepthFactor * riverDepth
+			const riverBedFloor = WATER_CONFIG.level - riverDepth * 1.1
+			height = Math.max(carvedHeight, riverBedFloor)
+		}
 
-		// === SPAWN AREA: Smooth transition from flat spawn to natural terrain ===
-		if (distSq < transitionEndSq) {
-			const t = (dist - spawnRadius) / (spawnTransitionRadius - spawnRadius)
-			const blend = t * t * t * (t * (t * 6 - 15) + 10) // Quintic smoothstep
-			height *= blend // Blend from 0 (flat) to full terrain height
+		// === SPAWN AREA: Flat center with smooth blend to surrounding terrain ===
+		if (dist < spawnRadius) {
+			// Linear blend: 0 at center, 1 at spawnRadius edge
+			// At halfway point (spawnRadius/2), terrain is 50% height
+			const blend = dist / spawnRadius
+			height *= blend
 		}
 
 		return height

@@ -6,16 +6,16 @@ const TERRAIN_CONFIG = {
 	baseFrequency: 0.04,
 	baseAmplitude: 4,
 
-	// Other Noise Scales
-	continentScale: 0.00007,
-	mountainScale: 0.001,
-
 	// Height Limits
 	maxMountainHeight: 400,
+	mountainScale: 0.001,
+
+	// Mountain band configuration (where mountains appear based on Z distance)
+	mountainStartDistance: 500,
+	mountainTransitionWidth: 300,
 
 	// Spawn Area - flat safe zone that transitions to natural terrain
 	spawnRadius: 200,
-	spawnTransitionRadius: 2500,
 
 	// Terrain Layers
 	layers: [

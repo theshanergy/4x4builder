@@ -21,9 +21,9 @@ const Drone = ({ onPositionUpdate, onRotationUpdate }) => {
 	// Movement config
 	const config = {
 		// Movement speeds
-		moveSpeed: 20, // Horizontal movement speed
+		moveSpeed: 200, // Horizontal movement speed
 		boostMultiplier: 2.5, // Speed multiplier when boosting
-		verticalSpeed: 30, // Vertical movement speed
+		verticalSpeed: 300, // Vertical movement speed
 		acceleration: 2, // How fast we lerp to target speed
 
 		// Tilt (visual only)
@@ -39,7 +39,7 @@ const Drone = ({ onPositionUpdate, onRotationUpdate }) => {
 
 		// Limits
 		minElevation: 1.0,
-		maxElevation: 200, // Maximum height above terrain (meters)
+		maxElevation: 2000, // Maximum height above terrain (meters)
 
 		// Default pitch
 		defaultPitch: defaultPitch.current,
