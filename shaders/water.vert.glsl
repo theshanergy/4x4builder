@@ -9,6 +9,7 @@ varying float vCameraDistance;
 varying vec2 vFlowDir;
 
 #include <common>
+#include <fog_pars_vertex>
 
 uniform vec4 waveA;
 uniform vec4 waveB;
@@ -69,8 +70,10 @@ void main() {
 	vFlowDir = flowDir;
 
 	// Calculate camera distance for distance-based effects
-	vec4 viewPos = viewMatrix * worldPos;
-	vCameraDistance = length(viewPos.xyz);
+	vec4 mvPosition = viewMatrix * worldPos;
+	vCameraDistance = length(mvPosition.xyz);
 
-	gl_Position = projectionMatrix * viewMatrix * worldPos;
+	gl_Position = projectionMatrix * mvPosition;
+
+	#include <fog_vertex>
 }

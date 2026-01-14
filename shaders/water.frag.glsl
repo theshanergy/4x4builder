@@ -129,6 +129,7 @@ vec3 FinalColorProcess(vec3 color) {
 }
 
 #include <common>
+#include <fog_pars_fragment>
 
 void main() {
 
@@ -209,4 +210,5 @@ void main() {
 	gl_FragColor = vec4(outgoingLight, depthAlpha);
 
 	#include <tonemapping_fragment>
+	#include <fog_fragment>
 }

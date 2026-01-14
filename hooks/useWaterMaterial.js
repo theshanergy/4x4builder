@@ -1,6 +1,6 @@
 import { useMemo, useRef, useEffect } from 'react'
 import { useLoader, useFrame, useThree } from '@react-three/fiber'
-import { TextureLoader, RepeatWrapping, ShaderMaterial, Color, Vector3, Matrix4, Plane, Vector4, PerspectiveCamera, WebGLRenderTarget, FrontSide } from 'three'
+import { TextureLoader, RepeatWrapping, ShaderMaterial, Color, Vector3, Matrix4, Plane, Vector4, PerspectiveCamera, WebGLRenderTarget, FrontSide, UniformsLib } from 'three'
 
 import WATER_CONFIG from '../config/water'
 import ENVIRONMENT_CONFIG from '../config/environment'
@@ -68,6 +68,9 @@ const useWaterMaterial = () => {
 			vertexShader: waterVertexShader,
 			fragmentShader: waterFragmentShader,
 			uniforms: {
+				// Fog uniforms (required when fog: true)
+				...UniformsLib.fog,
+
 				// Water rendering uniforms
 				normalSampler: { value: waterNormals },
 				mirrorSampler: { value: refs.renderTarget.texture },
@@ -101,7 +104,7 @@ const useWaterMaterial = () => {
 				edgeFadeDistance: { value: WATER_CONFIG.edgeFadeDistance },
 			},
 			lights: false,
-			fog: false,
+			fog: true,
 			side: FrontSide,
 			transparent: true,
 			depthWrite: false,
