@@ -11,7 +11,7 @@ const TERRAIN_CONFIG = {
 	mountainScale: 0.001,
 
 	// Spawn Area - flat safe zone that transitions to natural terrain
-	spawnRadius: 200,
+	spawnRadius: 600,
 
 	// Terrain Layers
 	layers: [

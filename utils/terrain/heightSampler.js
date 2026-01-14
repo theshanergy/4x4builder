@@ -75,6 +75,15 @@ export const createTerrainHelpers = (noise) => {
 			height += mountainHeight
 		}
 
+		// === SPAWN AREA: Flat center with smooth blend to surrounding terrain ===
+		if (dist < spawnRadius) {
+			// S-curve blend: flat at center, smooth ascent, blends seamlessly at edge
+			// Using smoothstep creates smooth acceleration and deceleration
+			const t = dist / spawnRadius
+			const blend = smoothstep(t)
+			height *= blend
+		}
+
 		// === RIVER CARVING: Cut channels through terrain ===
 		const riverDepthFactor = getRiverDepthFactor(x, z, noise)
 		if (riverDepthFactor > 0) {
@@ -83,14 +92,6 @@ export const createTerrainHelpers = (noise) => {
 			const carvedHeight = height * varianceRetention - riverDepthFactor * riverDepth
 			const riverBedFloor = WATER_CONFIG.level - riverDepth * 1.1
 			height = Math.max(carvedHeight, riverBedFloor)
-		}
-
-		// === SPAWN AREA: Flat center with smooth blend to surrounding terrain ===
-		if (dist < spawnRadius) {
-			// Linear blend: 0 at center, 1 at spawnRadius edge
-			// At halfway point (spawnRadius/2), terrain is 50% height
-			const blend = dist / spawnRadius
-			height *= blend
 		}
 
 		return height

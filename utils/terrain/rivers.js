@@ -3,7 +3,19 @@
 
 import RIVER_CONFIG from '../../config/rivers.js'
 
-const { valleySpacing, valleySpacingVariation, mountainTransitionWidth, primaryFrequency, primaryAmplitude, secondaryFrequency, secondaryAmplitude, tertiaryAmplitude, width, widthVariation, bankSlope } = RIVER_CONFIG
+const {
+	valleySpacing,
+	valleySpacingVariation,
+	mountainTransitionWidth,
+	primaryFrequency,
+	primaryAmplitude,
+	secondaryFrequency,
+	secondaryAmplitude,
+	tertiaryAmplitude,
+	width,
+	widthVariation,
+	bankSlope,
+} = RIVER_CONFIG
 
 /**
  * Get the base Z position for a valley at a given index.
@@ -134,7 +146,7 @@ export const getRiverDepthFactor = (worldX, worldZ, noise) => {
  * Calculate mountain blend factor based on distance from valley center.
  * Returns 0 in the valley (near river), 1 in full mountain zones.
  * Mountains start at approximately valleySpacing/2 from river center.
- * 
+ *
  * @param {number} worldX - World X coordinate
  * @param {number} worldZ - World Z coordinate
  * @param {Object} noise - Noise instance
@@ -142,23 +154,23 @@ export const getRiverDepthFactor = (worldX, worldZ, noise) => {
  */
 export const getValleyFactor = (worldX, worldZ, noise) => {
 	const { distanceToValley } = getNearestValley(worldX, worldZ, noise)
-	
+
 	// Mountains start halfway between valleys (valleySpacing/2)
 	// Subtract transition width to begin the blend before full mountain zone
-	const mountainStartDistance = (valleySpacing / 2) - mountainTransitionWidth
-	
+	const mountainStartDistance = valleySpacing / 2 - mountainTransitionWidth
+
 	if (distanceToValley <= mountainStartDistance) {
 		// Inside valley - no mountains
 		return 0
 	}
-	
+
 	const mountainFullDistance = mountainStartDistance + mountainTransitionWidth
-	
+
 	if (distanceToValley >= mountainFullDistance) {
 		// Full mountain zone
 		return 1
 	}
-	
+
 	// Transition zone - smooth blend using smoothstep
 	const t = (distanceToValley - mountainStartDistance) / mountainTransitionWidth
 	return t * t * (3 - 2 * t) // smoothstep
