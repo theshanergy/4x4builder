@@ -175,3 +175,75 @@ export const getValleyFactor = (worldX, worldZ, noise) => {
 	const t = (distanceToValley - mountainStartDistance) / mountainTransitionWidth
 	return t * t * (3 - 2 * t) // smoothstep
 }
+
+/**
+ * Calculate the flow direction of the river at a given position.
+ * Flow direction is tangent to the river's meandering curve.
+ * @param {number} worldX - World X coordinate
+ * @param {number} noise - Noise instance
+ * @param {number} valleyIndex - Valley index for consistent calculations
+ * @returns {Object} Normalized flow direction vector {x, z}
+ */
+export const getRiverFlowDirection = (worldX, noise, valleyIndex) => {
+	// Calculate the derivative of the meander function to get tangent direction
+	// River path: Z = baseZ + sin(x * freq1) * amp1 + sin(x * freq2) * amp2 + noise * amp3
+	// dZ/dX = cos(x * freq1) * freq1 * amp1 + cos(x * freq2) * freq2 * amp2 + dNoise/dX * amp3
+
+	const epsilon = 0.1
+	const z1 = getRiverCenterZ(worldX - epsilon, noise)
+	const z2 = getRiverCenterZ(worldX + epsilon, noise)
+	
+	// Tangent vector in world space
+	const dx = epsilon * 2
+	const dz = z2 - z1
+	
+	// Normalize
+	const length = Math.sqrt(dx * dx + dz * dz)
+	return {
+		x: dx / length,
+		z: dz / length
+	}
+}
+
+/**
+ * Calculate river flow velocity at a given position.
+ * Flow velocity increases where river narrows (conservation of mass).
+ * Returns velocity magnitude and direction.
+ * @param {number} worldX - World X coordinate
+ * @param {number} worldZ - World Z coordinate
+ * @param {number} baseFlowSpeed - Base flow speed (m/s) for average width
+ * @param {Object} noise - Noise instance
+ * @returns {Object} {velocity: number, direction: {x, z}, strength: number}
+ */
+export const getRiverFlow = (worldX, worldZ, baseFlowSpeed = 3.0, noise) => {
+	const { distance, riverWidth, valleyIndex, riverCenterZ } = getDistanceToRiver(worldX, worldZ, noise)
+	const halfWidth = riverWidth / 2
+	
+	// Only calculate flow if we're in the river
+	if (distance > halfWidth) {
+		return { velocity: 0, direction: { x: 1, z: 0 }, strength: 0 }
+	}
+	
+	// Get flow direction (tangent to river path)
+	const direction = getRiverFlowDirection(worldX, noise, valleyIndex)
+	
+	// Calculate velocity based on river width (narrower = faster)
+	// Using continuity equation: A1*V1 = A2*V2
+	// Assume average width and calculate speed multiplier
+	const averageWidth = width
+	const widthRatio = averageWidth / riverWidth
+	// Velocity scales with width ratio, clamped for realism
+	const velocityMultiplier = Math.min(widthRatio * widthRatio, 3.0)
+	const velocity = baseFlowSpeed * velocityMultiplier
+	
+	// Flow strength decreases near banks (parabolic profile)
+	// Maximum at center, zero at banks
+	const centeredness = 1 - (distance / halfWidth)
+	const flowProfile = centeredness * centeredness // Parabolic
+	
+	return {
+		velocity,
+		direction,
+		strength: flowProfile
+	}
+}

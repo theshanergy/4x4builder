@@ -21,6 +21,9 @@ const RIVER_CONFIG = {
 	widthVariation: 15, // Random width variation
 	depth: 2.5, // Depth below WATER_LEVEL
 	bankSlope: 25, // Width of the sloped banks
+	
+	// River flow
+	baseFlowSpeed: 3.0, // Base flow speed in m/s at average width
 }
 
 export default RIVER_CONFIG

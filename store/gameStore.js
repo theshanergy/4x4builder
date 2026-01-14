@@ -77,8 +77,10 @@ const useGameStore = create((set, get) => {
 		// Terrain height/normal functions (set by terrain helpers)
 		getTerrainHeight: null,
 		getTerrainNormal: null,
+		noiseInstance: null, // Noise instance for terrain/river calculations
 		setTerrainHeightFunction: (fn) => set({ getTerrainHeight: fn }),
 		setTerrainNormalFunction: (fn) => set({ getTerrainNormal: fn }),
+		setNoiseInstance: (noise) => set({ noiseInstance: noise }),
 
 		// Saved vehicles
 		savedVehicles: (() => {

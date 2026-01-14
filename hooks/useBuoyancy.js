@@ -4,15 +4,20 @@ import { Vector3, Quaternion } from 'three'
 
 import WATER_CONFIG from '../config/water'
 import BUOYANCY_CONFIG from '../config/buoyancy'
-import { vehicleState } from '../store/gameStore'
+import RIVER_CONFIG from '../config/rivers'
+import useGameStore, { vehicleState } from '../store/gameStore'
+import { getRiverFlow } from '../utils/terrain/rivers'
 
 /**
  * Buoyancy hook for vehicle water physics
  * Automatically applies buoyancy forces each frame when vehicle is in water
- * Works with the procedural water body system (lakes, seas)
+ * Works with the procedural water body system (lakes, seas, and rivers)
  * @param {Object} vehicleRef - Reference to the vehicle rigid body
  */
 const useBuoyancy = (vehicleRef) => {
+	// Get noise instance for river flow calculations
+	const noiseInstance = useGameStore((state) => state.noiseInstance)
+
 	// Track water intake (0 = dry, 1 = full/sunk)
 	const waterIntake = useRef(0)
 
@@ -92,8 +97,23 @@ const useBuoyancy = (vehicleRef) => {
 			vec.set(-angvel.x * angDragFactor, -angvel.y * angDragFactor, -angvel.z * angDragFactor)
 			vehicle.applyTorqueImpulse(vec, true)
 
-			// Note: Water flow forces are not applied in procedural water bodies
-			// The lakes and seas are calm water without directional flow
+			// 5. Apply River Flow Forces (if in a river)
+			if (noiseInstance) {
+				const flow = getRiverFlow(vehiclePos.x, vehiclePos.z, RIVER_CONFIG.baseFlowSpeed, noiseInstance)
+				
+				if (flow.strength > 0) {
+					// Calculate flow force: F = flowForce * flowStrength * flowVelocity * mass
+					// Scaled by submersion (deeper = more force) and mass (heavier = more force)
+					const flowMagnitude = BUOYANCY_CONFIG.flowForce * flow.strength * flow.velocity * mass * submersionRatio * delta
+					
+					vec.set(
+						flow.direction.x * flowMagnitude,
+						0, // No vertical flow component
+						flow.direction.z * flowMagnitude
+					)
+					vehicle.applyImpulse(vec, true)
+				}
+			}
 		} else {
 			vehicleState.isInWater = false
 			// Drain water slowly when out of water

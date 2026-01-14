@@ -26,7 +26,8 @@ const Terrain = () => {
 	useEffect(() => {
 		useGameStore.getState().setTerrainHeightFunction(terrainHelpers.getHeight)
 		useGameStore.getState().setTerrainNormalFunction(terrainHelpers.getNormal)
-	}, [terrainHelpers])
+		useGameStore.getState().setNoiseInstance(noise)
+	}, [terrainHelpers, noise])
 
 	// Terrain material shared by all terrain tiles
 	const terrainMaterial = useTerrainMaterial()
