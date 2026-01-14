@@ -167,8 +167,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Get lights toggle function from store
 	const toggleLights = useGameStore((state) => state.toggleLights)
 
-	// Get terrain height function from store
-	const getTerrainHeight = useGameStore((state) => state.getTerrainHeight)
+	// Get terrain helpers from store
+	const terrainHelpers = useGameStore((state) => state.terrainHelpers)
+	const getTerrainHeight = terrainHelpers?.getHeight
 
 	// Reset vehicle function - rights the vehicle at its current location
 	const resetVehicle = useCallback(() => {

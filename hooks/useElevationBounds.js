@@ -14,7 +14,8 @@ import useGameStore from '../store/gameStore'
  * @returns {Function} Function to check and enforce elevation bounds
  */
 const useElevationBounds = (positionRef, minHeightAboveTerrain, maxHeightAboveTerrain = null, targetRef = null, velocityRef = null) => {
-	const getTerrainHeight = useGameStore((state) => state.getTerrainHeight)
+	const terrainHelpers = useGameStore((state) => state.terrainHelpers)
+	const getTerrainHeight = terrainHelpers?.getHeight
 
 	const checkElevationBounds = useCallback(() => {
 		// Use direct terrain height sampling if available (much faster than raycasting)

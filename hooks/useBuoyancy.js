@@ -15,8 +15,8 @@ import { getRiverFlow } from '../utils/terrain/rivers'
  * @param {Object} vehicleRef - Reference to the vehicle rigid body
  */
 const useBuoyancy = (vehicleRef) => {
-	// Get noise instance for river flow calculations
-	const noiseInstance = useGameStore((state) => state.noiseInstance)
+	// Get terrain helpers for river flow calculations
+	const terrainHelpers = useGameStore((state) => state.terrainHelpers)
 
 	// Track water intake (0 = dry, 1 = full/sunk)
 	const waterIntake = useRef(0)
@@ -98,14 +98,14 @@ const useBuoyancy = (vehicleRef) => {
 			vehicle.applyTorqueImpulse(vec, true)
 
 			// 5. Apply River Flow Forces (if in a river)
-			if (noiseInstance) {
-				const flow = getRiverFlow(vehiclePos.x, vehiclePos.z, noiseInstance)
-				
+			if (terrainHelpers?.getFlow) {
+				const flow = terrainHelpers.getFlow(vehiclePos.x, vehiclePos.z)
+
 				if (flow.strength > 0) {
 					// Calculate flow force: F = flowForce * flowStrength * flowVelocity * mass
 					// Scaled by submersion (deeper = more force) and mass (heavier = more force)
 					const flowMagnitude = BUOYANCY_CONFIG.flowForce * flow.strength * flow.velocity * mass * submersionRatio * delta
-					
+
 					vec.set(
 						flow.direction.x * flowMagnitude,
 						0, // No vertical flow component

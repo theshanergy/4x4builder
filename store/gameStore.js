@@ -74,13 +74,9 @@ const useGameStore = create((set, get) => {
 		setCameraMode: (mode) => set({ cameraMode: mode }),
 		setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
 
-		// Terrain height/normal functions (set by terrain helpers)
-		getTerrainHeight: null,
-		getTerrainNormal: null,
-		noiseInstance: null, // Noise instance for terrain/river calculations
-		setTerrainHeightFunction: (fn) => set({ getTerrainHeight: fn }),
-		setTerrainNormalFunction: (fn) => set({ getTerrainNormal: fn }),
-		setNoiseInstance: (noise) => set({ noiseInstance: noise }),
+		// Terrain helpers (set by terrain system)
+		terrainHelpers: null,
+		setTerrainHelpers: (helpers) => set({ terrainHelpers: helpers }),
 
 		// Saved vehicles
 		savedVehicles: (() => {

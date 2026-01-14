@@ -22,12 +22,10 @@ const Terrain = () => {
 	// Create shared terrain helpers (height/normal sampling)
 	const terrainHelpers = useMemo(() => createTerrainHelpers(noise), [noise])
 
-	// Register terrain functions in the game store
+	// Register terrain helpers in the game store
 	useEffect(() => {
-		useGameStore.getState().setTerrainHeightFunction(terrainHelpers.getHeight)
-		useGameStore.getState().setTerrainNormalFunction(terrainHelpers.getNormal)
-		useGameStore.getState().setNoiseInstance(noise)
-	}, [terrainHelpers, noise])
+		useGameStore.getState().setTerrainHelpers(terrainHelpers)
+	}, [terrainHelpers])
 
 	// Terrain material shared by all terrain tiles
 	const terrainMaterial = useTerrainMaterial()
