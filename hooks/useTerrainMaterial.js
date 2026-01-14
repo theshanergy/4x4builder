@@ -3,6 +3,7 @@ import { useLoader } from '@react-three/fiber'
 import { RepeatWrapping, MeshStandardMaterial, TextureLoader } from 'three'
 
 import TERRAIN_CONFIG from '../config/terrain'
+import { QUADTREE_VIEW_RANGE, QUADTREE_ROOT_SIZE } from '../config/lod'
 
 // Uniform field definitions - maps layer properties to shader uniform names and values
 const UNIFORM_FIELDS = [
@@ -282,6 +283,11 @@ const useTerrainMaterial = () => {
 		return { uniformDeclarations: declarations, uniforms, blendCalculations, samplingCode, colorBlending, normalBlending }
 	}, [TERRAIN_LAYERS])
 
+	// Distance fade configuration - terrain fades out at the edges of view distance
+	// Account for tile centers: outermost tiles extend half their size beyond the view range
+	const fadeEndDistance = QUADTREE_VIEW_RANGE * QUADTREE_ROOT_SIZE - QUADTREE_ROOT_SIZE * 0.5
+	const fadeStartDistance = fadeEndDistance * 0.75
+
 	// Shader customization callback
 	const onBeforeCompile = useMemo(() => {
 		if (!layerTextures) return () => {}
@@ -300,6 +306,10 @@ const useTerrainMaterial = () => {
 			Object.entries(shaderCode.uniforms).forEach(([key, value]) => {
 				shader.uniforms[key] = { value }
 			})
+
+			// Set distance fade uniforms
+			shader.uniforms.uFadeStartDistance = { value: fadeStartDistance }
+			shader.uniforms.uFadeEndDistance = { value: fadeEndDistance }
 
 			// Vertex shader - pass world position
 			shader.vertexShader = shader.vertexShader.replace(
@@ -322,6 +332,10 @@ const useTerrainMaterial = () => {
 				`#include <common>
 				// Layer uniforms (generated from config)
 				${shaderCode.uniformDeclarations}
+				// Distance fade uniforms
+				uniform float uFadeStartDistance;
+				uniform float uFadeEndDistance;
+
 				// Varyings
 				varying vec3 vWorldPos;
 				varying vec3 vWorldNormal;
@@ -384,8 +398,19 @@ const useTerrainMaterial = () => {
 					${shaderCode.normalBlending}
 				#endif`
 			)
+
+			// Add distance-based alpha fade at the end of the shader
+			shader.fragmentShader = shader.fragmentShader.replace(
+				'#include <dithering_fragment>',
+				`#include <dithering_fragment>
+
+				// Distance-based fade to hide terrain edges
+				float distanceToCamera = length(vWorldPos - cameraPosition);
+				float distanceFade = 1.0 - smoothstep(uFadeStartDistance, uFadeEndDistance, distanceToCamera);
+				gl_FragColor.a *= distanceFade;`
+			)
 		}
-	}, [layerTextures, shaderCode, TERRAIN_LAYERS])
+	}, [layerTextures, shaderCode, TERRAIN_LAYERS, fadeStartDistance, fadeEndDistance])
 
 	// We don't need map/normalMap props since all layers are sampled in custom shader code
 	// But we need a normalMap to trigger USE_NORMALMAP define, so pass the first layer's normal
@@ -394,7 +419,10 @@ const useTerrainMaterial = () => {
 	// Create and configure the material
 	const material = useMemo(() => {
 		if (!layerTextures || !baseNormal) return null
-		const mat = new MeshStandardMaterial({ normalMap: baseNormal })
+		const mat = new MeshStandardMaterial({
+			normalMap: baseNormal,
+			transparent: true,
+		})
 		mat.onBeforeCompile = onBeforeCompile
 		mat.needsUpdate = true
 		return mat

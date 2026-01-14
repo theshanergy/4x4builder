@@ -55,9 +55,12 @@ const useTerrainQuadtree = () => {
 		const centerRootX = Math.floor(centerPosition.x / QUADTREE_ROOT_SIZE)
 		const centerRootZ = Math.floor(centerPosition.z / QUADTREE_ROOT_SIZE)
 
-		// Generate roots in a grid around the camera's current root
+		// Generate roots in a circular pattern around the camera's current root
 		for (let rx = -QUADTREE_VIEW_RANGE; rx <= QUADTREE_VIEW_RANGE; rx++) {
 			for (let rz = -QUADTREE_VIEW_RANGE; rz <= QUADTREE_VIEW_RANGE; rz++) {
+				// Skip tiles outside circular range
+				if (rx * rx + rz * rz > QUADTREE_VIEW_RANGE * QUADTREE_VIEW_RANGE) continue
+
 				// Calculate root tile coordinates
 				const rootTileX = centerRootX + rx
 				const rootTileZ = centerRootZ + rz

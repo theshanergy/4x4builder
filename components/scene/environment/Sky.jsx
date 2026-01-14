@@ -4,6 +4,7 @@ import { Environment } from '@react-three/drei'
 import { BackSide } from 'three'
 
 import ENVIRONMENT_CONFIG from '../../../config/environment'
+import { QUADTREE_VIEW_RANGE, QUADTREE_ROOT_SIZE } from '../../../config/lod'
 
 import skyVertexShader from '../../../shaders/sky.vert.glsl'
 import skyFragmentShader from '../../../shaders/sky.frag.glsl'
@@ -29,7 +30,11 @@ const AtmosphericSky = () => {
 		[sunDirection, sunColor, skyColorZenith, skyColorHorizon]
 	)
 
-	const geometry = useMemo(() => {
+	const fogDistance = useMemo(() => {
+		return QUADTREE_VIEW_RANGE * QUADTREE_ROOT_SIZE - QUADTREE_ROOT_SIZE * 0.5
+	}, [])
+
+	const skyGeometry = useMemo(() => {
 		return [500, 8, 8]
 	}, [])
 
@@ -47,16 +52,18 @@ const AtmosphericSky = () => {
 	})
 
 	return (
-		<group>
+		<>
 			<Environment files='assets/images/envmap/rustig_koppie_puresky_1k.hdr' environmentIntensity={0.3} />
 
 			<ambientLight intensity={2.0} color={skyColorZenith} />
 
+			<fog attach='fog' args={[skyColorHorizon, fogDistance * 0.5, fogDistance]} />
+
 			<mesh ref={meshRef} frustumCulled={false}>
-				<sphereGeometry args={geometry} />
+				<sphereGeometry args={skyGeometry} />
 				<shaderMaterial ref={materialRef} uniforms={uniforms} vertexShader={skyVertexShader} fragmentShader={skyFragmentShader} side={BackSide} depthWrite={false} />
 			</mesh>
-		</group>
+		</>
 	)
 }
 

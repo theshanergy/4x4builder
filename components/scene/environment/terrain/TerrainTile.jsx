@@ -110,7 +110,7 @@ const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMateria
 		<>
 			<group position={position}>
 				{terrainMaterial && <mesh geometry={terrainGeometry} material={terrainMaterial} receiveShadow />}
-				{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} />}
+				{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} renderOrder={1} />}
 			</group>
 			<Vegetation node={node} terrainHelpers={terrainHelpers} vegetationModels={vegetationModels} />
 		</>

@@ -4,6 +4,7 @@ import { PerspectiveCamera } from '@react-three/drei'
 
 import useGameStore from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
+import { QUADTREE_VIEW_RANGE, QUADTREE_ROOT_SIZE } from '../../../config/lod'
 
 import OrbitCamera from './OrbitCamera'
 import ChaseCamera from './ChaseCamera'
@@ -48,7 +49,8 @@ const CameraManager = () => {
 	const cameraConfig = useMemo(() => {
 		const isPortrait = window.innerWidth / window.innerHeight < 1
 		const defaultCameraPosition = isPortrait ? [-2, 1, 12] : [-4, 1, 6.5]
-		return { position: defaultCameraPosition, fov: 24, near: 0.1, far: 20000 }
+		const far = QUADTREE_VIEW_RANGE * QUADTREE_ROOT_SIZE
+		return { position: defaultCameraPosition, fov: 24, near: 0.1, far }
 	}, [])
 
 	const cameraMode = useGameStore((state) => state.cameraMode)
