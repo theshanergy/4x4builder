@@ -7,9 +7,9 @@ varying float vDepth;
 varying vec2 vWorldXZ;
 varying float vCameraDistance;
 varying vec2 vFlowDir;
-
 #include <common>
 #include <fog_pars_vertex>
+#include <logdepthbuf_pars_vertex>
 
 uniform vec4 waveA;
 uniform vec4 waveB;
@@ -75,5 +75,6 @@ void main() {
 
 	gl_Position = projectionMatrix * mvPosition;
 
+	#include <logdepthbuf_vertex>
 	#include <fog_vertex>
 }

@@ -130,6 +130,7 @@ vec3 FinalColorProcess(vec3 color) {
 
 #include <common>
 #include <fog_pars_fragment>
+#include <logdepthbuf_pars_fragment>
 
 void main() {
 
@@ -211,4 +212,5 @@ void main() {
 
 	#include <tonemapping_fragment>
 	#include <fog_fragment>
+	#include <logdepthbuf_fragment>
 }

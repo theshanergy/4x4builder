@@ -26,7 +26,7 @@ const ThreeCanvas = () => {
 		<div id='canvas' className='absolute inset-0 overflow-hidden'>
 			<Loader />
 
-			<Canvas shadows={{ enabled: !performanceDegraded }} dpr={performanceDegraded ? 1 : [1, 1.5]}>
+			<Canvas shadows={{ enabled: !performanceDegraded }} dpr={performanceDegraded ? 1 : [1, 1.5]} gl={{ logarithmicDepthBuffer: true }}>
 				<PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
 				<PerfMonitor />
 				<XR>
