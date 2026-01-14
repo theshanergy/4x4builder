@@ -4,9 +4,7 @@ import { Vector3, Quaternion } from 'three'
 
 import WATER_CONFIG from '../config/water'
 import BUOYANCY_CONFIG from '../config/buoyancy'
-import RIVER_CONFIG from '../config/rivers'
 import useGameStore, { vehicleState } from '../store/gameStore'
-import { getRiverFlow } from '../utils/terrain/rivers'
 
 /**
  * Buoyancy hook for vehicle water physics

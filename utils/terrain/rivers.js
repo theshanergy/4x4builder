@@ -60,45 +60,33 @@ const getNearestValleyIndex = (z, noise) => {
 }
 
 /**
- * Calculate the Z position of the river center at a given world position.
- * Finds the nearest valley and applies meandering within that valley.
+ * Calculate the meander offset at a given X position for a specific valley.
+ * This is the deviation from the valley's base Z position.
  */
-export const getRiverCenterZ = (x, noise) => {
-	// For initial calculation, use x=0 to get a stable valley index
-	// Then calculate meander relative to that valley's base
-	const sampleZ = 0 // We need a Z to find the valley, use origin
-	const valleyIndex = getNearestValleyIndex(sampleZ, noise)
-	const valleyBaseZ = getValleyBaseZ(valleyIndex, noise)
-
-	// Apply meandering relative to valley base
+const getMeanderOffset = (x, valleyIndex, noise) => {
 	const primary = Math.sin(x * primaryFrequency) * primaryAmplitude
 	const secondary = Math.sin(x * secondaryFrequency + 1.5) * secondaryAmplitude
 	const tertiary = noise ? noise.perlin2(x * 0.003 + valleyIndex * 100, 0.5) * tertiaryAmplitude : 0
-
-	return valleyBaseZ + primary + secondary + tertiary
+	return primary + secondary + tertiary
 }
 
 /**
  * Get info about the nearest valley to a world position.
  * Returns the valley's river center Z and distance to it.
+ * This is the central function for all river calculations - call this once
+ * and reuse the result to avoid redundant meander calculations.
  */
 export const getNearestValley = (worldX, worldZ, noise) => {
 	const valleyIndex = getNearestValleyIndex(worldZ, noise)
 	const valleyBaseZ = getValleyBaseZ(valleyIndex, noise)
-
-	// Apply meandering for this X position
-	const primary = Math.sin(worldX * primaryFrequency) * primaryAmplitude
-	const secondary = Math.sin(worldX * secondaryFrequency + 1.5) * secondaryAmplitude
-	const tertiary = noise ? noise.perlin2(worldX * 0.003 + valleyIndex * 100, 0.5) * tertiaryAmplitude : 0
-
-	const riverCenterZ = valleyBaseZ + primary + secondary + tertiary
-	const distanceToValley = Math.abs(worldZ - riverCenterZ)
+	const meanderOffset = getMeanderOffset(worldX, valleyIndex, noise)
+	const riverCenterZ = valleyBaseZ + meanderOffset
 
 	return {
 		valleyIndex,
 		valleyBaseZ,
 		riverCenterZ,
-		distanceToValley,
+		distanceToValley: Math.abs(worldZ - riverCenterZ),
 	}
 }
 
@@ -112,22 +100,15 @@ export const getRiverWidth = (x, noise, valleyIndex = 0) => {
 }
 
 /**
- * Calculate distance from a world position to the nearest river.
- */
-export const getDistanceToRiver = (worldX, worldZ, noise) => {
-	const { riverCenterZ, valleyIndex } = getNearestValley(worldX, worldZ, noise)
-	const riverWidth = getRiverWidth(worldX, noise, valleyIndex)
-	const distance = Math.abs(worldZ - riverCenterZ)
-	return { distance, riverZ: riverCenterZ, riverWidth, valleyIndex }
-}
-
-/**
  * Calculate how deeply the river should carve into terrain at a given position.
  * Returns 0-1 where 0 = no carving, 1 = maximum depth at river center.
+ * Optionally accepts pre-computed valley info to avoid redundant calculations.
  */
-export const getRiverDepthFactor = (worldX, worldZ, noise) => {
-	const { distance, riverWidth } = getDistanceToRiver(worldX, worldZ, noise)
+export const getRiverDepthFactor = (worldX, worldZ, noise, valley = null) => {
+	const v = valley || getNearestValley(worldX, worldZ, noise)
+	const riverWidth = getRiverWidth(worldX, noise, v.valleyIndex)
 	const halfWidth = riverWidth / 2
+	const distance = v.distanceToValley
 
 	if (distance < halfWidth) {
 		// River bed: full depth across the water width
@@ -146,14 +127,17 @@ export const getRiverDepthFactor = (worldX, worldZ, noise) => {
  * Calculate mountain blend factor based on distance from valley center.
  * Returns 0 in the valley (near river), 1 in full mountain zones.
  * Mountains start at approximately valleySpacing/2 from river center.
+ * Optionally accepts pre-computed valley info to avoid redundant calculations.
  *
  * @param {number} worldX - World X coordinate
  * @param {number} worldZ - World Z coordinate
  * @param {Object} noise - Noise instance
+ * @param {Object} valley - Optional pre-computed valley info from getNearestValley
  * @returns {number} Mountain blend factor (0-1)
  */
-export const getValleyFactor = (worldX, worldZ, noise) => {
-	const { distanceToValley } = getNearestValley(worldX, worldZ, noise)
+export const getValleyFactor = (worldX, worldZ, noise, valley = null) => {
+	const v = valley || getNearestValley(worldX, worldZ, noise)
+	const distanceToValley = v.distanceToValley
 
 	// Mountains start halfway between valleys (valleySpacing/2)
 	// Subtract transition width to begin the blend before full mountain zone
@@ -179,29 +163,27 @@ export const getValleyFactor = (worldX, worldZ, noise) => {
 /**
  * Calculate the flow direction of the river at a given position.
  * Flow direction is tangent to the river's meandering curve.
+ * Uses numerical derivative of the meander function.
  * @param {number} worldX - World X coordinate
- * @param {number} noise - Noise instance
  * @param {number} valleyIndex - Valley index for consistent calculations
+ * @param {Object} noise - Noise instance
  * @returns {Object} Normalized flow direction vector {x, z}
  */
-export const getRiverFlowDirection = (worldX, noise, valleyIndex) => {
-	// Calculate the derivative of the meander function to get tangent direction
-	// River path: Z = baseZ + sin(x * freq1) * amp1 + sin(x * freq2) * amp2 + noise * amp3
-	// dZ/dX = cos(x * freq1) * freq1 * amp1 + cos(x * freq2) * freq2 * amp2 + dNoise/dX * amp3
-
+const getRiverFlowDirection = (worldX, valleyIndex, noise) => {
+	// Calculate tangent direction using numerical derivative of meander
 	const epsilon = 0.1
-	const z1 = getRiverCenterZ(worldX - epsilon, noise)
-	const z2 = getRiverCenterZ(worldX + epsilon, noise)
-	
+	const z1 = getMeanderOffset(worldX - epsilon, valleyIndex, noise)
+	const z2 = getMeanderOffset(worldX + epsilon, valleyIndex, noise)
+
 	// Tangent vector in world space
 	const dx = epsilon * 2
 	const dz = z2 - z1
-	
+
 	// Normalize
 	const length = Math.sqrt(dx * dx + dz * dz)
 	return {
 		x: dx / length,
-		z: dz / length
+		z: dz / length,
 	}
 }
 
@@ -211,49 +193,48 @@ export const getRiverFlowDirection = (worldX, noise, valleyIndex) => {
  * Returns velocity magnitude and direction.
  * @param {number} worldX - World X coordinate
  * @param {number} worldZ - World Z coordinate
- * @param {number} baseFlowSpeed - Base flow speed (m/s) for average width
  * @param {Object} noise - Noise instance
  * @returns {Object} {velocity: number, direction: {x, z}, strength: number}
  */
 export const getRiverFlow = (worldX, worldZ, noise) => {
-	const { distance, riverWidth, valleyIndex, riverCenterZ } = getDistanceToRiver(worldX, worldZ, noise)
+	// Get valley info once and reuse for all calculations
+	const valley = getNearestValley(worldX, worldZ, noise)
+	const riverWidth = getRiverWidth(worldX, noise, valley.valleyIndex)
 	const halfWidth = riverWidth / 2
-	
+	const distance = valley.distanceToValley
+
 	// Only calculate flow if we're in the river
 	if (distance > halfWidth) {
 		return { velocity: 0, direction: { x: 1, z: 0 }, strength: 0 }
 	}
-	
-	// Get flow direction (tangent to river path)
-	const direction = getRiverFlowDirection(worldX, noise, valleyIndex)
-	
+
+	// Get flow direction (tangent to river path) - uses same valley index
+	const direction = getRiverFlowDirection(worldX, valley.valleyIndex, noise)
+
 	// Calculate velocity based on river width (narrower = faster)
 	// Using continuity equation: A1*V1 = A2*V2
-	// Assume average width and calculate speed multiplier
 	const averageWidth = width
 	const widthRatio = averageWidth / riverWidth
 	// Velocity scales with width ratio, clamped for realism
 	const velocityMultiplier = Math.min(widthRatio * widthRatio, 3.0)
 	const velocity = RIVER_CONFIG.baseFlowSpeed * velocityMultiplier
-	
+
 	// Flow strength is mostly uniform across river width
 	// Only fades out near the very edges (last 20% of width)
-	const edgeFadeStart = 0.8 // Start fading at 80% towards bank
-	const normalizedDist = distance / halfWidth // 0 at center, 1 at bank
+	const edgeFadeStart = 0.8
+	const normalizedDist = distance / halfWidth
 
 	let flowProfile
 	if (normalizedDist < edgeFadeStart) {
-		// Full flow in the main channel
 		flowProfile = 1.0
 	} else {
-		// Smooth fade near banks
 		const edgeProgress = (normalizedDist - edgeFadeStart) / (1.0 - edgeFadeStart)
-		flowProfile = 1.0 - edgeProgress * edgeProgress // Quadratic fade at edges only
+		flowProfile = 1.0 - edgeProgress * edgeProgress
 	}
 
 	return {
 		velocity,
 		direction,
-		strength: flowProfile
+		strength: flowProfile,
 	}
 }

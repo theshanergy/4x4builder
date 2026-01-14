@@ -6,7 +6,7 @@ import { Vector3 } from 'three'
 
 import TERRAIN_CONFIG from '../../config/terrain'
 import WATER_CONFIG from '../../config/water'
-import { getRiverDepthFactor, getValleyFactor, getRiverFlow } from './rivers'
+import { getNearestValley, getRiverDepthFactor, getValleyFactor, getRiverFlow } from './rivers'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
@@ -57,9 +57,11 @@ export const createTerrainHelpers = (noise) => {
 
 		let height = baseNoise * regionModifier
 
+		// === VALLEY INFO: Get once and reuse for mountains and river carving ===
+		const valley = getNearestValley(x, z, noise)
+
 		// === MOUNTAINS: Based on distance from nearest valley center ===
-		// Use valley factor from rivers.js for proper separation of concerns
-		const mountainBlend = getValleyFactor(x, z, noise)
+		const mountainBlend = getValleyFactor(x, z, noise, valley)
 
 		if (mountainBlend > 0) {
 			// Ridge noise for sharp peaks
@@ -85,7 +87,7 @@ export const createTerrainHelpers = (noise) => {
 		}
 
 		// === RIVER CARVING: Cut channels through terrain ===
-		const riverDepthFactor = getRiverDepthFactor(x, z, noise)
+		const riverDepthFactor = getRiverDepthFactor(x, z, noise, valley)
 		if (riverDepthFactor > 0) {
 			const riverDepth = 2.5
 			const varianceRetention = 1 - riverDepthFactor * 0.95
@@ -99,18 +101,18 @@ export const createTerrainHelpers = (noise) => {
 
 	/**
 	 * Get terrain normal using numerical gradient.
+	 * Note: For bulk geometry generation, useTerrainGeometry computes normals
+	 * more efficiently using cached height samples. This function is for
+	 * single-point queries (e.g., vegetation placement).
 	 */
 	const getNormal = (x, z, target = new Vector3()) => {
-		const dist = Math.sqrt(x * x + z * z)
-		const epsilon = dist > 500 ? GRADIENT_EPSILON * 4 : GRADIENT_EPSILON
+		const hL = getHeight(x - GRADIENT_EPSILON, z)
+		const hR = getHeight(x + GRADIENT_EPSILON, z)
+		const hD = getHeight(x, z - GRADIENT_EPSILON)
+		const hU = getHeight(x, z + GRADIENT_EPSILON)
 
-		const hL = getHeight(x - epsilon, z)
-		const hR = getHeight(x + epsilon, z)
-		const hD = getHeight(x, z - epsilon)
-		const hU = getHeight(x, z + epsilon)
-
-		const dhdx = (hR - hL) / (2 * epsilon)
-		const dhdz = (hU - hD) / (2 * epsilon)
+		const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
+		const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
 
 		return target.set(-dhdx, 1, -dhdz).normalize()
 	}
