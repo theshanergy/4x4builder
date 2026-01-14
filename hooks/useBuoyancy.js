@@ -99,7 +99,7 @@ const useBuoyancy = (vehicleRef) => {
 
 			// 5. Apply River Flow Forces (if in a river)
 			if (noiseInstance) {
-				const flow = getRiverFlow(vehiclePos.x, vehiclePos.z, RIVER_CONFIG.baseFlowSpeed, noiseInstance)
+				const flow = getRiverFlow(vehiclePos.x, vehiclePos.z, noiseInstance)
 				
 				if (flow.strength > 0) {
 					// Calculate flow force: F = flowForce * flowStrength * flowVelocity * mass

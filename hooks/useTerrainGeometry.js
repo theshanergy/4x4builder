@@ -31,6 +31,8 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 
 		// Track water depth for each vertex
 		const depths = new Float32Array(totalSamples)
+		// Track flow direction for each vertex (x, z components combined with strength)
+		const flowDirs = new Float32Array(totalSamples * 2)
 		let hasWater = false
 
 		// Cache for height samples - avoids recomputing for normal calculation
@@ -153,12 +155,21 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				worldXForUV[vertIndex] = uvWorldX
 				worldZForUV[vertIndex] = uvWorldZ
 
-				// Calculate water depth
+				// Calculate water depth and flow velocity
 				if (height < WATER_CONFIG.level) {
 					depths[vertIndex] = WATER_CONFIG.level - height
 					hasWater = true
+
+					// Get river flow at this position
+					const flow = terrainHelpers.getFlow(uvWorldX, uvWorldZ)
+					// Store flow velocity vector (direction * velocity * strength)
+					// This gives us the actual m/s velocity to use directly in shader
+					flowDirs[vertIndex * 2] = flow.direction.x * flow.velocity * flow.strength
+					flowDirs[vertIndex * 2 + 1] = flow.direction.z * flow.velocity * flow.strength
 				} else {
 					depths[vertIndex] = 0
+					flowDirs[vertIndex * 2] = 0
+					flowDirs[vertIndex * 2 + 1] = 0
 				}
 				vertIndex++
 			}
@@ -331,6 +342,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				waterGeom.setAttribute('normal', new BufferAttribute(waterNormals, 3))
 				waterGeom.setAttribute('uv', new BufferAttribute(uvs, 2)) // Reuse terrain UVs
 				waterGeom.setAttribute('depth', new BufferAttribute(depths, 1))
+				waterGeom.setAttribute('flowDir', new BufferAttribute(flowDirs, 2)) // River flow direction
 				// Use slice to trim to actual size used
 				waterGeom.setIndex(new BufferAttribute(waterIndicesArray.slice(0, waterIdx), 1))
 			}

@@ -6,6 +6,7 @@ varying vec4 worldPosition;
 varying float vDepth;
 varying vec2 vWorldXZ;
 varying float vCameraDistance;
+varying vec2 vFlowDir;
 
 #include <common>
 
@@ -22,6 +23,8 @@ uniform float shallowDepthThreshold;
 
 // Per-vertex depth attribute (distance from water surface to terrain)
 attribute float depth;
+// Per-vertex flow direction (river flow, scaled by strength)
+attribute vec2 flowDir;
 
 vec3 GerstnerWave(vec4 wave, vec3 p, float waveScale) {
 	float steepness = wave.z * waveScale;
@@ -32,11 +35,7 @@ vec3 GerstnerWave(vec4 wave, vec3 p, float waveScale) {
 	float f = k * (dot(d, vec2(p.x, p.z)) - c * time);
 	float a = steepness / k;
 
-	return vec3(
-		d.x * (a * cos(f)),
-		a * sin(f),
-		d.y * (a * cos(f))
-	);
+	return vec3(d.x * (a * cos(f)), a * sin(f), d.y * (a * cos(f)));
 }
 
 void main() {
@@ -48,26 +47,27 @@ void main() {
 	// At LOD boundaries, these match the coarse neighbor due to interpolation
 	// This ensures seamless wave calculations across tiles
 	vec3 worldSpacePos = vec3(uv.x, 0.0, uv.y);
-	
+
 	// Pass to fragment shader for noise calculation
 	vWorldXZ = uv;
-	
+
 	// Compute Gerstner wave displacement
 	vec3 waveDisplacement = vec3(0.0);
 	waveDisplacement += GerstnerWave(waveA, worldSpacePos, waveScale);
 	waveDisplacement += GerstnerWave(waveB, worldSpacePos, waveScale);
 	waveDisplacement += GerstnerWave(waveC, worldSpacePos, waveScale);
-	
+
 	// Apply displacement to local position
 	vec3 displacedPosition = position + waveDisplacement;
-	
+
 	// Transform to world space
 	vec4 worldPos = modelMatrix * vec4(displacedPosition, 1.0);
 	worldPosition = worldPos;
 	mirrorCoord = textureMatrix * worldPos;
 
 	vDepth = depth;
-	
+	vFlowDir = flowDir;
+
 	// Calculate camera distance for distance-based effects
 	vec4 viewPos = viewMatrix * worldPos;
 	vCameraDistance = length(viewPos.xyz);

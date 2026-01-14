@@ -215,7 +215,7 @@ export const getRiverFlowDirection = (worldX, noise, valleyIndex) => {
  * @param {Object} noise - Noise instance
  * @returns {Object} {velocity: number, direction: {x, z}, strength: number}
  */
-export const getRiverFlow = (worldX, worldZ, baseFlowSpeed = 3.0, noise) => {
+export const getRiverFlow = (worldX, worldZ, noise) => {
 	const { distance, riverWidth, valleyIndex, riverCenterZ } = getDistanceToRiver(worldX, worldZ, noise)
 	const halfWidth = riverWidth / 2
 	
@@ -234,13 +234,23 @@ export const getRiverFlow = (worldX, worldZ, baseFlowSpeed = 3.0, noise) => {
 	const widthRatio = averageWidth / riverWidth
 	// Velocity scales with width ratio, clamped for realism
 	const velocityMultiplier = Math.min(widthRatio * widthRatio, 3.0)
-	const velocity = baseFlowSpeed * velocityMultiplier
+	const velocity = RIVER_CONFIG.baseFlowSpeed * velocityMultiplier
 	
-	// Flow strength decreases near banks (parabolic profile)
-	// Maximum at center, zero at banks
-	const centeredness = 1 - (distance / halfWidth)
-	const flowProfile = centeredness * centeredness // Parabolic
-	
+	// Flow strength is mostly uniform across river width
+	// Only fades out near the very edges (last 20% of width)
+	const edgeFadeStart = 0.8 // Start fading at 80% towards bank
+	const normalizedDist = distance / halfWidth // 0 at center, 1 at bank
+
+	let flowProfile
+	if (normalizedDist < edgeFadeStart) {
+		// Full flow in the main channel
+		flowProfile = 1.0
+	} else {
+		// Smooth fade near banks
+		const edgeProgress = (normalizedDist - edgeFadeStart) / (1.0 - edgeFadeStart)
+		flowProfile = 1.0 - edgeProgress * edgeProgress // Quadratic fade at edges only
+	}
+
 	return {
 		velocity,
 		direction,

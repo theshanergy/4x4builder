@@ -14,7 +14,7 @@ const BUOYANCY_CONFIG = {
 	minBuoyancy: 0.1, // Buoyancy factor when fully sunk (still has some displacement)
 
 	// Flow parameters
-	flowForce: 8.0, // Multiplier for flow force strength
+	flowForce: 1.5, // Multiplier for flow force strength
 }
 
 export default BUOYANCY_CONFIG

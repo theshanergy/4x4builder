@@ -6,7 +6,7 @@ import { Vector3 } from 'three'
 
 import TERRAIN_CONFIG from '../../config/terrain'
 import WATER_CONFIG from '../../config/water'
-import { getRiverDepthFactor, getValleyFactor } from './rivers'
+import { getRiverDepthFactor, getValleyFactor, getRiverFlow } from './rivers'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
@@ -122,9 +122,18 @@ export const createTerrainHelpers = (noise) => {
 		return getHeight(x, z) < WATER_CONFIG.level
 	}
 
+	/**
+	 * Get river flow direction and strength at a position.
+	 * Returns { direction: {x, z}, strength: 0-1, velocity }
+	 */
+	const getFlow = (x, z) => {
+		return getRiverFlow(x, z, noise)
+	}
+
 	return {
 		getHeight,
 		getNormal,
 		isWater,
+		getFlow,
 	}
 }
