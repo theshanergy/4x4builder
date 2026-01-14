@@ -57,7 +57,7 @@ const AtmosphericSky = () => {
 
 			<ambientLight intensity={2.0} color={skyColorZenith} />
 
-			<fog attach='fog' args={[skyColorHorizon, fogDistance * 0.5, fogDistance]} />
+			<fog attach='fog' args={[skyColorHorizon, fogDistance * 0.2, fogDistance]} />
 
 			<mesh ref={meshRef} frustumCulled={false}>
 				<sphereGeometry args={skyGeometry} />
