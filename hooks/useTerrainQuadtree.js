@@ -1,7 +1,7 @@
 import { useState, useRef, startTransition } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, MAX_QUADTREE_DEPTH } from '../config/lod'
+import { QUADTREE_ROOT_SIZE, QUADTREE_MIN_SIZE, LOD_SPLIT_FACTOR, LOD_HYSTERESIS, MAX_QUADTREE_DEPTH, QUADTREE_VIEW_RANGE } from '../config/lod'
 import { QuadtreeNode, getEdgeStitchInfo } from '../utils/terrain/quadtree'
 
 /**
@@ -50,15 +50,14 @@ const useTerrainQuadtree = () => {
 
 		// Determine which quadtree roots we need based on player position
 		const rootsNeeded = new Set()
-		const viewRange = 2 // Number of root tiles in each direction from center
 
 		// Calculate the root tile the camera is currently in
 		const centerRootX = Math.floor(centerPosition.x / QUADTREE_ROOT_SIZE)
 		const centerRootZ = Math.floor(centerPosition.z / QUADTREE_ROOT_SIZE)
 
 		// Generate roots in a grid around the camera's current root
-		for (let rx = -viewRange; rx <= viewRange; rx++) {
-			for (let rz = -viewRange; rz <= viewRange; rz++) {
+		for (let rx = -QUADTREE_VIEW_RANGE; rx <= QUADTREE_VIEW_RANGE; rx++) {
+			for (let rz = -QUADTREE_VIEW_RANGE; rz <= QUADTREE_VIEW_RANGE; rz++) {
 				// Calculate root tile coordinates
 				const rootTileX = centerRootX + rx
 				const rootTileZ = centerRootZ + rz
@@ -67,19 +66,13 @@ const useTerrainQuadtree = () => {
 				const rootX = rootTileX * QUADTREE_ROOT_SIZE + QUADTREE_ROOT_SIZE / 2
 				const rootZ = rootTileZ * QUADTREE_ROOT_SIZE + QUADTREE_ROOT_SIZE / 2
 
-				// Check if this root is within reasonable view distance
-				const distX = centerPosition.x - rootX
-				const distZ = centerPosition.z - rootZ
-				const distSq = distX * distX + distZ * distZ
+				// Mark this root as needed
+				const rootKey = `${rootX},${rootZ}`
+				rootsNeeded.add(rootKey)
 
-				if (distSq < QUADTREE_ROOT_SIZE * QUADTREE_ROOT_SIZE * 4) {
-					const rootKey = `${rootX},${rootZ}`
-					rootsNeeded.add(rootKey)
-
-					// Create root if it doesn't exist
-					if (!quadtreeRoots.current.has(rootKey)) {
-						quadtreeRoots.current.set(rootKey, new QuadtreeNode(rootX, rootZ, QUADTREE_ROOT_SIZE, MAX_QUADTREE_DEPTH))
-					}
+				// Create root if it doesn't exist
+				if (!quadtreeRoots.current.has(rootKey)) {
+					quadtreeRoots.current.set(rootKey, new QuadtreeNode(rootX, rootZ, QUADTREE_ROOT_SIZE, MAX_QUADTREE_DEPTH))
 				}
 			}
 		}

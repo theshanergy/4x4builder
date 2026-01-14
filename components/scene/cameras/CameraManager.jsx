@@ -1,5 +1,6 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { PerspectiveCamera } from '@react-three/drei'
 
 import useGameStore from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
@@ -43,6 +44,13 @@ const CAMERA_MODES = [CameraMode.ORBIT, CameraMode.CHASE, CameraMode.FIRST_PERSO
 
 // Main camera manager - handles switching between camera modes
 const CameraManager = () => {
+	// Set default camera position based on aspect ratio
+	const cameraConfig = useMemo(() => {
+		const isPortrait = window.innerWidth / window.innerHeight < 1
+		const defaultCameraPosition = isPortrait ? [-2, 1, 12] : [-4, 1, 6.5]
+		return { position: defaultCameraPosition, fov: 24, near: 0.1, far: 20000 }
+	}, [])
+
 	const cameraMode = useGameStore((state) => state.cameraMode)
 	const setCameraMode = useGameStore((state) => state.setCameraMode)
 	const infoMode = useGameStore((state) => state.infoMode)
@@ -77,23 +85,39 @@ const CameraManager = () => {
 		keyPressedLastFrame.current = switchPressed
 	})
 
-	// Handle info mode
+	// Select camera component based on mode
+	let CameraController
+	let cameraProps = {}
+
 	if (infoMode) {
-		return <InfoCamera target={target} />
+		CameraController = InfoCamera
+		cameraProps = { target }
+	} else {
+		switch (cameraMode) {
+			case CameraMode.FIRST_PERSON:
+				CameraController = FirstPersonCamera
+				cameraProps = { target }
+				break
+			case CameraMode.CHASE:
+				CameraController = ChaseCamera
+				cameraProps = { target }
+				break
+			case CameraMode.DRONE:
+				CameraController = DroneCamera
+				break
+			case CameraMode.ORBIT:
+			default:
+				CameraController = OrbitCamera
+				cameraProps = { transitionFromInfo: prevInfoMode.current }
+		}
 	}
 
-	// Render the appropriate camera controller based on current mode
-	switch (cameraMode) {
-		case CameraMode.FIRST_PERSON:
-			return <FirstPersonCamera target={target} />
-		case CameraMode.CHASE:
-			return <ChaseCamera target={target} />
-		case CameraMode.DRONE:
-			return <DroneCamera />
-		case CameraMode.ORBIT:
-		default:
-			return <OrbitCamera transitionFromInfo={prevInfoMode.current} />
-	}
+	return (
+		<>
+			<PerspectiveCamera makeDefault {...cameraConfig} />
+			<CameraController {...cameraProps} />
+		</>
+	)
 }
 
 export default CameraManager

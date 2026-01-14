@@ -1,5 +1,8 @@
 // LOD (Level of Detail) Configuration for Terrain Quadtree System
 
+// Number of root tiles to render in each direction from camera center
+export const QUADTREE_VIEW_RANGE = 4
+
 // Base size of the entire terrain quadtree (power of 2 recommended)
 export const QUADTREE_ROOT_SIZE = 4096
 
