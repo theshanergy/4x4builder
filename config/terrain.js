@@ -36,7 +36,7 @@ const TERRAIN_CONFIG = {
 			textureScale: 0.4,
 			normalScale: 0.5,
 			height: {
-				min: -1,
+				min: 0,
 				max: 45,
 				transitionMin: 3,
 				transitionMax: 55,
