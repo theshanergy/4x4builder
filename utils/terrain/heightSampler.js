@@ -6,7 +6,7 @@ import { Vector3 } from 'three'
 
 import TERRAIN_CONFIG from '../../config/terrain'
 import WATER_CONFIG from '../../config/water'
-import { getRiverDepthFactor, getNearestValley } from './rivers'
+import { getRiverDepthFactor, getValleyFactor } from './rivers'
 
 // Epsilon for numerical gradient approximation
 const GRADIENT_EPSILON = 0.01
@@ -18,7 +18,7 @@ const GRADIENT_EPSILON = 0.01
  * @returns {Object} Object with getHeight, getNormal, and isWater functions
  */
 export const createTerrainHelpers = (noise) => {
-	const { baseFrequency, baseAmplitude, maxMountainHeight, mountainScale, mountainStartDistance, mountainTransitionWidth, spawnRadius } = TERRAIN_CONFIG
+	const { baseFrequency, baseAmplitude, maxMountainHeight, mountainScale, spawnRadius } = TERRAIN_CONFIG
 
 	/**
 	 * Smoothstep interpolation (cubic hermite)
@@ -58,19 +58,11 @@ export const createTerrainHelpers = (noise) => {
 		let height = baseNoise * regionModifier
 
 		// === MOUNTAINS: Based on distance from nearest valley center ===
-		const { distanceToValley: distFromValley } = getNearestValley(x, z, noise)
+		// Use valley factor from rivers.js for proper separation of concerns
+		const mountainBlend = getValleyFactor(x, z, noise)
 
-		if (distFromValley > mountainStartDistance) {
-			let mountainBlend = 1
-
-			const mountainFullDist = mountainStartDistance + mountainTransitionWidth
-			if (distFromValley < mountainFullDist) {
-				// Smooth blend in transition zone
-				const t = (distFromValley - mountainStartDistance) / mountainTransitionWidth
-				mountainBlend = smoothstep(t)
-			}
-
-			// Ridge noise for sharp peaks (original approach)
+		if (mountainBlend > 0) {
+			// Ridge noise for sharp peaks
 			const ridge1 = 1 - Math.abs(noise.perlin2(x * mountainScale, z * mountainScale))
 			const ridge2 = 1 - Math.abs(noise.perlin2(x * mountainScale * 1.8 + 100, z * mountainScale * 1.8 + 100))
 			const ridgeNoise = ridge1 * ridge1 * 0.6 + ridge2 * ridge2 * 0.4

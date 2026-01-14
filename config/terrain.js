@@ -10,10 +10,6 @@ const TERRAIN_CONFIG = {
 	maxMountainHeight: 400,
 	mountainScale: 0.001,
 
-	// Mountain band configuration (where mountains appear based on Z distance)
-	mountainStartDistance: 500,
-	mountainTransitionWidth: 300,
-
 	// Spawn Area - flat safe zone that transitions to natural terrain
 	spawnRadius: 200,
 

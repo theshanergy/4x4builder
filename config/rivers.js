@@ -2,8 +2,12 @@
 // Valleys are spaced using noise for natural mountain separation
 const RIVER_CONFIG = {
 	// Valley spacing - controls distance between valley centers
-	valleySpacing: 4000, // Average distance between valleys
+	valleySpacing: 5000, // Average distance between valleys
 	valleySpacingVariation: 0.3, // Noise-based variation (0-1, as fraction of spacing)
+
+	// Mountain placement - derived automatically from valley spacing
+	// Mountains appear between valleys, with smooth transitions
+	mountainTransitionWidth: 3000, // Blend distance for mountain fade-in
 
 	// Meandering parameters for river within each valley
 	primaryFrequency: 0.0015,
