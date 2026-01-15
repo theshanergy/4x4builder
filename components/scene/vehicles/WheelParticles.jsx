@@ -36,22 +36,33 @@ const PARTICLE_CONFIG = {
 	},
 }
 
-// Shared vertex shader
+// Shared vertex shader with logarithmic depth buffer support
 const PARTICLE_VERTEX_SHADER = `
+	#include <common>
+	#include <logdepthbuf_pars_vertex>
+
 	attribute float size;
 	attribute float opacity;
 	varying float vOpacity;
+
 	void main() {
 		vOpacity = opacity;
 		vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 		gl_PointSize = size * (450.0 / -mvPosition.z);
 		gl_Position = projectionMatrix * mvPosition;
+
+		#include <logdepthbuf_vertex>
 	}
 `
 
 const WATER_FRAGMENT_SHADER = `
+	#include <logdepthbuf_pars_fragment>
+
 	varying float vOpacity;
+
 	void main() {
+		#include <logdepthbuf_fragment>
+
 		vec2 uv = gl_PointCoord.xy - 0.5;
 		float r2 = dot(uv, uv);
 		if (r2 > 0.25) discard;
@@ -63,9 +74,14 @@ const WATER_FRAGMENT_SHADER = `
 `
 
 const DUST_FRAGMENT_SHADER = `
+	#include <logdepthbuf_pars_fragment>
+
 	uniform sampler2D uTexture;
 	varying float vOpacity;
+
 	void main() {
+		#include <logdepthbuf_fragment>
+
 		vec2 uv = gl_PointCoord.xy - 0.5;
 		float r2 = dot(uv, uv);
 		if (r2 > 0.25) discard;

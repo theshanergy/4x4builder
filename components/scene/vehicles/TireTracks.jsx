@@ -14,58 +14,67 @@ const SLIP_THRESHOLD = 2.0
 
 // Vertex shader - passes instance data to fragment shader
 const vertexShader = `
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
+
   attribute float aSpawnTime;
   attribute float aSpawnOrder;
-  
+
   varying float vSpawnTime;
   varying float vSpawnOrder;
   varying vec2 vUv;
-  
+
   void main() {
     vUv = uv;
     vSpawnTime = aSpawnTime;
     vSpawnOrder = aSpawnOrder;
     gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+
+    #include <logdepthbuf_vertex>
   }
 `
 
 // Fragment shader - handles GPU-based fading
 const fragmentShader = `
+  #include <logdepthbuf_pars_fragment>
+
   uniform sampler2D uTexture;
   uniform float uTime;
   uniform float uSpawnCounter;
   uniform float uMaxSegments;
   uniform float uTrackFadeTime;
   uniform float uTrackFadeDuration;
-  
+
   varying float vSpawnTime;
   varying float vSpawnOrder;
   varying vec2 vUv;
-  
+
   void main() {
+    #include <logdepthbuf_fragment>
+
     vec4 texColor = texture2D(uTexture, vUv);
-    
+
     // Time-based fade
     float age = uTime - vSpawnTime;
     float timeFade = 0.0;
     if (age > uTrackFadeTime) {
       timeFade = min(1.0, (age - uTrackFadeTime) / uTrackFadeDuration);
     }
-    
+
     // Distance-based fade (order-based)
     float orderAge = uSpawnCounter - vSpawnOrder;
     float normalizedAge = min(1.0, orderAge / uMaxSegments);
     float orderFade = normalizedAge * normalizedAge;
-    
+
     // Use stronger of the two fades
     float fade = max(timeFade, orderFade);
-    
+
     // Apply fade to alpha
     float alpha = (1.0 - fade) * texColor.a;
-    
+
     // Discard fully faded fragments
     if (alpha < 0.01) discard;
-    
+
     gl_FragColor = vec4(texColor.rgb, alpha);
   }
 `
@@ -446,7 +455,7 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 		}
 	})
 
-	return <instancedMesh ref={meshRef} args={[geometry, material, MAX_TRACK_SEGMENTS]} frustumCulled={false} renderOrder={-1} />
+	return <instancedMesh ref={meshRef} args={[geometry, material, MAX_TRACK_SEGMENTS]} frustumCulled={false} />
 }
 
 export default TireTracks
