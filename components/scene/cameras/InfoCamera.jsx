@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Vector3, MathUtils } from 'three'
+import { Vector3, Quaternion, MathUtils } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
 import { dampVector3 } from '../../../utils/dampVector3'
