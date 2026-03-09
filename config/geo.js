@@ -15,7 +15,7 @@ const TILE_SERVER_BASE = import.meta.env.VITE_TILE_SERVER_URL
 
 const GEO_CONFIG = {
 	// Default spawn origin
-	defaultOrigin: { lat: 38.5733, lng: -109.5498, name: 'Moab, Utah' },
+	defaultOrigin: { lat: 49.6978, lng: -123.1630, name: 'Moab, Utah' },
 
 	// Named presets available via ?preset=<name> URL param
 	presets: [
