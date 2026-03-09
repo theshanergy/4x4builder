@@ -162,9 +162,15 @@ const Terrain = () => {
 
 	// Publish into game store so physics / vehicle hooks can query terrain
 	useEffect(() => {
-		useGameStore.getState().setTerrainHelpers(terrainHelpers)
+		useGameStore.getState().setTerrainHelpers(tilesReady ? terrainHelpers : null)
 		useGameStore.getState().setGeoOrigin(geoOrigin)
-	}, [terrainHelpers, geoOrigin])
+	}, [terrainHelpers, geoOrigin, tilesReady])
+
+	useEffect(() => {
+		return () => {
+			useGameStore.getState().setTerrainHelpers(null)
+		}
+	}, [])
 
 	// Vegetation cell cache must be cleared in sync with geometry
 	useEffect(() => {

@@ -10,6 +10,7 @@ import useVehicleSync from '../../../hooks/useVehicleSync'
 import useVehiclePhysics from '../../../hooks/useVehiclePhysics'
 import useVehicleBroadcast from '../../../hooks/useVehicleBroadcast'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
+import useInitialVehicleSpawn from '../../../hooks/useInitialVehicleSpawn'
 
 import VehicleAudio from './VehicleAudio'
 import WheelParticles from './WheelParticles'
@@ -62,6 +63,8 @@ const Vehicle = () => {
 		}))
 	}, [wheelPositions, config.tire_diameter])
 
+	const spawnPosition = useInitialVehicleSpawn(physicsWheels)
+
 	// Use vehicle physics
 	const { vehicleController } = useVehiclePhysics(chassisRef, physicsWheels)
 
@@ -94,9 +97,11 @@ const Vehicle = () => {
 	const colliderArgs = useMemo(() => [0.9, 0.5, wheelbase / 2 + axleHeight], [wheelbase, axleHeight])
 	const colliderPosition = useMemo(() => [0, 1, 0], [])
 
+	if (!spawnPosition) return null
+
 	return (
 		<>
-			<RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false} linearDamping={0.05} angularDamping={1}>
+			<RigidBody ref={chassisRef} type='dynamic' position={spawnPosition} colliders={false} canSleep={false} linearDamping={0.05} angularDamping={1}>
 				<CuboidCollider args={colliderArgs} position={colliderPosition} />
 				<group ref={chassisGroupRef} name='Vehicle'>
 					<VehicleAudio />

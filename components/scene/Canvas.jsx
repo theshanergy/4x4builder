@@ -40,7 +40,9 @@ const ThreeCanvas = () => {
 
 						<RemoteVehicleManager />
 
-						<Environment />
+						<Suspense fallback={null}>
+							<Environment />
+						</Suspense>
 					</Physics>
 
 					<Screenshot />

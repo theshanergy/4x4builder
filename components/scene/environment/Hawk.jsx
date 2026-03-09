@@ -1,9 +1,9 @@
 import { useRef, useEffect, useMemo } from 'react'
-import { useFrame, useLoader } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import { AnimationMixer, LoopRepeat, Vector3, MathUtils } from 'three'
-import { GLTFLoader } from 'three-stdlib'
 
 import { vehicleState } from '../../../store/gameStore'
+import useMeshoptGLTF, { preloadMeshoptGLTF } from '../../../hooks/useMeshoptGLTF'
 
 // Normalize angle to -PI to PI range
 const normalizeAngle = (angle) => MathUtils.euclideanModulo(angle + Math.PI, Math.PI * 2) - Math.PI
@@ -25,7 +25,7 @@ export default function Hawk() {
 	const currentRotation = useRef(0)
 	const prevPosition = useRef(new Vector3())
 
-	const { scene, animations } = useLoader(GLTFLoader, '/assets/models/environment/hawk.glb')
+	const { scene, animations } = useMeshoptGLTF('/assets/models/environment/hawk.glb')
 
 	const mixer = useMemo(() => new AnimationMixer(scene), [scene])
 
@@ -117,3 +117,5 @@ export default function Hawk() {
 		</group>
 	)
 }
+
+preloadMeshoptGLTF('/assets/models/environment/hawk.glb')
