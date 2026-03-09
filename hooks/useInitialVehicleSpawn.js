@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 
 import useGameStore, { vehicleState } from '../store/gameStore'
 
-const INITIAL_SPAWN_CLEARANCE = 1.0
-
 const useInitialVehicleSpawn = (physicsWheels) => {
 	const terrainHelpers = useGameStore((state) => state.terrainHelpers)
 	const [spawnPosition, setSpawnPosition] = useState(null)
@@ -19,7 +17,7 @@ const useInitialVehicleSpawn = (physicsWheels) => {
 			}
 		}
 
-		const initialPosition = [0, maxTerrainHeight + INITIAL_SPAWN_CLEARANCE, 0]
+		const initialPosition = [0, maxTerrainHeight, 0]
 		setSpawnPosition(initialPosition)
 		vehicleState.position.set(...initialPosition)
 	}, [spawnPosition, terrainHelpers, physicsWheels])
