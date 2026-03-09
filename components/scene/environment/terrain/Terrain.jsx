@@ -3,6 +3,7 @@ import { Noise } from 'noisejs'
 
 import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
 import { clearVegetationCache } from '../../../../utils/terrain/vegetationGeneration'
+import { clearGeometryCache } from '../../../../utils/terrain/geometryCache'
 import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
 import useWaterMaterial from '../../../../hooks/useWaterMaterial'
 import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
@@ -28,9 +29,10 @@ const Terrain = () => {
 		useGameStore.getState().setTerrainHelpers(terrainHelpers)
 	}, [terrainHelpers])
 
-	// Evict vegetation cell cache when terrain helpers change (noise seed changed)
+	// Evict caches when terrain helpers change (noise seed changed)
 	useEffect(() => {
 		clearVegetationCache()
+		clearGeometryCache()
 	}, [terrainHelpers])
 
 	// Terrain material shared by all terrain tiles
