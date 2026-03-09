@@ -32,10 +32,6 @@ class TransformBuffer {
 		}
 	}
 
-	getLatest() {
-		return this.buffer[this.buffer.length - 1] || null
-	}
-
 	interpolate(renderTime, interpolationDelay = INTERPOLATION_DELAY) {
 		if (this.buffer.length === 0) return null
 		if (this.buffer.length === 1) return this.buffer[0]
@@ -84,7 +80,7 @@ class TransformBuffer {
 
 		return {
 			position: before.position.map((v, i) => MathUtils.lerp(v, after.position[i], clampedT)),
-			rotation: this.slerpQuat(before.rotation, after.rotation, clampedT),
+			rotation: slerpQuat(before.rotation, after.rotation, clampedT),
 			wheelRotations: before.wheelRotations?.map((v, i) => MathUtils.lerp(v, after.wheelRotations?.[i] || v, clampedT)) || [0, 0, 0, 0],
 			wheelYPositions: before.wheelYPositions?.map((v, i) => MathUtils.lerp(v, after.wheelYPositions?.[i] || v, clampedT)) || null,
 			steering: MathUtils.lerp(before.steering || 0, after.steering || 0, clampedT),
@@ -94,17 +90,29 @@ class TransformBuffer {
 		}
 	}
 
-	slerpQuat(a, b, t) {
-		const qa = new Quaternion(a[0], a[1], a[2], a[3])
-		const qb = new Quaternion(b[0], b[1], b[2], b[3])
-		qa.slerp(qb, t)
-		return [qa.x, qa.y, qa.z, qa.w]
-	}
-
 	clear() {
 		this.buffer = []
 	}
 }
+
+// Scratch objects for slerpQuat
+const _qa = new Quaternion()
+const _qb = new Quaternion()
+
+function slerpQuat(a, b, t) {
+	_qa.fromArray(a)
+	_qb.fromArray(b)
+	_qa.slerp(_qb, t)
+	return _qa.toArray()
+}
+
+// Scratch objects reused every frame to avoid GC churn
+const _targetPos = new Vector3()
+const _targetRot = new Quaternion()
+const _steeringQuat = new Quaternion()
+const _spinQuat = new Quaternion()
+const _axisY = new Vector3(0, 1, 0)
+const _axisX = new Vector3(1, 0, 0)
 
 /**
  * RemoteVehicle - Visual-only vehicle component for rendering other players
@@ -129,7 +137,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 			...vehicleConfigs.defaults,
 			...vehicleConfig,
 		}),
-		[vehicleConfig]
+		[vehicleConfig],
 	)
 
 	const { color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, spare, addons, lighting } = config
@@ -180,13 +188,13 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 
 		if (interpolated) {
 			// Smoothly lerp to target position
-			const targetPos = new Vector3(...interpolated.position)
-			currentPosition.current.lerp(targetPos, INTERPOLATION_SMOOTHING)
+			_targetPos.fromArray(interpolated.position)
+			currentPosition.current.lerp(_targetPos, INTERPOLATION_SMOOTHING)
 			groupRef.current.position.copy(currentPosition.current)
 
 			// Smoothly slerp to target rotation
-			const targetRot = new Quaternion(...interpolated.rotation)
-			currentRotation.current.slerp(targetRot, INTERPOLATION_SMOOTHING)
+			_targetRot.fromArray(interpolated.rotation)
+			currentRotation.current.slerp(_targetRot, INTERPOLATION_SMOOTHING)
 			groupRef.current.quaternion.copy(currentRotation.current)
 
 			// Update front wheel steering
@@ -213,18 +221,15 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 
 				// Create quaternion from steering (Y axis) and spin (X axis)
 				// This matches how the physics system applies wheel rotation
-				const steeringQuat = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), wheelSteering)
-				const spinQuat = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), wheelSpin)
-				ref.current.quaternion.multiplyQuaternions(steeringQuat, spinQuat)
+				_steeringQuat.setFromAxisAngle(_axisY, wheelSteering)
+				_spinQuat.setFromAxisAngle(_axisX, wheelSpin)
+				ref.current.quaternion.multiplyQuaternions(_steeringQuat, _spinQuat)
 			})
 		}
 	})
 
 	// Callback for VehicleAudio to get current audio state
-	const getRemoteState = useMemo(
-		() => () => currentAudioState.current,
-		[]
-	)
+	const getRemoteState = () => currentAudioState.current
 
 	return (
 		<group ref={groupRef} name={`RemoteVehicle-${playerId}`}>
