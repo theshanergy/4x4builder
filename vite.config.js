@@ -18,14 +18,6 @@ export default defineConfig({
     ],
     server: {
         host: true,
-        proxy: {
-            // Forward /tiles/* to the local game server during development.
-            // In production the client uses VITE_TILE_SERVER_URL directly.
-            '/tiles': {
-                target: 'http://localhost:8080',
-                changeOrigin: true,
-            },
-        },
     },
     resolve: {
         dedupe: ['three', 'three-stdlib'],

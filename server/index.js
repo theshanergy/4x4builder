@@ -1,13 +1,9 @@
 import http from 'http'
 import settings from './config/settings.js'
 import WebSocketServer from './src/WebSocketServer.js'
-import { handleTileRequest } from './src/TileProxy.js'
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
-	// Tile proxy — handles /tiles/:type/:z/:x/:y
-	if (handleTileRequest(req, res)) return
-
 	// Health check endpoint
 	if (req.url === '/health') {
 		res.writeHead(200, { 'Content-Type': 'application/json' })

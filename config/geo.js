@@ -2,13 +2,20 @@
  * Geographic configuration for real-world terrain.
  *
  * Tile server URL:
- *   Development  → Vite proxies /tiles/* to localhost:8080  (no env var needed)
- *   Production   → set VITE_TILE_SERVER_URL to your Render.com service URL
- *                  e.g. https://your-server.onrender.com
+ *   Production   → Netlify edge function at /tiles (same origin, CDN-cached globally)
+ *   Development  → Vite proxies /tiles/* to localhost:8080 (no env var needed)
+ *
+ * No VITE_TILE_SERVER_URL env var is needed in production any more. The tile
+ * proxy now runs as a Netlify edge function on the same domain, so requests
+ * go to /tiles/... and are cached at Netlify's CDN edge globally.
+ *
+ * To use the old Render.com proxy instead (e.g. for a non-Netlify deploy),
+ * set VITE_TILE_SERVER_URL to your server base URL.
  */
 
-// Base URL for tile requests.  In dev the Vite proxy rewrites /tiles → server.
-// In production point VITE_TILE_SERVER_URL at the Render.com service.
+// In production: same-origin /tiles (Netlify edge function + CDN)
+// In dev: Vite proxies /tiles/* → localhost:8080 (server/src/TileProxy.js)
+// Override with VITE_TILE_SERVER_URL for non-Netlify deployments.
 const TILE_SERVER_BASE = import.meta.env.VITE_TILE_SERVER_URL
 	? `${import.meta.env.VITE_TILE_SERVER_URL}/tiles`
 	: '/tiles'
