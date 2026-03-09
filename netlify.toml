@@ -3,6 +3,7 @@
   command = "npm run build"
 
 [dev]
+  command = "vite"
   targetPort = 5173
   framework = "vite"
 
