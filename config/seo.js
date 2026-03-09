@@ -12,15 +12,6 @@ export const defaultMeta = {
 	url: BASE_URL,
 }
 
-function escapeHtml(value) {
-	return String(value)
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&#39;')
-}
-
 export function getVehicleBySlug(slug) {
 	const vehicles = vehicleConfigs.vehicles
 
@@ -146,30 +137,35 @@ export function buildStructuredData(meta, vehicle) {
 	return data
 }
 
-export function generateSeoHead(meta, vehicle) {
+export function generateSeoTags(meta, vehicle) {
 	const url = meta.url || BASE_URL
 	const imageUrl = `${BASE_URL}${META_IMAGE_PATH}`
 	const structuredData = buildStructuredData(meta, vehicle)
 
-	return `
-		<title>${escapeHtml(meta.title)}</title>
-		<meta name="description" content="${escapeHtml(meta.description)}" />
-		<meta name="keywords" content="${escapeHtml(meta.keywords)}" />
-		<meta property="og:type" content="website" />
-		<meta property="og:title" content="${escapeHtml(meta.title)}" />
-		<meta property="og:description" content="${escapeHtml(meta.description)}" />
-		<meta property="og:url" content="${escapeHtml(url)}" />
-		<meta property="og:site_name" content="4x4 Builder" />
-		<meta property="og:image" content="${escapeHtml(imageUrl)}" />
-		<meta property="og:image:width" content="1200" />
-		<meta property="og:image:height" content="630" />
-		<meta name="twitter:card" content="summary_large_image" />
-		<meta name="twitter:title" content="${escapeHtml(meta.title)}" />
-		<meta name="twitter:description" content="${escapeHtml(meta.description)}" />
-		<meta name="twitter:url" content="${escapeHtml(url)}" />
-		<meta name="twitter:image" content="${escapeHtml(imageUrl)}" />
-		<link rel="canonical" href="${escapeHtml(url)}" />
-		${structuredData.map((data) => `<script type="application/ld+json">${JSON.stringify(data)}</script>`).join('\n\t\t')}`
+	return [
+		{ tag: 'title', children: meta.title },
+		{ tag: 'meta', attrs: { name: 'description', content: meta.description } },
+		{ tag: 'meta', attrs: { name: 'keywords', content: meta.keywords } },
+		{ tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
+		{ tag: 'meta', attrs: { property: 'og:title', content: meta.title } },
+		{ tag: 'meta', attrs: { property: 'og:description', content: meta.description } },
+		{ tag: 'meta', attrs: { property: 'og:url', content: url } },
+		{ tag: 'meta', attrs: { property: 'og:site_name', content: '4x4 Builder' } },
+		{ tag: 'meta', attrs: { property: 'og:image', content: imageUrl } },
+		{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+		{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+		{ tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+		{ tag: 'meta', attrs: { name: 'twitter:title', content: meta.title } },
+		{ tag: 'meta', attrs: { name: 'twitter:description', content: meta.description } },
+		{ tag: 'meta', attrs: { name: 'twitter:url', content: url } },
+		{ tag: 'meta', attrs: { name: 'twitter:image', content: imageUrl } },
+		{ tag: 'link', attrs: { rel: 'canonical', href: url } },
+		...structuredData.map((data) => ({
+			tag: 'script',
+			attrs: { type: 'application/ld+json' },
+			children: JSON.stringify(data),
+		})),
+	]
 }
 
 export function getSeoPageData() {

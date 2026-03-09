@@ -1,39 +1,42 @@
-import { BASE_URL, generateSeoHead, getSeoPageData } from '../config/seo.js'
+import { BASE_URL, generateSeoTags, getSeoPageData } from '../config/seo.js'
 
-const SEO_PLACEHOLDER = '<!-- SEO_HEAD -->'
 const ROOT_SLUG = ''
 
-function injectSeoHead(html, seoHead) {
-	if (!html.includes(SEO_PLACEHOLDER)) {
-		throw new Error('SEO placeholder was not found in index.html')
-	}
+function escapeAttr(value) {
+	return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+}
 
-	return html.replace(SEO_PLACEHOLDER, seoHead.trim())
+function tagsToHtml(tags) {
+	return tags
+		.map((descriptor) => {
+			const { tag, attrs = {}, children } = descriptor
+			const attrStr = Object.entries(attrs)
+				.map(([key, value]) => ` ${key}="${escapeAttr(value)}"`)
+				.join('')
+
+			if (tag === 'title') return `<title>${children}</title>`
+			if (children != null) return `<${tag}${attrStr}>${children}</${tag}>`
+			return `<${tag}${attrStr} />`
+		})
+		.join('\n\t\t')
 }
 
 function generateSitemapXml(pages) {
-	const urls = pages.map((page) => ({
-		loc: page.slug ? `/${page.slug}` : '/',
-		changefreq: page.slug ? 'weekly' : 'daily',
-		priority: page.slug ? '0.8' : '1.0',
-	}))
-
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls
-	.map(
-		(url) => `  <url>
-    <loc>${BASE_URL}${url.loc}</loc>
-    <changefreq>${url.changefreq}</changefreq>
-    <priority>${url.priority}</priority>
+${pages
+	.map((page) => {
+		const loc = page.slug ? `/${page.slug}` : '/'
+		const changefreq = page.slug ? 'weekly' : 'daily'
+		const priority = page.slug ? '0.8' : '1.0'
+		return `  <url>
+    <loc>${BASE_URL}${loc}</loc>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
   </url>`
-	)
+	})
 	.join('\n')}
 </urlset>`
-}
-
-function getTrimmedSeoHead(page) {
-	return generateSeoHead(page.meta, page.vehicle).trim()
 }
 
 export default function seoPrerenderPlugin() {
@@ -44,14 +47,14 @@ export default function seoPrerenderPlugin() {
 		throw new Error('Root SEO page data was not found')
 	}
 
-	const rootSeoHead = getTrimmedSeoHead(rootPage)
+	const rootSeoHtml = tagsToHtml(generateSeoTags(rootPage.meta, rootPage.vehicle))
 
 	return {
 		name: 'seo-prerender-plugin',
 		enforce: 'post',
 
-		transformIndexHtml(html) {
-			return injectSeoHead(html, rootSeoHead)
+		transformIndexHtml() {
+			return generateSeoTags(rootPage.meta, rootPage.vehicle)
 		},
 
 		generateBundle(_, bundle) {
@@ -61,17 +64,19 @@ export default function seoPrerenderPlugin() {
 				throw new Error('Built index.html asset was not found in the Vite bundle output')
 			}
 
-			if (!indexAsset.source.includes(rootSeoHead)) {
+			if (!indexAsset.source.includes(rootSeoHtml)) {
 				throw new Error('Injected root SEO head was not found in built index.html')
 			}
 
 			for (const page of pages) {
 				if (page.slug === ROOT_SLUG) continue
 
+				const pageSeoHtml = tagsToHtml(generateSeoTags(page.meta, page.vehicle))
+
 				this.emitFile({
 					type: 'asset',
 					fileName: `${page.slug}/index.html`,
-					source: indexAsset.source.replace(rootSeoHead, getTrimmedSeoHead(page)),
+					source: indexAsset.source.replace(rootSeoHtml, pageSeoHtml),
 				})
 			}
 
