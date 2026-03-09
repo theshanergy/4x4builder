@@ -21,4 +21,7 @@ dist-ssr
 *.ntvs*
 *.njsproj
 *.sln
+
+# Temp tile cache
+server/tile-cache/
 *.sw?

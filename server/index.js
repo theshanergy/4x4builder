@@ -1,23 +1,27 @@
 import http from 'http'
 import settings from './config/settings.js'
 import WebSocketServer from './src/WebSocketServer.js'
+import { handleTileRequest } from './src/TileProxy.js'
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
+	// Tile proxy — handles /tiles/:type/:z/:x/:y
+	if (handleTileRequest(req, res)) return
+
 	// Health check endpoint
 	if (req.url === '/health') {
 		res.writeHead(200, { 'Content-Type': 'application/json' })
 		res.end(JSON.stringify({ status: 'ok', timestamp: Date.now() }))
 		return
 	}
-	
+
 	// Stats endpoint
 	if (req.url === '/stats') {
 		res.writeHead(200, { 'Content-Type': 'application/json' })
 		res.end(JSON.stringify(wsServer.getStats()))
 		return
 	}
-	
+
 	// Default response
 	res.writeHead(200, { 'Content-Type': 'text/plain' })
 	res.end('4x4 Builder Multiplayer Server')

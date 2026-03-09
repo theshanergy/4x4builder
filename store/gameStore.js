@@ -78,6 +78,10 @@ const useGameStore = create((set, get) => {
 		terrainHelpers: null,
 		setTerrainHelpers: (helpers) => set({ terrainHelpers: helpers }),
 
+		// Geographic origin for real-world terrain (set by Terrain on init)
+		geoOrigin: null,
+		setGeoOrigin: (origin) => set({ geoOrigin: origin }),
+
 		// Saved vehicles
 		savedVehicles: (() => {
 			// Get from local storage or null.

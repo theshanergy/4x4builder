@@ -16,7 +16,13 @@ import { getCachedGeometry, stitchSignature } from '../utils/terrain/geometryCac
  */
 const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 	return useMemo(() => {
-		const cacheKey = `${node.key}::${stitchSignature(edgeStitchInfo)}`
+		// Include _dataVersion in the key so that when new elevation tiles load,
+		// fresh geometry is built under a new key while the previous geometry entry
+		// remains in cache (not disposed) until naturally LRU-evicted.
+		// This prevents the flash that occurs if the cache is cleared before new
+		// geometry is ready to render.
+		const version = terrainHelpers._dataVersion ?? 0
+		const cacheKey = `${node.key}::${stitchSignature(edgeStitchInfo)}::v${version}`
 		return getCachedGeometry(cacheKey, () => buildGeometry(node, terrainHelpers, edgeStitchInfo))
 	}, [node, terrainHelpers, edgeStitchInfo])
 }
