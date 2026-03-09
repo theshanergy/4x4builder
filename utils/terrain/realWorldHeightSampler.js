@@ -80,10 +80,11 @@ export const createTerrainHelpers = (elevationProvider, geoOrigin, dataVersion =
 
 	/**
 	 * River flow direction and strength.
-	 * Stub — procedural rivers removed. Returns zero-flow everywhere.
-	 * Future: query a WaterwayProvider (OSM) here.
+	 * TODO: query a WaterwayProvider (OSM) for real river data.
+	 * Returns zero-flow everywhere until then — water geometry will render
+	 * as still water with no directional current.
 	 */
-	const getFlow = (_worldX, _worldZ) => ({
+	const getFlow = () => ({
 		direction: { x: 0, z: 1 },
 		strength: 0,
 		velocity: 0,

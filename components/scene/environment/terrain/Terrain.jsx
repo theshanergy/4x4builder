@@ -11,6 +11,7 @@ import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
 import useVegetation from '../../../../hooks/useVegetation'
 import useGameStore from '../../../../store/gameStore'
 import GEO_CONFIG from '../../../../config/geo'
+import { QUADTREE_VIEW_RANGE, QUADTREE_ROOT_SIZE } from '../../../../config/lod'
 import TerrainCollider from './TerrainCollider'
 import TerrainTile from './TerrainTile'
 
@@ -121,8 +122,8 @@ const Terrain = () => {
 		let cancelled = false
 
 		async function warmup() {
-			// Cover the entire view frustum at spawn (~10 km radius)
-			const bounds = boundsAround(geoOrigin, 5 * 4096 * 0.5)
+			// Cover the entire view frustum at spawn (half-diagonal of the visible root grid)
+			const bounds = boundsAround(geoOrigin, QUADTREE_VIEW_RANGE * QUADTREE_ROOT_SIZE * 0.5)
 
 			for (const zoom of GEO_CONFIG.warmupZooms) {
 				if (cancelled) return
@@ -164,18 +165,16 @@ const Terrain = () => {
 	useEffect(() => {
 		useGameStore.getState().setTerrainHelpers(tilesReady ? terrainHelpers : null)
 		useGameStore.getState().setGeoOrigin(geoOrigin)
-	}, [terrainHelpers, geoOrigin, tilesReady])
-
-	useEffect(() => {
 		return () => {
 			useGameStore.getState().setTerrainHelpers(null)
 		}
-	}, [])
+	}, [terrainHelpers, geoOrigin, tilesReady])
 
-	// Vegetation cell cache must be cleared in sync with geometry
+	// Vegetation cell cache is keyed on world position — only needs clearing when the
+	// geographic origin changes, not on every elevation tile refinement.
 	useEffect(() => {
 		clearVegetationCache()
-	}, [terrainHelpers])
+	}, [geoOrigin])
 
 	// -----------------------------------------------------------------------
 	// Quadtree LOD drives the visible leaf set
@@ -189,11 +188,18 @@ const Terrain = () => {
 	useEffect(() => {
 		if (!tilesReady || leafTiles.length === 0) return
 
-		// Collect unique zoom levels needed by the current leaf set
-		const zoomsNeeded = new Set(leafTiles.map(({ node }) => elevationProvider.zoomForLod(node.lod)))
-		const bounds = leafBounds(leafTiles, geoOrigin)
+		// Group leaf nodes by their zoom level so each prefetch covers only the
+		// tiles actually needed at that resolution — avoids over-fetching coarse
+		// zoom tiles across the entire leaf extent.
+		const nodesByZoom = new Map()
+		for (const leaf of leafTiles) {
+			const zoom = elevationProvider.zoomForLod(leaf.node.lod)
+			if (!nodesByZoom.has(zoom)) nodesByZoom.set(zoom, [])
+			nodesByZoom.get(zoom).push(leaf)
+		}
 
-		for (const zoom of zoomsNeeded) {
+		for (const [zoom, nodes] of nodesByZoom) {
+			const bounds = leafBounds(nodes, geoOrigin)
 			elevationProvider
 				.prefetch(bounds.northLat, bounds.southLat, bounds.westLng, bounds.eastLng, zoom)
 				.then((hasNewTiles) => {
