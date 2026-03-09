@@ -2,6 +2,10 @@
   publish = "dist"
   command = "npm run build"
 
+[dev]
+  targetPort = 5173
+  framework = "vite"
+
 # Edge functions
 [[edge_functions]]
   function = "tiles"

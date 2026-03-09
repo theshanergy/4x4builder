@@ -25,3 +25,6 @@ dist-ssr
 # Temp tile cache
 server/tile-cache/
 *.sw?
+
+# Netlify
+.netlify
