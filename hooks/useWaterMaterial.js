@@ -82,7 +82,7 @@ const useWaterMaterial = () => {
 				sunColor: { value: sunColor.clone() },
 				sunDirection: { value: sunDirection.clone() },
 				eye: { value: new Vector3() },
-				waterColor: { value: new Color(WATER_CONFIG.waterColor[0], WATER_CONFIG.waterColor[1], WATER_CONFIG.waterColor[2]) },
+				waterColor: { value: new Color(WATER_CONFIG.waterColor) },
 
 				// Sky colors for reflection fallback
 				skyColor: { value: skyColorZenith.clone() },

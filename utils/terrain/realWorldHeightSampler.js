@@ -16,6 +16,7 @@
 
 import { Vector3 } from 'three'
 import { worldToLatLng } from './geoProjection.js'
+import WATER_CONFIG from '../../config/water.js'
 
 // Epsilon for numerical gradient (metres). Fine-grained enough to detect
 // realistic slopes without introducing noise from tile pixel boundaries.
@@ -71,11 +72,12 @@ export const createTerrainHelpers = (elevationProvider, geoOrigin, dataVersion =
 	}
 
 	/**
-	 * Whether a world position is below sea level (height < 0).
-	 * Coastlines are automatic — no special configuration needed.
+	 * Whether a world position is at or below sea level.
+	 * Uses WATER_CONFIG.level (SEA_LEVEL) as the threshold — see config/water.js
+	 * for why <= is correct with Terrarium elevation data.
 	 */
 	const isWater = (worldX, worldZ) => {
-		return getHeight(worldX, worldZ) < 0
+		return getHeight(worldX, worldZ) <= WATER_CONFIG.level
 	}
 
 	/**

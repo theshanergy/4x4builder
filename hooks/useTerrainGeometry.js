@@ -173,7 +173,7 @@ function buildGeometry(node, terrainHelpers, edgeStitchInfo) {
 			worldZForUV[vertIndex] = uvWorldZ
 
 			// Calculate water depth and flow velocity
-			if (height < WATER_CONFIG.level) {
+			if (height <= WATER_CONFIG.level) {
 				depths[vertIndex] = WATER_CONFIG.level - height
 				hasWater = true
 
