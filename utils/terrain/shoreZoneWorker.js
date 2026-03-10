@@ -15,10 +15,9 @@ self.onmessage = ({ data: { elevations, z, config } }) => {
 	const sz = ELEVATION_TILE_SIZE
 	const pixelSize = 156543 / (2 ** z)
 
-	const { level: waterLevel, syntheticShoreThreshold, syntheticMaxDepth, syntheticFalloffDistance, syntheticBlendThreshold } = config
+	const { level: waterLevel, syntheticShoreThreshold, syntheticMaxDepth, syntheticFalloffDistance } = config
 	const shoreLevel = waterLevel + syntheticShoreThreshold
 	const falloffDist = syntheticFalloffDistance
-	const blendThresh = syntheticBlendThreshold
 	const maxDepth = syntheticMaxDepth
 
 	// BFS distance transform — seeded from solid-land pixels
@@ -50,7 +49,7 @@ self.onmessage = ({ data: { elevations, z, config } }) => {
 		if (height > shoreLevel) continue
 
 		const dist = distPx[i] * pixelSize
-		const t = Math.max(0, Math.min(1, (dist - blendThresh) / (falloffDist - blendThresh)))
+		const t = Math.max(0, Math.min(1, dist / falloffDist))
 		const syntheticH = waterLevel - maxDepth * t * t * (3 - 2 * t)
 		const rawBlend = Math.max(0, Math.min(1, (height - waterLevel) / syntheticShoreThreshold))
 		const blend = rawBlend * rawBlend * (3 - 2 * rawBlend)

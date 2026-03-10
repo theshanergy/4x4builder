@@ -74,7 +74,6 @@ export class ElevationProvider extends TileProvider {
 				syntheticShoreThreshold: WATER_CONFIG.syntheticShoreThreshold,
 				syntheticMaxDepth: WATER_CONFIG.syntheticMaxDepth,
 				syntheticFalloffDistance: WATER_CONFIG.syntheticFalloffDistance,
-				syntheticBlendThreshold: WATER_CONFIG.syntheticBlendThreshold,
 			}}, [elevations.buffer])
 		})
 
