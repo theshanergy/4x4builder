@@ -112,6 +112,14 @@ export class TileProvider {
 	}
 
 	/**
+	 * Like getTile but does NOT promote to MRU.
+	 * Use in tight sampling loops (e.g. geometry building) to avoid Map churn.
+	 */
+	peekTile(z, x, y) {
+		return this._mem.get(this._key(z, x, y)) ?? null
+	}
+
+	/**
 	 * Whether a tile is present in the in-process memory cache.
 	 */
 	isCached(z, x, y) {

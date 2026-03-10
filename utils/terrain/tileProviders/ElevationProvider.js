@@ -15,6 +15,7 @@
 import { TileProvider } from './TileProvider.js'
 import { latLngToTile, getElevationZoom } from '../geoProjection.js'
 import WATER_CONFIG from '../../../config/water.js'
+import ShoreZoneWorker from '../shoreZoneWorker.js?worker'
 
 export const ELEVATION_TILE_SIZE = 256
 
@@ -30,6 +31,14 @@ export class ElevationProvider extends TileProvider {
 		super({ type: 'elevation', serverBase, memoryCap })
 		this.verticalScale = verticalScale
 		this.lodZoomLevels = lodZoomLevels
+
+		// Persistent worker for BFS shore processing. Multiple tiles may decode
+		// concurrently, so we keep a FIFO queue of pending resolve callbacks.
+		this._shoreWorker = new ShoreZoneWorker()
+		this._shoreWorkerQueue = []
+		this._shoreWorker.onmessage = ({ data: { elevations } }) => {
+			this._shoreWorkerQueue.shift()?.(elevations)
+		}
 	}
 
 	/**
@@ -56,76 +65,20 @@ export class ElevationProvider extends TileProvider {
 			elevations[i] = (r * 256 + g + b / 256 - 32768) * this.verticalScale
 		}
 
-		// Post-process: replace inaccurate Terrarium shore data with synthetic depth.
-		// This modifies the tile in-place so all subsequent getHeight() calls return
-		// consistent corrected values — stitching and normals stay seam-free.
-		this.processShoreZone(elevations, z)
+		// Post-process off the main thread: BFS distance transform + synthetic depth blend.
+		// Transfer the buffer to the worker (zero-copy), await the processed result.
+		const processed = await new Promise((resolve) => {
+			this._shoreWorkerQueue.push(resolve)
+			this._shoreWorker.postMessage({ elevations, z, config: {
+				level: WATER_CONFIG.level,
+				syntheticShoreThreshold: WATER_CONFIG.syntheticShoreThreshold,
+				syntheticMaxDepth: WATER_CONFIG.syntheticMaxDepth,
+				syntheticFalloffDistance: WATER_CONFIG.syntheticFalloffDistance,
+				syntheticBlendThreshold: WATER_CONFIG.syntheticBlendThreshold,
+			}}, [elevations.buffer])
+		})
 
-		return elevations
-	}
-
-	/**
-	 * BFS distance transform on the raw 256×256 elevation tile.
-	 * For every pixel in the "shore zone" (height ≤ water level + shoreThreshold),
-	 * compute the pixel-distance to the nearest solid-land pixel (height > shoreLevel),
-	 * convert to world metres, then blend between a synthetic depth-from-shore curve
-	 * and the original Terrarium height — exactly as requested in config/water.js.
-	 *
-	 * @param {Float32Array} elevations - Decoded tile, modified in place
-	 * @param {number} z - Tile zoom level, used to convert pixel distance → metres
-	 */
-	processShoreZone(elevations, z) {
-		const sz = ELEVATION_TILE_SIZE
-		// Approximate world-space metres per pixel at this zoom level (equirectangular)
-		const pixelSize = 156543 / Math.pow(2, z)
-
-		const waterLevel = WATER_CONFIG.level
-		const shoreThreshold = WATER_CONFIG.syntheticShoreThreshold
-		const maxDepth = WATER_CONFIG.syntheticMaxDepth
-		const falloffDist = WATER_CONFIG.syntheticFalloffDistance
-		const blendThresh = WATER_CONFIG.syntheticBlendThreshold
-		const shoreLevel = waterLevel + shoreThreshold
-
-		// BFS distance transform — distances in pixels, seeded from solid-land pixels
-		const distPx = new Float32Array(sz * sz).fill(Infinity)
-		const queue = []
-		let head = 0
-
-		for (let i = 0; i < sz * sz; i++) {
-			if (elevations[i] > shoreLevel) {
-				distPx[i] = 0
-				queue.push(i)
-			}
-		}
-
-		while (head < queue.length) {
-			const idx = queue[head++]
-			const next = distPx[idx] + 1
-			const row = Math.floor(idx / sz)
-			const col = idx % sz
-			if (row > 0)    { const n = idx - sz; if (next < distPx[n]) { distPx[n] = next; queue.push(n) } }
-			if (row < sz-1) { const n = idx + sz; if (next < distPx[n]) { distPx[n] = next; queue.push(n) } }
-			if (col > 0)    { const n = idx - 1;  if (next < distPx[n]) { distPx[n] = next; queue.push(n) } }
-			if (col < sz-1) { const n = idx + 1;  if (next < distPx[n]) { distPx[n] = next; queue.push(n) } }
-		}
-
-		// Apply synthetic blend for all shore-zone pixels
-		for (let i = 0; i < sz * sz; i++) {
-			const height = elevations[i]
-			if (height > shoreLevel) continue // solid land — leave untouched
-
-			const dist = distPx[i] * pixelSize // pixels → metres
-
-			// Depth curve: 0 within blendThresh, ramps to maxDepth at falloffDist
-			const t = Math.max(0, Math.min(1, (dist - blendThresh) / (falloffDist - blendThresh)))
-			const syntheticH = waterLevel - maxDepth * t * t * (3 - 2 * t)
-
-			// Blend: 0 at water level (fully synthetic) → 1 at shoreLevel (fully Terrarium)
-			const rawBlend = Math.max(0, Math.min(1, (height - waterLevel) / shoreThreshold))
-			const blend = rawBlend * rawBlend * (3 - 2 * rawBlend)
-
-			elevations[i] = syntheticH + (height - syntheticH) * blend
-		}
+		return processed
 	}
 
 	// ---------------------------------------------------------------------------
@@ -175,7 +128,9 @@ export class ElevationProvider extends TileProvider {
 	getElevation(lat, lng, preferredZoom) {
 		for (let zoom = preferredZoom; zoom >= 6; zoom--) {
 			const { x, y, fracX, fracY } = latLngToTile(lat, lng, zoom)
-			const tile = this.getTile(zoom, x, y)
+			// peekTile: skip LRU promotion — getElevation is called hundreds of times per
+			// geometry build and these tiles are already hot; the Map churn is wasted work.
+			const tile = this.peekTile(zoom, x, y)
 			if (tile) return this.sampleBilinear(tile, fracX, fracY)
 		}
 		return null

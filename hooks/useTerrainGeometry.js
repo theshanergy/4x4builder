@@ -97,62 +97,40 @@ function buildGeometry(node, terrainHelpers, edgeStitchInfo) {
 		}
 	}
 
-	// Pre-compute stitch decisions for all edge vertices to avoid redundant checks
-	// This caches which vertices need stitching and what parameters to use
-	const stitchCache = new Map()
-	for (let j = 0; j < sampleCount; j++) {
-		const onSouthEdge = j === 0
-		const onNorthEdge = j === segments
-		for (let i = 0; i < sampleCount; i++) {
-			const onWestEdge = i === 0
-			const onEastEdge = i === segments
-
-			// Only cache edge vertices that need stitching
-			if (onWestEdge && westNeedsStitch) {
-				stitchCache.set(j * sampleCount + i, { step: westStep, axis: 'z' })
-			} else if (onEastEdge && eastNeedsStitch) {
-				stitchCache.set(j * sampleCount + i, { step: eastStep, axis: 'z' })
-			} else if (onSouthEdge && southNeedsStitch) {
-				stitchCache.set(j * sampleCount + i, { step: southStep, axis: 'x' })
-			} else if (onNorthEdge && northNeedsStitch) {
-				stitchCache.set(j * sampleCount + i, { step: northStep, axis: 'x' })
-			}
-		}
-	}
-
 	// First pass: sample heights and cache them
 	let vertIndex = 0
 	for (let j = 0; j < sampleCount; j++) {
 		const localZ = j * step
 		const worldZ = originZ + localZ
+		const onSouthEdge = j === 0
+		const onNorthEdge = j === segments
 
 		for (let i = 0; i < sampleCount; i++) {
 			const localX = i * step
 			const worldX = originX + localX
+			const onWestEdge = i === 0
+			const onEastEdge = i === segments
 
 			let height
 			let uvWorldX = worldX
 			let uvWorldZ = worldZ
 
-			// Check stitch cache for this vertex
-			const stitchInfo = stitchCache.get(vertIndex)
-			if (stitchInfo) {
-				// Apply cached stitch parameters
-				height = getStitchedHeight(worldX, worldZ, stitchInfo.step, stitchInfo.axis)
-				heightCache[vertIndex] = height
-
-				// Snap UVs to coarse neighbor's grid points
-				// Water shader uses UVs for wave calculations
-				if (stitchInfo.axis === 'z') {
-					uvWorldZ = Math.round(worldZ / stitchInfo.step) * stitchInfo.step
-				} else {
-					uvWorldX = Math.round(worldX / stitchInfo.step) * stitchInfo.step
-				}
+			if (onWestEdge && westNeedsStitch) {
+				height = getStitchedHeight(worldX, worldZ, westStep, 'z')
+				uvWorldZ = Math.round(worldZ / westStep) * westStep
+			} else if (onEastEdge && eastNeedsStitch) {
+				height = getStitchedHeight(worldX, worldZ, eastStep, 'z')
+				uvWorldZ = Math.round(worldZ / eastStep) * eastStep
+			} else if (onSouthEdge && southNeedsStitch) {
+				height = getStitchedHeight(worldX, worldZ, southStep, 'x')
+				uvWorldX = Math.round(worldX / southStep) * southStep
+			} else if (onNorthEdge && northNeedsStitch) {
+				height = getStitchedHeight(worldX, worldZ, northStep, 'x')
+				uvWorldX = Math.round(worldX / northStep) * northStep
 			} else {
-				// No stitching needed - sample directly
 				height = terrainHelpers.getHeight(worldX, worldZ)
-				heightCache[vertIndex] = height
 			}
+			heightCache[vertIndex] = height
 			const posIndex = vertIndex * 3
 			const uvIndex = vertIndex * 2
 
@@ -179,22 +157,15 @@ function buildGeometry(node, terrainHelpers, edgeStitchInfo) {
 	// Depth and flow pass: tile data is already post-processed by ElevationProvider
 	// (shore-zone pixels have been blended with synthetic depth-from-shore), so
 	// any vertex below water level already has a plausible depth baked in.
-	vertIndex = 0
-	for (let j = 0; j < sampleCount; j++) {
-		for (let i = 0; i < sampleCount; i++) {
-			const height = heightCache[vertIndex]
-			if (height <= WATER_CONFIG.level) {
-				hasWater = true
-				depths[vertIndex] = WATER_CONFIG.level - height
-				const flow = terrainHelpers.getFlow(worldXForUV[vertIndex], worldZForUV[vertIndex])
-				flowDirs[vertIndex * 2] = flow.direction.x * flow.velocity * flow.strength
-				flowDirs[vertIndex * 2 + 1] = flow.direction.z * flow.velocity * flow.strength
-			} else {
-				depths[vertIndex] = 0
-				flowDirs[vertIndex * 2] = 0
-				flowDirs[vertIndex * 2 + 1] = 0
-			}
-			vertIndex++
+	// depths and flowDirs are zero-initialized Float32Arrays, so only underwater vertices need writing
+	for (let v = 0; v < totalSamples; v++) {
+		const height = heightCache[v]
+		if (height <= WATER_CONFIG.level) {
+			hasWater = true
+			depths[v] = WATER_CONFIG.level - height
+			const flow = terrainHelpers.getFlow(worldXForUV[v], worldZForUV[v])
+			flowDirs[v * 2] = flow.direction.x * flow.velocity * flow.strength
+			flowDirs[v * 2 + 1] = flow.direction.z * flow.velocity * flow.strength
 		}
 	}
 
