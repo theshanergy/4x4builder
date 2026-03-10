@@ -195,7 +195,7 @@ export class TileProvider {
 			const db = await openIDB()
 			const raw = await idbGet(db, key)
 			if (raw) {
-				const decoded = await this.decode(raw)
+				const decoded = await this.decode(raw, z, x, y)
 				this._store(key, decoded)
 				return decoded
 			}
@@ -215,7 +215,7 @@ export class TileProvider {
 			.then((db) => idbPut(db, key, buffer))
 			.catch(() => {})
 
-		const decoded = await this.decode(buffer)
+		const decoded = await this.decode(buffer, z, x, y)
 		this._store(key, decoded)
 		return decoded
 	}

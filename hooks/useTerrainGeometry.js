@@ -172,15 +172,21 @@ function buildGeometry(node, terrainHelpers, edgeStitchInfo) {
 			worldXForUV[vertIndex] = uvWorldX
 			worldZForUV[vertIndex] = uvWorldZ
 
-			// Calculate water depth and flow velocity
-			if (height <= WATER_CONFIG.level) {
-				depths[vertIndex] = WATER_CONFIG.level - height
-				hasWater = true
+			vertIndex++
+		}
+	}
 
-				// Get river flow at this position
-				const flow = terrainHelpers.getFlow(uvWorldX, uvWorldZ)
-				// Store flow velocity vector (direction * velocity * strength)
-				// This gives us the actual m/s velocity to use directly in shader
+	// Depth and flow pass: tile data is already post-processed by ElevationProvider
+	// (shore-zone pixels have been blended with synthetic depth-from-shore), so
+	// any vertex below water level already has a plausible depth baked in.
+	vertIndex = 0
+	for (let j = 0; j < sampleCount; j++) {
+		for (let i = 0; i < sampleCount; i++) {
+			const height = heightCache[vertIndex]
+			if (height <= WATER_CONFIG.level) {
+				hasWater = true
+				depths[vertIndex] = WATER_CONFIG.level - height
+				const flow = terrainHelpers.getFlow(worldXForUV[vertIndex], worldZForUV[vertIndex])
 				flowDirs[vertIndex * 2] = flow.direction.x * flow.velocity * flow.strength
 				flowDirs[vertIndex * 2 + 1] = flow.direction.z * flow.velocity * flow.strength
 			} else {
