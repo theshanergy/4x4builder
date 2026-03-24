@@ -4,6 +4,7 @@ import Drawer from './Drawer'
 import Editor from './Editor'
 import Logo from './Logo'
 import MultiplayerPanel from './MultiplayerPanel'
+import FeedbackButton from './FeedbackButton'
 
 // Sidebar component
 const Sidebar = () => {
@@ -25,6 +26,7 @@ const Sidebar = () => {
 			</div>
 			<Editor />
 			<MultiplayerPanel />
+			<FeedbackButton />
 		</Drawer>
 	)
 }

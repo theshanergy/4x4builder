@@ -1,6 +1,7 @@
 import vehicleConfigs from '../../vehicleConfigs'
 import EditorSection from './EditorSection'
 import useGameStore from '../../store/gameStore'
+import FeedbackForm from './FeedbackForm'
 
 import VehicleIcon from '../../assets/images/icons/Vehicle.svg'
 import SuspensionIcon from '../../assets/images/icons/Suspension.svg'
@@ -16,6 +17,7 @@ function Editor() {
     const currentVehicle = useGameStore((state) => state.currentVehicle) || {}
 
     const setVehicle = useGameStore((state) => state.setVehicle)
+    const showNotification = useGameStore((state) => state.showNotification)
     const physicsEnabled = useGameStore((state) => state.physicsEnabled)
     const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
     const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
@@ -23,6 +25,25 @@ function Editor() {
 
     // Memoize vehicle config to avoid repeated lookups
     const vehicleConfig = currentVehicle.body ? vehicleConfigs.vehicles[currentVehicle.body] : null
+
+    const handleRequestVehicle = () => {
+        const handleSuccess = () => {
+            showNotification({
+                type: 'success',
+                title: 'Thanks!',
+                text: 'Your vehicle request has been received. We appreciate your feedback.',
+                centered: true,
+                confirmButtonText: 'Close',
+            })
+        }
+        showNotification({
+            title: 'Vehicle Request',
+            content: <FeedbackForm onSuccess={handleSuccess} placeholder="Would you like your vehicle added or is there an addon we're missing? Let us know!" />,
+            showCancelButton: true,
+            cancelButtonText: 'Close',
+            hideConfirm: true,
+        })
+    }
     const hasAddons = vehicleConfig?.addons && Object.keys(vehicleConfig.addons).length > 0
     const hasSpare = vehicleConfig?.spare_wheel
     const hasLighting = vehicleConfig?.lighting && Object.keys(vehicleConfig.lighting).length > 0
@@ -89,6 +110,9 @@ function Editor() {
                     <label>Model</label>
                     <GroupedSelect value={currentVehicle.body} itemList={vehicleConfigs.vehicles} groupBy={'make'} onChange={(e) => setVehicle({ body: e.target.value })} />
                 </div>
+                <button onClick={handleRequestVehicle} className='p-0 text-[11px] capitalize shadow-none text-stone-500 hover:text-stone-300 transition-colors bg-transparent border-none'>
+                    Request vehicle
+                </button>
             </EditorSection>
 
             {/* Paint */}

@@ -57,6 +57,7 @@
 		@apply inline-block;
 	}
 	input,
+	textarea,
 	button,
 	select {
 		@apply p-2 max-w-full border border-stone-800 bg-stone-900 text-stone-200 text-sm rounded shadow-sm outline-none;

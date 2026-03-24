@@ -84,7 +84,7 @@ const Drawer = ({ id, open: controlledOpen, defaultOpen = true, onToggle, classN
                 )}>
                 {open ? <CloseIcon className='w-full' /> : <GearIcon className='w-full' />}
             </div>
-            <div className={classNames('overflow-y-auto scrollbar-none', isVertical ? 'h-full' : 'h-[50vh]')}>{children}</div>
+            <div className={classNames('flex flex-col overflow-y-auto scrollbar-none', isVertical ? 'h-full' : 'h-[50vh]')}>{children}</div>
         </div>
     )
 }

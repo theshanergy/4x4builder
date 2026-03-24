@@ -76,7 +76,7 @@ const Notification = () => {
 
 				{notification.text && <p className={`text-gray-300 ${notification.centered ? 'text-center text-lg' : ''}`}>{notification.text}</p>}
 
-				{notification.html && <div dangerouslySetInnerHTML={{ __html: notification.html }} />}
+				{notification.content}
 
 				{notification.input && (
 					<input
@@ -114,15 +114,17 @@ const Notification = () => {
 						</button>
 					)}
 
-					<button
-						className={
-							notification.type === 'success'
-								? 'bg-green-600 hover:bg-green-500 w-full max-w-xs justify-center py-3 text-base shadow-lg shadow-green-900/20'
-								: 'primary'
-						}
-						onClick={handleConfirm}>
-						{notification.confirmButtonText || 'OK'}
-					</button>
+					{!notification.hideConfirm && (
+						<button
+							className={
+								notification.type === 'success'
+									? 'bg-green-600 hover:bg-green-500 w-full max-w-xs justify-center py-3 text-base shadow-lg shadow-green-900/20'
+									: 'primary'
+							}
+							onClick={handleConfirm}>
+							{notification.confirmButtonText || 'OK'}
+						</button>
+					)}
 				</div>
 			</div>
 		</div>

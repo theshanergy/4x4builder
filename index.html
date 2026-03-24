@@ -25,6 +25,11 @@
 	</head>
 	<body>
 		<div id="root"></div>
+		<!-- Hidden form for Netlify build-time detection -->
+		<form name="feedback" data-netlify="true" hidden>
+			<input type="email" name="email" />
+			<textarea name="message"></textarea>
+		</form>
 		<script type="module" src="/main.jsx"></script>
 	</body>
 </html>
