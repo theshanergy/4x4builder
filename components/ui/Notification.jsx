@@ -8,6 +8,7 @@ const Notification = () => {
 	const hideNotification = useGameStore((state) => state.hideNotification)
 
 	const [inputValue, setInputValue] = useState('')
+	const [submitting, setSubmitting] = useState(false)
 	const inputRef = useRef(null)
 
 	// Reset input value when notification changes
@@ -23,19 +24,30 @@ const Notification = () => {
 	if (!notification) return null
 
 	// Confirm the notification
-	const handleConfirm = () => {
+	const handleConfirm = async () => {
 		const currentId = notification.id
 		if (notification.onConfirm) {
-			notification.onConfirm({
-				isConfirmed: true,
-				value: inputValue,
-				isDismissed: false,
-			})
-		}
-
-		// Hide if no new notification was shown
-		if (useGameStore.getState().notification?.id === currentId) {
-			hideNotification()
+			setSubmitting(true)
+			try {
+				await notification.onConfirm({
+					isConfirmed: true,
+					value: inputValue,
+					isDismissed: false,
+				})
+				// Hide if no new notification was shown
+				if (useGameStore.getState().notification?.id === currentId) {
+					hideNotification()
+				}
+			} catch {
+				// error is handled inside the content (e.g. form shows inline error)
+			} finally {
+				setSubmitting(false)
+			}
+		} else {
+			// Hide if no new notification was shown
+			if (useGameStore.getState().notification?.id === currentId) {
+				hideNotification()
+			}
 		}
 	}
 
@@ -121,8 +133,9 @@ const Notification = () => {
 									? 'bg-green-600 hover:bg-green-500 w-full max-w-xs justify-center py-3 text-base shadow-lg shadow-green-900/20'
 									: 'primary'
 							}
+							disabled={submitting}
 							onClick={handleConfirm}>
-							{notification.confirmButtonText || 'OK'}
+							{submitting ? 'Sending…' : (notification.confirmButtonText || 'OK')}
 						</button>
 					)}
 				</div>

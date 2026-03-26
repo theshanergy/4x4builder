@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import useInputStore from '../../../store/inputStore'
 import useMultiplayerStore from '../../../store/multiplayerStore'
+import useGameStore from '../../../store/gameStore'
 
 // Standard gamepad button/axis indices (Xbox layout)
 const GAMEPAD = {
@@ -34,6 +35,7 @@ const InputManager = () => {
 		// Normalize key to handle Shift+key case changes
 		// e.g., pressing 'w' then Shift will fire keyup as 'W'
 		const normalizeKey = (key) => {
+			if (!key) return key
 			// Only normalize single character keys (letters)
 			if (key.length === 1) {
 				return key.toLowerCase()
@@ -42,7 +44,8 @@ const InputManager = () => {
 		}
 
 		const handleKeyDown = (e) => {
-			// Ignore keyboard input when chat is open
+			// Ignore keyboard input when a modal or chat is open
+			if (useGameStore.getState().notification) return
 			if (useMultiplayerStore.getState().chatOpen) return
 			setKey(normalizeKey(e.key), true)
 		}

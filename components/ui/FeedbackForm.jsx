@@ -1,39 +1,35 @@
-import { useState } from 'react'
+import { useState, forwardRef, useImperativeHandle } from 'react'
 
 const encode = (data) =>
 	Object.keys(data)
 		.map((key) => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
 		.join('&')
 
-// Feedback form rendered inside the Notification modal
-const FeedbackForm = ({ onSuccess, placeholder = 'Share your thoughts, bug reports, or feature requests…' }) => {
+// Feedback form rendered inside the Notification modal.
+// Exposes a submit() method via ref so the Notification's confirm button can trigger submission.
+const FeedbackForm = forwardRef(({ onSuccess, placeholder = 'Share your thoughts, bug reports, or feature requests…' }, ref) => {
 	const [email, setEmail] = useState('')
 	const [message, setMessage] = useState('')
-	const [submitting, setSubmitting] = useState(false)
 	const [error, setError] = useState(null)
 
-	const handleSubmit = async (e) => {
-		e.preventDefault()
-		setSubmitting(true)
-		setError(null)
-
-		try {
+	useImperativeHandle(ref, () => ({
+		submit: async () => {
+			setError(null)
 			const response = await fetch('/', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 				body: encode({ 'form-name': 'feedback', email, message }),
 			})
-
-			if (!response.ok) throw new Error('Submission failed')
+			if (!response.ok) {
+				setError('Something went wrong. Please try again.')
+				throw new Error('Submission failed')
+			}
 			onSuccess()
-		} catch {
-			setError('Something went wrong. Please try again.')
-			setSubmitting(false)
-		}
-	}
+		},
+	}), [email, message, onSuccess])
 
 	return (
-		<form onSubmit={handleSubmit} className='space-y-4'>
+		<form className='space-y-4'>
 			<div>
 				<label htmlFor='feedback-email'>Email <span className='text-gray-500 font-normal'>(optional)</span></label>
 				<input
@@ -54,17 +50,15 @@ const FeedbackForm = ({ onSuccess, placeholder = 'Share your thoughts, bug repor
 					value={message}
 					onChange={(e) => setMessage(e.target.value)}
 					placeholder={placeholder}
-					required
 					rows={4}
 					className='w-full'
 				/>
 			</div>
 			{error && <p className='text-red-400 text-sm'>{error}</p>}
-			<button type='submit' disabled={submitting} className='w-full justify-center'>
-				{submitting ? 'Sending…' : 'Send Feedback'}
-			</button>
 		</form>
 	)
-}
+})
+
+FeedbackForm.displayName = 'FeedbackForm'
 
 export default FeedbackForm

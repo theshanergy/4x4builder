@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import vehicleConfigs from '../../vehicleConfigs'
 import EditorSection from './EditorSection'
 import useGameStore from '../../store/gameStore'
@@ -26,6 +27,8 @@ function Editor() {
     // Memoize vehicle config to avoid repeated lookups
     const vehicleConfig = currentVehicle.body ? vehicleConfigs.vehicles[currentVehicle.body] : null
 
+    const requestVehicleFormRef = useRef()
+
     const handleRequestVehicle = () => {
         const handleSuccess = () => {
             showNotification({
@@ -37,11 +40,12 @@ function Editor() {
             })
         }
         showNotification({
-            title: 'Vehicle Request',
-            content: <FeedbackForm onSuccess={handleSuccess} placeholder="Would you like your vehicle added or is there an addon we're missing? Let us know!" />,
+            title: 'Request Vehicle',
+            content: <FeedbackForm ref={requestVehicleFormRef} onSuccess={handleSuccess} placeholder="Is there a particular vehicle or addon we're missing? Let us know!" />,
             showCancelButton: true,
             cancelButtonText: 'Close',
-            hideConfirm: true,
+            confirmButtonText: 'Send Request',
+            onConfirm: () => requestVehicleFormRef.current.submit(),
         })
     }
     const hasAddons = vehicleConfig?.addons && Object.keys(vehicleConfig.addons).length > 0

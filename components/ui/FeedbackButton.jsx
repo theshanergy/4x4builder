@@ -1,9 +1,11 @@
+import { useRef } from 'react'
 import useGameStore from '../../store/gameStore'
 import FeedbackForm from './FeedbackForm'
 import ChatIcon from '../../assets/images/icons/Chat.svg'
 
 const FeedbackButton = () => {
 	const showNotification = useGameStore((state) => state.showNotification)
+	const formRef = useRef()
 
 	const handleSuccess = () => {
 		showNotification({
@@ -17,11 +19,12 @@ const FeedbackButton = () => {
 
 	const handleClick = () => {
 		showNotification({
-			title: '4x4 Builder Feedback',
-			content: <FeedbackForm onSuccess={handleSuccess} />,
+			title: 'Feedback',
+			content: <FeedbackForm ref={formRef} onSuccess={handleSuccess} />,
 			showCancelButton: true,
 			cancelButtonText: 'Close',
-			hideConfirm: true,
+			confirmButtonText: 'Send Feedback',
+			onConfirm: () => formRef.current.submit(),
 		})
 	}
 
