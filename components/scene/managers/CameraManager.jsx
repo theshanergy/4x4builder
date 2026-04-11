@@ -5,7 +5,7 @@ import { OrbitControls } from '@react-three/drei'
 
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 
 // Camera modes enum
 const CameraMode = {

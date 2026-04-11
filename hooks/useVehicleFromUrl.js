@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation, useParams, useNavigate } from 'react-router-dom'
 import useGameStore from '../store/gameStore'
-import vehicleConfigs from '../vehicleConfigs'
+import vehicleConfigs from '../config/vehicles'
 
 // Hook to load vehicle from URL (handles both ?config= query params and /:slug paths)
 export default function useVehicleFromUrl() {

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import vehicleConfigs from '../vehicleConfigs'
+import vehicleConfigs from '../config/vehicles'
 
 // Constant rotation value (90 degrees in radians)
 const WHEEL_ROTATION = (Math.PI * 90) / 180

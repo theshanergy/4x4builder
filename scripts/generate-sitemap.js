@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import vehicleConfigs from '../vehicleConfigs.js';
+import vehicleConfigs from '../config/vehicles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_URL = 'https://4x4builder.com';

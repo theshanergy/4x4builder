@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import vehicleConfigs from '../../vehicleConfigs'
+import vehicleConfigs from '../../config/vehicles'
 import EditorSection from './EditorSection'
 import useGameStore from '../../store/gameStore'
 import FeedbackForm from './FeedbackForm'

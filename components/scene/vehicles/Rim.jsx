@@ -1,7 +1,7 @@
 import { memo, useMemo, useEffect } from 'react'
 import { useGLTF } from '@react-three/drei'
 
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 import useMaterialProperties from '../../../hooks/useMaterialProperties'
 import cloneWithMaterials from '../../../utils/cloneWithMaterials'
 

@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { Vector3 } from 'three'
 
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 import useTireDirtMaterial from '../../../hooks/useTireDirtMaterial'
 
 // Calculate point on line (a to b, at length)

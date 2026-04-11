@@ -2,7 +2,7 @@ import { memo, useMemo, useRef, useEffect, Suspense } from 'react'
 import { Vector3, Quaternion, MathUtils } from 'three'
 import { useFrame } from '@react-three/fiber'
 
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
 
 import Wheels from './Wheels'

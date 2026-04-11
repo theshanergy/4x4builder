@@ -1,7 +1,7 @@
 import { memo, useMemo, useRef, useLayoutEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 import Wheel from './Wheel'
 
 // Wheels - container component that positions wheel groups (including spare wheel)

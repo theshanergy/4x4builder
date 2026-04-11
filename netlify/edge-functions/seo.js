@@ -1,4 +1,4 @@
-import vehicleConfigs from '../../vehicleConfigs.js'
+import vehicleConfigs from '../../config/vehicles.js'
 
 // SEO configuration
 const BASE_URL = 'https://4x4builder.com'

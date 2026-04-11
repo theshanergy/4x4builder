@@ -1,7 +1,7 @@
 import { memo, useMemo, useRef, useLayoutEffect, Suspense, forwardRef } from 'react'
 import { useGLTF } from '@react-three/drei'
 
-import vehicleConfigs from '../../../vehicleConfigs'
+import vehicleConfigs from '../../../config/vehicles'
 import useAnimateHeight from '../../../hooks/useAnimateHeight'
 import useMaterialProperties from '../../../hooks/useMaterialProperties'
 import cloneWithMaterials from '../../../utils/cloneWithMaterials'
