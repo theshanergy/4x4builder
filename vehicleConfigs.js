@@ -605,6 +605,40 @@ const vehicleConfigs = {
 				],
 			},
 		},
+		ram_1500_dt_cc: {
+			slug: 'ram-1500-dt-crew-cab',
+			name: 'RAM 1500 Crew Cab',
+			year: '2019+',
+			make: 'RAM',
+			model: '/assets/models/vehicles/ram/1500/dt/1500_crew_cab.glb',
+			wheel_offset: 0.85,
+			wheelbase: 3.453,
+			driverPosition: [0.55, 1.75, 0.3],
+			default_addons: {},
+			addons: {},
+			lighting: {
+				lightbar: [
+					{
+						name: 'Grille Light Bar',
+						width: 16,
+						rows: 2,
+						color: 'white',
+						position: [0, 0.46, 2.66],
+						rotation: [0, 0, 0],
+						curvature: 9,
+					},
+					{
+						name: 'Ditch Lights',
+						width: 2,
+						rows: 2,
+						color: 'white',
+						position: [0.87, 1.0, 1.25],
+						rotation: [0, 0.45, 0],
+						pair: true,
+					},
+				],
+			},
+		},
 	},
 	wheels: {
 		rims: {
