@@ -12,7 +12,7 @@ import useVehicleBroadcast from '../../../hooks/useVehicleBroadcast'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
 
 import VehicleAudio from './VehicleAudio'
-import Dust from './Dust'
+import WheelParticles from './WheelParticles'
 import TireTracks from './TireTracks'
 import Wheels from './Wheels'
 import VehicleBody from './VehicleBody'
@@ -44,6 +44,9 @@ const Vehicle = () => {
 
 	// Get vehicle dimensions and wheel positions from shared hook
 	const { axleHeight, vehicleHeight, wheelbase, wheelPositions } = useVehicleDimensions(config)
+
+	// Convert wheel width from inches to meters
+	const wheelWidth = (config.rim_width * 2.54) / 100
 
 	// Create wheel configurations
 	const physicsWheels = useMemo(() => {
@@ -93,7 +96,7 @@ const Vehicle = () => {
 
 	return (
 		<>
-			<RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false} angularDamping={1}>
+			<RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false} linearDamping={0.05} angularDamping={1}>
 				<CuboidCollider args={colliderArgs} position={colliderPosition} />
 				<group ref={chassisGroupRef} name='Vehicle'>
 					<VehicleAudio />
@@ -130,8 +133,8 @@ const Vehicle = () => {
 			</RigidBody>
 			{!performanceDegraded && !isMobile && (
 				<>
-					<Dust vehicleController={vehicleController} wheelRefs={wheelRefs} />
-					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={(config.rim_width * 2.54) / 100} tireRadius={axleHeight} />
+					<WheelParticles vehicleController={vehicleController} wheelRefs={wheelRefs} wheelRadius={axleHeight} wheelWidth={wheelWidth} />
+					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={wheelWidth} tireRadius={axleHeight} />
 				</>
 			)}
 		</>
