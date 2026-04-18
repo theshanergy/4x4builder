@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import vehicleConfigs from '../../config/vehicles'
 import useGameStore from '../../store/gameStore'
 import Logo from './Logo'
@@ -55,6 +56,7 @@ const SpecItem = ({ label, value }) => {
 }
 
 const VehicleInfo = () => {
+	const navigate = useNavigate()
 	const currentVehicle = useGameStore((state) => state.currentVehicle)
 	const vehicleData = vehicleConfigs.vehicles[currentVehicle.body]
 	const infoMode = useGameStore((state) => state.infoMode)
@@ -63,7 +65,7 @@ const VehicleInfo = () => {
 	// Handle entering the configurator
 	const enterConfigurator = () => {
 		setInfoMode(false)
-		window.history.replaceState(null, '', '/')
+		navigate('/')
 	}
 
 	if (!vehicleData) {

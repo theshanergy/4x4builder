@@ -3,7 +3,6 @@ import ControllerIcon from '../../assets/images/icons/Gamepad.svg'
 import SaveIcon from '../../assets/images/icons/Save.svg'
 import ShareIcon from '../../assets/images/icons/Share.svg'
 import CameraIcon from '../../assets/images/icons/Camera.svg'
-import InfoIcon from '../../assets/images/icons/Info.svg'
 
 const Actions = () => {
 	// Get vehicle state from store using selectors
@@ -13,9 +12,6 @@ const Actions = () => {
 	const showNotification = useGameStore((state) => state.showNotification)
 	const controlsVisible = useGameStore((state) => state.controlsVisible)
 	const setControlsVisible = useGameStore((state) => state.setControlsVisible)
-	const infoMode = useGameStore((state) => state.infoMode)
-	const setInfoMode = useGameStore((state) => state.setInfoMode)
-
 	// Save current vehicle to local storage.
 	const saveVehicle = () => {
 		// Get the name of the existing vehicle, if available.
@@ -126,11 +122,6 @@ const Actions = () => {
 		setControlsVisible(!controlsVisible)
 	}
 
-	// Toggle info mode
-	const toggleInfoMode = () => {
-		setInfoMode(!infoMode)
-	}
-
 	return (
 		<div id='actions' className='flex gap-2 absolute bottom-4 right-4'>
 			<button title={controlsVisible ? 'Hide Controls' : 'Show Controls'} className={controlsVisible ? 'active' : ''} onClick={toggleControls}>
@@ -138,9 +129,6 @@ const Actions = () => {
 			</button>
 			<button title='Save Vehicle' className='secondary' onClick={saveVehicle}>
 				<SaveIcon className='icon' />
-			</button>
-			<button title='Vehicle Info' className={`secondary ${infoMode ? 'active' : ''}`} onClick={toggleInfoMode}>
-				<InfoIcon className='icon' />
 			</button>
 		</div>
 	)
