@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import vehicleConfigs from '../../config/vehicles'
 import EditorSection from './EditorSection'
 import useGameStore from '../../store/gameStore'
@@ -12,6 +12,57 @@ import TireIcon from '../../assets/images/icons/Tire.svg'
 import ToolIcon from '../../assets/images/icons/Tool.svg'
 import GearIcon from '../../assets/images/icons/Gear.svg'
 import LightIcon from '../../assets/images/icons/Light.svg'
+
+// Group object by key.
+const groupObjectByKey = (object, key) => {
+    const groups = {}
+    for (const id of Object.keys(object)) {
+        const type = object[id][key]
+        if (!groups[type]) groups[type] = []
+        groups[type].push(id)
+    }
+    return groups
+}
+
+// Select list grouped by provided type.
+const GroupedSelect = ({ value, itemList, groupBy, ...restProps }) => {
+    const groupedList = useMemo(() => groupObjectByKey(itemList, groupBy), [itemList, groupBy])
+
+    return (
+        <select value={value || ''} {...restProps}>
+            {Object.keys(groupedList).map((type) => (
+                <optgroup key={type} label={type}>
+                    {groupedList[type].map((id) => (
+                        <option key={id} value={id}>
+                            {itemList[id].name}{itemList[id].year ? ` (${itemList[id].year})` : ''}
+                        </option>
+                    ))}
+                </optgroup>
+            ))}
+        </select>
+    )
+}
+
+// Select list of different ranges in inches.
+const InchRangeSelect = ({ value, min, max, ...restProps }) => {
+    const elements = useMemo(() => {
+        const out = []
+        for (let i = min; i <= max; i++) {
+            out.push(
+                <option key={i} value={i}>
+                    {i}"
+                </option>
+            )
+        }
+        return out
+    }, [min, max])
+
+    return (
+        <select value={value || 0} {...restProps}>
+            {elements}
+        </select>
+    )
+}
 
 function Editor() {
     // Get vehicle state from store
@@ -51,59 +102,6 @@ function Editor() {
     const hasAddons = vehicleConfig?.addons && Object.keys(vehicleConfig.addons).length > 0
     const hasSpare = vehicleConfig?.spare_wheel
     const hasLighting = vehicleConfig?.lighting && Object.keys(vehicleConfig.lighting).length > 0
-
-    // Group object by key.
-    const groupObjectByKey = (object, key) => {
-        const groups = {}
-        // Loop through object keys.
-        for (const id of Object.keys(object)) {
-            const type = object[id][key]
-            // Create group key if doesnt exist.
-            if (!groups[type]) groups[type] = []
-            // Push item to group.
-            groups[type].push(id)
-        }
-        return groups
-    }
-
-    // Select list grouped by provided type.
-    const GroupedSelect = ({ value, itemList, groupBy, ...restProps }) => {
-        // Get list sorted by type.
-        const groupedList = groupObjectByKey(itemList, groupBy)
-
-        return (
-            <select value={value || ''} {...restProps}>
-                {Object.keys(groupedList).map((type) => (
-                    <optgroup key={type} label={type}>
-                        {groupedList[type].map((id) => (
-                            <option key={id} value={id}>
-                                {itemList[id].name}{itemList[id].year ? ` (${itemList[id].year})` : ''}
-                            </option>
-                        ))}
-                    </optgroup>
-                ))}
-            </select>
-        )
-    }
-
-    // Select list of different ranges in inches.
-    const InchRangeSelect = ({ value, min, max, ...restProps }) => {
-        let elements = []
-        // Build options.
-        for (let i = min; i <= max; i++) {
-            elements.push(
-                <option key={i} value={i}>
-                    {i}"
-                </option>
-            )
-        }
-
-        return (
-            <select value={value || 0} {...restProps}>
-                {elements}
-            </select>
-        )
-    }
 
     return (
         <div id='editor'>

@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from 'react'
+import { Suspense, useMemo, useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
 import { PerformanceMonitor } from '@react-three/drei'
@@ -14,13 +14,27 @@ import RemoteVehicleManager from './vehicles/RemoteVehicleManager'
 import Screenshot from '../ui/Screenshot'
 
 // Dev-only performance monitor - completely excluded from production bundle
-const PerfMonitor = import.meta.env.DEV ? (await import('./managers/PerformanceMonitor')).default : () => null
+const useDevPerfMonitor = () => {
+	const [Comp, setComp] = useState(null)
+	useEffect(() => {
+		if (!import.meta.env.DEV) return
+		let cancelled = false
+		import('./managers/PerformanceMonitor').then((m) => {
+			if (!cancelled) setComp(() => m.default)
+		})
+		return () => {
+			cancelled = true
+		}
+	}, [])
+	return Comp
+}
 
 // Canvas component
 const ThreeCanvas = () => {
 	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const setPerformanceDegraded = useGameStore((state) => state.setPerformanceDegraded)
+	const PerfMonitor = useDevPerfMonitor()
 
 	// Set default camera position based on aspect ratio
 	const cameraConfig = useMemo(() => {
@@ -35,7 +49,7 @@ const ThreeCanvas = () => {
 
 			<Canvas shadows={{ enabled: !performanceDegraded }} dpr={performanceDegraded ? 1 : [1, 1.5]} camera={cameraConfig}>
 				<PerformanceMonitor onDecline={() => setPerformanceDegraded(true)} />
-				<PerfMonitor />
+				{PerfMonitor ? <PerfMonitor /> : null}
 				<XR>
 					<InputManager />
 
