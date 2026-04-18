@@ -14,9 +14,9 @@ import {
 	Matrix4 
 } from 'three'
 
-import useGameStore, { vehicleState } from '../../../store/gameStore'
-import grassVertexShader from '../../../shaders/grass.vert.glsl'
-import grassFragmentShader from '../../../shaders/grass.frag.glsl'
+import useGameStore, { vehicleState } from '../../../../store/gameStore'
+import grassVertexShader from '../../../../shaders/grass.vert.glsl'
+import grassFragmentShader from '../../../../shaders/grass.frag.glsl'
 
 // Seeded random number generator (mulberry32) - inlined for performance
 const createSeededRandom = (seed) => {
