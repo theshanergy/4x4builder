@@ -13,29 +13,29 @@
 	},
 	"dependencies": {
 		"@react-three/drei": "^10.7.7",
-		"@react-three/fiber": "^9.4.2",
+		"@react-three/fiber": "^9.6.0",
 		"@react-three/rapier": "^2.2.0",
-		"@react-three/xr": "^6.6.28",
-		"@tailwindcss/vite": "^4.1.17",
+		"@react-three/xr": "^6.6.29",
+		"@tailwindcss/vite": "^4.2.2",
 		"classnames": "^2.5.1",
-		"immer": "^11.0.1",
+		"immer": "^11.1.4",
 		"noisejs": "^2.1.0",
-		"react": "^19.2.1",
-		"react-dom": "^19.2.1",
-		"react-router-dom": "^7.10.1",
-		"tailwindcss": "^4.1.17",
-		"three": "^0.182.0",
+		"react": "^19.2.5",
+		"react-dom": "^19.2.5",
+		"react-router-dom": "^7.14.1",
+		"tailwindcss": "^4.2.2",
+		"three": "^0.184.0",
 		"three-stdlib": "^2.36.1",
-		"vite-plugin-svgr": "^4.5.0",
-		"zustand": "^5.0.9"
+		"vite-plugin-svgr": "^5.2.0",
+		"zustand": "^5.0.12"
 	},
 	"devDependencies": {
-		"@types/react": "^19.2.7",
+		"@types/react": "^19.2.14",
 		"@types/react-dom": "^19.2.3",
-		"@vitejs/plugin-basic-ssl": "^2.1.0",
-		"@vitejs/plugin-react": "^5.1.2",
+		"@vitejs/plugin-basic-ssl": "^2.3.0",
+		"@vitejs/plugin-react": "^6.0.1",
 		"r3f-perf": "^7.2.3",
-		"vite": "^7.2.7",
-		"vite-plugin-glsl": "^1.5.5"
+		"vite": "^8.0.8",
+		"vite-plugin-glsl": "^1.6.0"
 	}
 }
