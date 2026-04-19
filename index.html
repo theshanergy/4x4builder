@@ -26,9 +26,10 @@
 	<body>
 		<div id="root"></div>
 		<!-- Hidden form for Netlify build-time detection -->
-		<form name="feedback" data-netlify="true" hidden>
+		<form name="feedback" data-netlify="true" netlify-honeypot="bot-field" hidden>
 			<input type="email" name="email" />
 			<textarea name="message"></textarea>
+			<input name="bot-field" />
 		</form>
 		<script type="module" src="/main.jsx"></script>
 	</body>

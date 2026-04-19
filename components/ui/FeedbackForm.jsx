@@ -15,10 +15,14 @@ const FeedbackForm = forwardRef(({ onSuccess, placeholder = 'Share your thoughts
 	useImperativeHandle(ref, () => ({
 		submit: async () => {
 			setError(null)
+			if (!message.trim()) {
+				setError('Please enter a message.')
+				throw new Error('Empty message')
+			}
 			const response = await fetch('/', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: encode({ 'form-name': 'feedback', email, message }),
+				body: encode({ 'form-name': 'feedback', 'bot-field': '', email, message }),
 			})
 			if (!response.ok) {
 				setError('Something went wrong. Please try again.')
