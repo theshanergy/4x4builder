@@ -29,12 +29,12 @@ const FeedbackButton = () => {
 	}
 
 	return (
-		<button
-			onClick={handleClick}
-			className='mt-auto flex gap-4 items-center w-full px-5 py-4 bg-stone-900/60 text-stone-500 uppercase text-sm font-bold hover:bg-stone-800/60 transition-colors'>
-			<ChatIcon className='w-5 h-5' />
-			Feedback
-		</button>
+		<div className='mt-auto'>
+			<button onClick={handleClick} className='w-full mt-5 bg-white/2 border-solid border-white/5 text-white/60 hover:bg-white/5'>
+				<ChatIcon className='w-5 h-5' />
+				Feedback
+			</button>
+		</div>
 	)
 }
 

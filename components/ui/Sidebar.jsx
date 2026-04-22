@@ -20,10 +20,8 @@ const Sidebar = () => {
 	}, [])
 
 	return (
-		<Drawer id='sidebar' isVertical={isVertical} defaultOpen={isVertical} className='order-first bg-black/80 text-gray-400 z-50'>
-			<div className='text-white bg-stone-900'>
-				<Logo />
-			</div>
+		<Drawer id='sidebar' isVertical={isVertical} defaultOpen={isVertical} className='order-first p-5 bg-black/80 text-gray-400 backdrop-blur-md z-50'>
+			<Logo />
 			<Editor />
 			<MultiplayerPanel />
 			<FeedbackButton />

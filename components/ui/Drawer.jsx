@@ -68,7 +68,7 @@ const Drawer = ({ id, open: controlledOpen, defaultOpen = true, onToggle, classN
         <div
             id={id}
             ref={drawerRef}
-            className={classNames('fixed z-20 transform-gpu', isVertical ? 'inset-y-0 left-0 w-64' : 'inset-x-0 bottom-0', className)}
+            className={classNames('fixed z-20 transform-gpu', isVertical ? 'inset-y-0 left-0 w-72' : 'inset-x-0 bottom-0', className)}
             style={{
                 transform: isVertical ? `translateX(${translateValue}px)` : `translateY(${translateValue}px)`,
                 transition: dragging ? 'none' : 'transform 0.3s ease-in-out',
@@ -79,8 +79,8 @@ const Drawer = ({ id, open: controlledOpen, defaultOpen = true, onToggle, classN
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
                 className={classNames(
-                    'absolute flex items-center justify-center text-stone-900 rounded pointer-events-auto cursor-pointer touch-none',
-                    isVertical ? 'left-full top-4 ml-4 h-6 w-6' : 'bottom-full left-4 mb-4 h-11 w-11 bg-stone-900 text-white p-3'
+                    'absolute flex items-center justify-center text-black/80 rounded pointer-events-auto cursor-pointer touch-none',
+                    isVertical ? 'left-full top-4 ml-4 h-6 w-6' : 'bottom-full left-4 mb-4 h-11 w-11 bg-black/50 text-white p-3'
                 )}>
                 {open ? <CloseIcon className='w-full' /> : <GearIcon className='w-full' />}
             </div>
