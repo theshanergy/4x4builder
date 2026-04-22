@@ -13,9 +13,6 @@ const SceneEnvironment = memo(() => {
 			{/* Sun directional light */}
 			<Sun />
 
-			{/* Ambient light for better fill - cool sky, warm ground */}
-			<hemisphereLight args={['#b1e1ff', '#d4c4a8', 0.6]} />
-
 			{/* Atmospheric sky with procedural clouds */}
 			<Sky />
 

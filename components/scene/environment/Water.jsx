@@ -2,7 +2,9 @@ import { useRef, useMemo, useEffect, Suspense } from 'react'
 import { Color, RepeatWrapping, CircleGeometry, ShaderMaterial, DoubleSide } from 'three'
 import { useFrame } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
-import { sunDirection, vehicleState } from '../../../store/gameStore'
+
+import { vehicleState } from '../../../store/gameStore'
+import ENVIRONMENT_CONFIG from '../../../config/environment'
 import waterVertexShader from '../../../shaders/water.vert.glsl'
 import waterFragmentShader from '../../../shaders/water.frag.glsl'
 
@@ -15,6 +17,9 @@ const WATER_RADIUS = 300
 // Single large water plane that follows the player - inner component that uses loader
 const WaterMesh = () => {
 	const ref = useRef()
+
+	// Get environment config
+	const { sunDirection, sunColor } = ENVIRONMENT_CONFIG
 
 	// Load water normal map texture
 	const waterNormals = useTexture('/assets/images/ground/water_normal.jpg')
@@ -38,7 +43,7 @@ const WaterMesh = () => {
 				uSkyColor: { value: new Color().setHSL(0.57, 0.65, 0.55) }, // Blue sky
 				uSkyHorizonColor: { value: new Color().setHSL(0.65, 0.35, 0.75) }, // Pale horizon
 				uSunDirection: { value: sunDirection },
-				uSunColor: { value: new Color().setHSL(0.13, 1.0, 0.97) },
+				uSunColor: { value: sunColor },
 				uDistortionScale: { value: 3.5 },
 				uWaveSpeed: { value: 0.025 },
 				uWaveScale: { value: 0.12 },
