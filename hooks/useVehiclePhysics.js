@@ -40,13 +40,11 @@ const REAR_WHEEL_FRICTION = 0.85
 // Transmission simulation
 const TRANSMISSION = {
 	gearRatios: [0, 3.5, 2.2, 1.4, 1.0, 0.75], // 0 = park/neutral, 1-5 = gears
-	finalDrive: 3.73,
+	finalDrive: 4.88,
 	wheelRadius: 0.35, // meters (approximate)
 	idleRpm: 850,
-	maxRpm: 6200,
-	redlineRpm: 5800,
-	shiftUpRpm: 5500,
-	shiftDownRpm: 1800,
+	maxRpm: 9000,
+	redlineRpm: 7000,
 	shiftCooldown: 0.4, // seconds between shifts to prevent gear skipping
 	parkEngageSpeed: 0.05, // Speed threshold (m/s) below which park engages
 	parkEngageDelay: 0.1, // Time (seconds) vehicle must be stopped before park engages
@@ -89,6 +87,34 @@ const getTorqueMultiplier = (rpm) => {
 	return 1.0
 }
 
+// Calculate dynamic shift-up RPM based on gear
+const getShiftUpRpm = (gear) => {
+	if (gear <= 0) return TRANSMISSION.redlineRpm * 0.95
+
+	// Normalize gear to [0, 1], clamping at gear 5
+	const t = Math.min(gear - 1, 4) / 4
+
+	// Exponential falloff
+	const shiftPercent = 0.95 - 0.65 * Math.pow(t, 2.5)
+
+	return TRANSMISSION.redlineRpm * shiftPercent
+}
+
+// Calculate dynamic downshift RPM based on gear
+// Uses falloff to prevent rapid shifting in lower gears
+const getShiftDownRpm = (gear) => {
+	if (gear <= 1) return TRANSMISSION.idleRpm // Don't downshift below 1st gear
+
+	// Normalize gear to [0, 1], clamping at gear 5
+	const t = Math.min(gear - 1, 4) / 4
+
+	// Exponential falloff for downshift point
+	// Lower gears have wider RPM range before downshifting
+	const shiftPercent = 0.55 - 0.15 * Math.pow(t, 2.5)
+
+	return Math.max(TRANSMISSION.redlineRpm * shiftPercent, TRANSMISSION.idleRpm)
+}
+
 /**
  * Generic vehicle physics hook for wheeled vehicles
  * @param {Object} vehicleRef - Reference to the vehicle rigid body
@@ -117,7 +143,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	const wheelQuat2 = useMemo(() => new Quaternion(), [])
 
 	// Buoyancy hook for water physics
-	const { isInWater, applyBuoyancy } = useBuoyancy(vehicleRef)
+	const { applyBuoyancy } = useBuoyancy(vehicleRef)
 
 	// Engine load tracking
 	const smoothedLoad = useRef(0.5)
@@ -359,11 +385,13 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		const canShift = currentTime - lastShiftTime.current > TRANSMISSION.shiftCooldown
 
 		if (!isAirborne.current && vehicleState.gear !== -1 && !isInPark.current) {
-			if (canShift && currentRpmFromDrivetrain > TRANSMISSION.shiftUpRpm && currentGear < TRANSMISSION.gearRatios.length - 1 && throttleInput > 0.3) {
+			const dynamicShiftUpRpm = getShiftUpRpm(currentGear)
+			const dynamicShiftDownRpm = getShiftDownRpm(currentGear)
+			if (canShift && currentRpmFromDrivetrain > dynamicShiftUpRpm && currentGear < TRANSMISSION.gearRatios.length - 1 && throttleInput > 0.3) {
 				currentGear++
 				vehicleState.gear = currentGear
 				lastShiftTime.current = currentTime
-			} else if (canShift && currentRpmFromDrivetrain < TRANSMISSION.shiftDownRpm && currentGear > 1 && absSpeed > 0.5) {
+			} else if (canShift && currentRpmFromDrivetrain < dynamicShiftDownRpm && currentGear > 1 && absSpeed > 0.5) {
 				currentGear--
 				vehicleState.gear = currentGear
 				lastShiftTime.current = currentTime
@@ -528,7 +556,11 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			brakeForce = FORCES.brake * throttleInput
 		} else {
 			// Normal forward mode
-			if (throttleInput > 0) {
+			if (brakeInput > 0) {
+				// Active braking - no engine force
+				engineForce = 0
+				brakeForce = FORCES.brake * brakeInput
+			} else if (throttleInput > 0) {
 				// Get torque multiplier from curve based on current RPM
 				const torqueMultiplier = getTorqueMultiplier(vehicleState.rpm)
 
@@ -542,6 +574,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 				// Combined force: base * throttle * torque curve * gear advantage
 				engineForce = FORCES.accelerate * throttleInput * torqueMultiplier * gearMultiplier
+				brakeForce = 0
 			} else if (forwardSpeed > 1.0) {
 				// Engine braking when coasting forward
 				const gearRatio = TRANSMISSION.gearRatios[currentGear] || 1
@@ -553,30 +586,34 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 				// Apply as negative engine force (opposing forward motion)
 				engineForce = -brakingForce
+				brakeForce = 0
 			} else {
 				engineForce = 0
+				brakeForce = 0
 			}
-
-			brakeForce = FORCES.brake * brakeInput
 		}
 
-		if (!isAirborne.current) {
-			// Front wheels steering (assuming first two wheels are front)
-			for (let i = 0; i < 2 && i < wheels.length; i++) {
-				vehicleController.current.setWheelSteering(i, steerForce)
-			}
+		// Front wheels
+		for (let i = 0; i < 2 && i < wheels.length; i++) {
+			// Set steering for front wheels
+			vehicleController.current.setWheelSteering(i, steerForce)
+			// Apply 40% of engine force to front wheels
+			vehicleController.current.setWheelEngineForce(i, -engineForce * 0.4)
+		}
 
-			// Rear wheels driving (assuming last two wheels are rear)
-			for (let i = 2; i < 4 && i < wheels.length; i++) {
-				vehicleController.current.setWheelEngineForce(i, -engineForce)
-			}
+		// Rear wheels
+		for (let i = 2; i < 4 && i < wheels.length; i++) {
+			// 60% of engine force to rear wheels
+			vehicleController.current.setWheelEngineForce(i, -engineForce * 0.6)
+		}
 
-			// All wheels braking
-			for (let i = 0; i < wheels.length; i++) {
-				vehicleController.current.setWheelBrake(i, brakeForce)
-			}
-		} else if (!isInWater.current) {
-			// Airborne controls when all wheels are not in contact (disabled in water)
+		// All wheels braking
+		for (let i = 0; i < wheels.length; i++) {
+			vehicleController.current.setWheelBrake(i, brakeForce)
+		}
+
+		// Airborne controls when all wheels are not in contact (disabled in water)
+		if (isAirborne.current && !vehicleState.isInWater) {
 			if (vehicle) {
 				// Construct torque vector in world space using reusable objects
 				tempLocalTorque.set(pitchInput, yawInput, rollInput)

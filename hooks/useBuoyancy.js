@@ -1,5 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { Vector3, Quaternion } from 'three'
+import { vehicleState } from '../store/gameStore'
 
 // Water level constant
 const WATER_LEVEL = -1
@@ -26,8 +27,6 @@ const BUOYANCY = {
  * @returns {Object} - Buoyancy state and update function
  */
 export const useBuoyancy = (vehicleRef) => {
-	// Track if vehicle is in water
-	const isInWater = useRef(false)
 	// Track water intake (0 = dry, 1 = full/sunk)
 	const waterIntake = useRef(0)
 
@@ -49,7 +48,7 @@ export const useBuoyancy = (vehicleRef) => {
 		const submersionDepth = WATER_LEVEL - vehiclePos.y
 
 		if (submersionDepth > 0) {
-			isInWater.current = true
+			vehicleState.isInWater = true
 
 			// 1. Update water intake (sinking mechanic)
 			waterIntake.current = Math.min(1, waterIntake.current + delta * BUOYANCY.sinkingRate)
@@ -113,7 +112,7 @@ export const useBuoyancy = (vehicleRef) => {
 
 			return true
 		} else {
-			isInWater.current = false
+			vehicleState.isInWater = false
 			// Drain water slowly when out of water
 			waterIntake.current = Math.max(0, waterIntake.current - delta * 0.2)
 			return false
@@ -121,7 +120,6 @@ export const useBuoyancy = (vehicleRef) => {
 	}
 
 	return {
-		isInWater,
 		applyBuoyancy,
 	}
 }
