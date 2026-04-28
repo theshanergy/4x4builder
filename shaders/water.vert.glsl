@@ -24,7 +24,7 @@ uniform float shallowDepthThreshold;
 
 // Per-vertex depth attribute (distance from water surface to terrain)
 attribute float depth;
-// Per-vertex flow direction (river flow, scaled by strength)
+// Per-vertex flow velocity. Zero means static open-water noi
 attribute vec2 flowDir;
 
 vec3 GerstnerWave(vec4 wave, vec3 p, float waveScale) {

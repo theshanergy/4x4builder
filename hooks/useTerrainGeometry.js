@@ -31,8 +31,6 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 
 		// Track water depth for each vertex
 		const depths = new Float32Array(totalSamples)
-		// Track flow direction for each vertex (x, z components combined with strength)
-		const flowDirs = new Float32Array(totalSamples * 2)
 		let hasWater = false
 
 		// Cache for height samples - avoids recomputing for normal calculation
@@ -155,21 +153,13 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				worldXForUV[vertIndex] = uvWorldX
 				worldZForUV[vertIndex] = uvWorldZ
 
-				// Calculate water depth and flow velocity
+				// Calculate water depth. Flow defaults to zero; future splines can
+				// populate the water geometry's flowDir attribute without terrain sampling.
 				if (height < WATER_CONFIG.level) {
 					depths[vertIndex] = WATER_CONFIG.level - height
 					hasWater = true
-
-					// Get river flow at this position
-					const flow = terrainHelpers.getFlow(uvWorldX, uvWorldZ)
-					// Store flow velocity vector (direction * velocity * strength)
-					// This gives us the actual m/s velocity to use directly in shader
-					flowDirs[vertIndex * 2] = flow.direction.x * flow.velocity * flow.strength
-					flowDirs[vertIndex * 2 + 1] = flow.direction.z * flow.velocity * flow.strength
 				} else {
 					depths[vertIndex] = 0
-					flowDirs[vertIndex * 2] = 0
-					flowDirs[vertIndex * 2 + 1] = 0
 				}
 				vertIndex++
 			}
@@ -286,6 +276,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			// Create water positions and normals (reuse terrain UVs)
 			const waterPositions = new Float32Array(totalSamples * 3)
 			const waterNormals = new Float32Array(totalSamples * 3)
+			const flowDirs = new Float32Array(totalSamples * 2)
 
 			// Build water geometry with snapped positions at LOD boundaries
 			// Both positions AND UVs need to match for seamless rendering
@@ -342,7 +333,7 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				waterGeom.setAttribute('normal', new BufferAttribute(waterNormals, 3))
 				waterGeom.setAttribute('uv', new BufferAttribute(uvs, 2)) // Reuse terrain UVs
 				waterGeom.setAttribute('depth', new BufferAttribute(depths, 1))
-				waterGeom.setAttribute('flowDir', new BufferAttribute(flowDirs, 2)) // River flow direction
+				waterGeom.setAttribute('flowDir', new BufferAttribute(flowDirs, 2)) // Reserved for spline-derived flow
 				// Use slice to trim to actual size used
 				waterGeom.setIndex(new BufferAttribute(waterIndicesArray.slice(0, waterIdx), 1))
 			}

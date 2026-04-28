@@ -45,20 +45,17 @@ const TERRAIN_CONFIG = {
 		heightOffsetPreserve: 0.0,
 	},
 
-	// --- Emergent rivers (derived from erosion ridgemap) ---
-	// Flow strength = smoothstep(threshold, threshold+band, -ridgemap)
-	river: {
-		// Ridgemap threshold below which a point is considered a drainage channel.
-		// More negative = only deep channels count as rivers.
-		ridgeThreshold: 0.1,
-		// Transition width for the flow-strength ramp.
-		ridgeBand: 0.2,
-		// Base flow speed (m/s) at unit slope magnitude.
-		baseFlowSpeed: 3.0,
-		// Max flow speed cap (m/s).
-		maxFlowSpeed: 9.0,
-		// Epsilon (world meters) for finite-difference gradient of ridgemap.
-		gradientEpsilon: 4.0,
+	// Ocean boundary — terrain tapers off into the sea beyond this radius
+	ocean: {
+		// Distance from origin (meters) where land meets the ocean
+		radius: 3500,
+		// Width of the beach/falloff transition zone (meters)
+		transition: 500,
+		// How far below water level the ocean floor sinks (meters)
+		depth: 30,
+		// Normalized depth at the transition midpoint (0 = water surface, 1 = full ocean depth)
+		// Controls the shape of the beach profile — lower = gentler initial slope
+		beachMidpointDepth: 0.2,
 	},
 
 	// Terrain Layers (shader material)

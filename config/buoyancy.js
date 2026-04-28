@@ -12,9 +12,6 @@ const BUOYANCY_CONFIG = {
 	// Sinking parameters
 	sinkingRate: 0.05, // How fast it fills with water (0-1 per second)
 	minBuoyancy: 0.1, // Buoyancy factor when fully sunk (still has some displacement)
-
-	// Flow parameters
-	flowForce: 1.5, // Multiplier for flow force strength
 }
 
 export default BUOYANCY_CONFIG

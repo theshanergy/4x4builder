@@ -22,7 +22,7 @@ varying vec4 worldPosition;
 varying float vDepth;
 varying vec2 vWorldXZ; // Original world XZ from UVs for seamless noise
 varying float vCameraDistance;
-varying vec2 vFlowDir; // River flow direction (scaled by strength)
+varying vec2 vFlowDir; // Optional flow velocity
 
 // Static noise for areas without flow (open water)
 vec4 getStaticNoise(vec2 uv) {
@@ -37,10 +37,14 @@ vec4 getStaticNoise(vec2 uv) {
 	return noise * 0.5 - 1.0;
 }
 
-// Combined noise function that uses flow velocity for river areas
+// Combined noise function that can use per-vertex flow velocity.
 vec4 getNoise(vec2 uv) {
-	// vFlowDir contains actual velocity in m/s (direction * velocity * strength)
+	// vFlowDir contains actual velocity in m/s. Zero keeps ocean water static.
 	float flowSpeed = length(vFlowDir);
+
+	if(flowSpeed < 0.1) {
+		return getStaticNoise(uv);
+	}
 
 	// How often the texture "resets" and cross-fades (in seconds)
 	float cyclePeriod = 2.0;
@@ -61,7 +65,7 @@ vec4 getNoise(vec2 uv) {
 	vec2 scaledFlowOffset0 = flowOffset0 * size;
 	vec2 scaledFlowOffset1 = flowOffset1 * size;
 
-	// Sample with flow offset for river areas
+	// Sample with flow offset for moving water areas
 	vec2 uv0 = ((uv - scaledFlowOffset0) / 103.0) + vec2(time / 17.0, time / 29.0);
 	vec2 uv1 = (uv - scaledFlowOffset0) / 107.0 - vec2(time / -19.0, time / 31.0);
 	vec2 uv2 = (uv - scaledFlowOffset0) / vec2(8907.0, 9803.0) + vec2(time / 101.0, time / 97.0);
@@ -86,11 +90,6 @@ vec4 getNoise(vec2 uv) {
 	// Cross-fade between the two phases
 	float blend = abs(t0 - 0.5) * 2.0;
 	vec4 flowNoise = mix(noise0, noise1, blend) * 0.5 - 1.0;
-
-	// For areas without flow, use static noise
-	if(flowSpeed < 0.1) {
-		return getStaticNoise(uv);
-	}
 
 	// Blend between static and flowing based on flow speed
 	vec4 staticNoise = getStaticNoise(uv);

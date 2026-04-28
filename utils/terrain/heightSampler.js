@@ -1,12 +1,11 @@
 // Terrain Height Sampler — Phacelle-noise erosion (CPU port of the shader in
 // docs/advanced-terrain-erosion.html). Drives both the visual mesh and the
-// physics heightfield. Emergent rivers are derived from the erosion ridgemap.
+// physics heightfield.
 
 import { Vector3 } from 'three'
 
 import TERRAIN_CONFIG from '../../config/terrain'
 import WATER_CONFIG from '../../config/water'
-import { getFlowFromSample } from './rivers'
 
 // -------------------------------------------------------------------------
 // Hash / gradient noise (port of shader `hash` + `noised`). Returns
@@ -72,18 +71,8 @@ const createNoise = (seed) => {
 		const value = va + ux * (vb - va) + uy * (vc - va) + ux * uy * (va - vb - vc + vd)
 
 		// analytic derivatives (matches shader's noised())
-		const dx =
-			ga.x +
-			ux * (gb.x - ga.x) +
-			uy * (gc.x - ga.x) +
-			ux * uy * (ga.x - gb.x - gc.x + gd.x) +
-			dux * (uy * (va - vb - vc + vd) + (vb - va))
-		const dy =
-			ga.y +
-			ux * (gb.y - ga.y) +
-			uy * (gc.y - ga.y) +
-			ux * uy * (ga.y - gb.y - gc.y + gd.y) +
-			duy * (ux * (va - vb - vc + vd) + (vc - va))
+		const dx = ga.x + ux * (gb.x - ga.x) + uy * (gc.x - ga.x) + ux * uy * (ga.x - gb.x - gc.x + gd.x) + dux * (uy * (va - vb - vc + vd) + (vb - va))
+		const dy = ga.y + ux * (gb.y - ga.y) + uy * (gc.y - ga.y) + ux * uy * (ga.y - gb.y - gc.y + gd.y) + duy * (ux * (va - vb - vc + vd) + (vc - va))
 
 		out[0] = value
 		out[1] = dx
@@ -286,8 +275,8 @@ const erosionFilter = (noise, px, py, hIn, sxIn, syIn, fadeTargetIn, cfg, out, t
 }
 
 // -------------------------------------------------------------------------
-// Sample cache — a small LRU keyed by quantized (x,z). getHeight / getNormal
-// / getFlow all hit this, sharing the ~80 noise evaluations per sample.
+// Sample cache — a small LRU keyed by quantized (x,z). getHeight / getNormal /
+// isWater all hit this, sharing the ~80 noise evaluations per sample.
 // -------------------------------------------------------------------------
 const CACHE_QUANT = 0.001 // sub-millimeter — effectively exact for fp32 grids
 const CACHE_LIMIT = 4096
@@ -330,8 +319,14 @@ export const createTerrainHelpers = () => {
 		hashRaw,
 	}
 
-	const { worldScale, heightScale, heightOrigin, spawnRadius } = TERRAIN_CONFIG
+	const { worldScale, heightScale, heightOrigin, spawnRadius, ocean } = TERRAIN_CONFIG
 	const cfg = TERRAIN_CONFIG.erosion
+	const spawnRadiusSq = spawnRadius * spawnRadius
+	const oceanRadiusSq = ocean.radius * ocean.radius
+	const oceanTransitionStart = ocean.radius - ocean.transition
+	const oceanTransitionStartSq = oceanTransitionStart * oceanTransitionStart
+	const oceanFloorHeight = WATER_CONFIG.level - ocean.depth
+	const oceanMidpointHeight = oceanFloorHeight * ocean.beachMidpointDepth
 
 	// Scratch buffers
 	const tmpND = [0, 0, 0]
@@ -342,21 +337,20 @@ export const createTerrainHelpers = () => {
 
 	// LRU cache (Map preserves insertion order)
 	const cache = new Map()
+	const cacheResult = (key, result) => {
+		cache.set(key, result)
+		if (cache.size > CACHE_LIMIT) {
+			// Evict oldest entry (Map iteration order is insertion order)
+			const firstKey = cache.keys().next().value
+			cache.delete(firstKey)
+		}
+		return result
+	}
 
 	// Raw sample in shader-normalized space. Returns full info for this (x,z).
 	const sampleRaw = (px, py) => {
 		// === Base fractal noise (eroded-surface seed) ===
-		fractalNoise(
-			noise,
-			px,
-			py,
-			TERRAIN_CONFIG.heightFrequency,
-			TERRAIN_CONFIG.heightOctaves,
-			TERRAIN_CONFIG.heightLacunarity,
-			TERRAIN_CONFIG.heightGain,
-			tmpND,
-			tmpND2
-		)
+		fractalNoise(noise, px, py, TERRAIN_CONFIG.heightFrequency, TERRAIN_CONFIG.heightOctaves, TERRAIN_CONFIG.heightLacunarity, TERRAIN_CONFIG.heightGain, tmpND, tmpND2)
 		// n *= HEIGHT_AMP; shader scales value and derivs by heightAmp
 		const h0 = tmpND[0] * TERRAIN_CONFIG.heightAmp
 		const sx0 = tmpND[1] * TERRAIN_CONFIG.heightAmp
@@ -401,6 +395,17 @@ export const createTerrainHelpers = () => {
 			return cached
 		}
 
+		const distSq = x * x + z * z
+		if (distSq >= oceanRadiusSq) {
+			return cacheResult(key, {
+				height: oceanFloorHeight,
+				slopeX: 0,
+				slopeZ: 0,
+				ridgeMap: 1,
+				erosion: 0,
+			})
+		}
+
 		const px = x / worldScale
 		const py = z / worldScale
 		const raw = sampleRaw(px, py)
@@ -415,18 +420,43 @@ export const createTerrainHelpers = () => {
 		let worldSlopeZ = raw.slopeY * slopeScale
 
 		// Spawn flatten — blend world height toward 0 near origin.
-		// Also scale the ridgemap so rivers don't carve through spawn.
-		const distSq = x * x + z * z
+		// Also smooth the ridgemap so debug samples stay coherent.
 		let ridgeMap = raw.ridgeMap
-		if (distSq < spawnRadius * spawnRadius) {
+		if (distSq < spawnRadiusSq) {
 			const dist = Math.sqrt(distSq)
 			const t = dist / spawnRadius
 			const blend = t * t * (3 - 2 * t)
 			worldHeight *= blend
 			worldSlopeX *= blend
 			worldSlopeZ *= blend
-			// Push ridgemap positive inside spawn (no rivers)
+			// Push ridgemap positive inside spawn.
 			ridgeMap = mix(1, ridgeMap, blend)
+		}
+
+		// Ocean falloff — terrain tapers into the ocean beyond oceanRadius.
+		// Mirrors the beach profile from the original Terrain component.
+		if (distSq > oceanTransitionStartSq) {
+			const dist = Math.sqrt(distSq)
+			const t = (dist - oceanTransitionStart) / ocean.transition // 0 at shore, 1 at ocean
+			const bezierT = t * t * (3 - 2 * t) // smoothstep
+
+			// Two-stage beach profile: gentle slope then steeper drop-off
+			let beachHeight
+			if (t < 0.5) {
+				const localT = t * 2
+				beachHeight = worldHeight * (1 - localT) + oceanMidpointHeight * localT
+			} else {
+				const localT = (t - 0.5) * 2
+				const dropCurve = localT * localT // Quadratic — steeper descent
+				beachHeight = oceanMidpointHeight * (1 - dropCurve) + oceanFloorHeight * dropCurve
+			}
+
+			// Suppress terrain noise as we enter the water
+			const noiseSuppression = (1 - bezierT) * (1 - bezierT) * (1 - bezierT)
+			worldHeight = worldHeight * noiseSuppression + beachHeight * (1 - noiseSuppression)
+			worldSlopeX *= noiseSuppression
+			worldSlopeZ *= noiseSuppression
+			ridgeMap = mix(ridgeMap, 1, bezierT)
 		}
 
 		const result = {
@@ -437,13 +467,7 @@ export const createTerrainHelpers = () => {
 			erosion: raw.erosion,
 		}
 
-		cache.set(key, result)
-		if (cache.size > CACHE_LIMIT) {
-			// Evict oldest entry (Map iteration order is insertion order)
-			const firstKey = cache.keys().next().value
-			cache.delete(firstKey)
-		}
-		return result
+		return cacheResult(key, result)
 	}
 
 	const getHeight = (x, z) => sample(x, z).height
@@ -459,13 +483,10 @@ export const createTerrainHelpers = () => {
 
 	const isWater = (x, z) => sample(x, z).height < WATER_CONFIG.level
 
-	const getFlow = (x, z) => getFlowFromSample(x, z, sample)
-
 	return {
 		getHeight,
 		getNormal,
 		isWater,
-		getFlow,
 		// Exposed for debugging / future shader-side use.
 		sample,
 	}
