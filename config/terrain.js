@@ -48,7 +48,7 @@ const TERRAIN_CONFIG = {
 	// Ocean boundary — terrain tapers off into the sea beyond this radius
 	ocean: {
 		// Distance from origin (meters) where land meets the ocean
-		radius: 3500,
+		radius: 5000,
 		// Width of the beach/falloff transition zone (meters)
 		transition: 500,
 		// How far below water level the ocean floor sinks (meters)
