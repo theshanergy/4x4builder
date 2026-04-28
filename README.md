@@ -151,7 +151,7 @@ The server runs on port 8080 by default and provides:
 ├── shaders/            # GLSL vertex and fragment shaders
 ├── store/              # Zustand state stores
 ├── utils/              # Utility functions
-└── vehicleConfigs.js   # Vehicle, wheel, and tire definitions
+└── config/				# Configuration
 ```
 
 ---

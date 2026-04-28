@@ -1,115 +1,153 @@
-import { useRef, useMemo, useEffect, memo } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useMemo, useEffect, useRef, memo } from 'react'
 import { RigidBody, HeightfieldCollider } from '@react-three/rapier'
-import { RepeatWrapping, PlaneGeometry, Vector3 } from 'three'
 
-// Fade-in duration for new tiles (in seconds)
-const TILE_FADE_DURATION = 0.5
+import { TILE_RESOLUTION, QUADTREE_MIN_SIZE } from '../../../../config/lod'
+import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
+import { waterVisibility } from '../../../../store/gameStore'
+import Vegetation from './Vegetation'
 
-const TerrainTile = memo(({ position, tileSize, resolution, maxHeight, terrainHelpers, map, normalMap, shouldFade = true }) => {
-	const materialRef = useRef()
-	const opacityRef = useRef(shouldFade ? 0 : 1)
+// Default edge stitch info (no stitching needed)
+const DEFAULT_EDGE_STITCH_INFO = {
+	north: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
+	south: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
+	east: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
+	west: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
+}
 
-	// Animate opacity from 0 to 1 when tile is created
-	useFrame((_, delta) => {
-		if (materialRef.current && opacityRef.current < 1) {
-			opacityRef.current = Math.min(1, opacityRef.current + delta / TILE_FADE_DURATION)
-			materialRef.current.opacity = opacityRef.current
-			materialRef.current.transparent = opacityRef.current < 1
+/**
+ * Custom comparison for QuadtreeTerrainTile props.
+ * Prevents unnecessary re-renders when props haven't meaningfully changed.
+ */
+const arePropsEqual = (prevProps, nextProps) => {
+	// Check properties that affect rendering
+	if (
+		prevProps.node.key !== nextProps.node.key ||
+		prevProps.node.size !== nextProps.node.size ||
+		prevProps.node.centerX !== nextProps.node.centerX ||
+		prevProps.node.centerZ !== nextProps.node.centerZ
+	) {
+		return false
+	}
+
+	// Edge stitch info deep comparison
+	const prevEdge = prevProps.edgeStitchInfo
+	const nextEdge = nextProps.edgeStitchInfo
+	if (prevEdge !== nextEdge) {
+		if (!prevEdge || !nextEdge) return false
+		if (
+			prevEdge.north.needsStitch !== nextEdge.north.needsStitch ||
+			prevEdge.south.needsStitch !== nextEdge.south.needsStitch ||
+			prevEdge.east.needsStitch !== nextEdge.east.needsStitch ||
+			prevEdge.west.needsStitch !== nextEdge.west.needsStitch ||
+			prevEdge.north.neighborStep !== nextEdge.north.neighborStep ||
+			prevEdge.south.neighborStep !== nextEdge.south.neighborStep ||
+			prevEdge.east.neighborStep !== nextEdge.east.neighborStep ||
+			prevEdge.west.neighborStep !== nextEdge.west.neighborStep
+		) {
+			return false
 		}
-	})
+	}
 
-	// Apply texture settings - UVs are now in world coordinates, so repeat controls texture density
-	useMemo(() => {
-		if (map) {
-			map.wrapS = map.wrapT = RepeatWrapping
-			map.repeat.set(1, 1) // 1 texture unit per world unit
-		}
-		if (normalMap) {
-			normalMap.wrapS = normalMap.wrapT = RepeatWrapping
-			normalMap.repeat.set(0.33, 0.33) // Larger scale for normal map details
-		}
-	}, [map, normalMap])
+	// Reference comparisons for objects that should be stable
+	if (
+		prevProps.terrainHelpers !== nextProps.terrainHelpers ||
+		prevProps.terrainMaterial !== nextProps.terrainMaterial ||
+		prevProps.waterMaterial !== nextProps.waterMaterial ||
+		prevProps.vegetationModels !== nextProps.vegetationModels
+	) {
+		return false
+	}
 
-	// Generate heights, UVs, and normals together to avoid redundant calculations
-	const heights = useMemo(() => {
-		const { getRawHeight, getNormal } = terrainHelpers
-		const values = []
-		const vertexCount = (resolution + 1) * (resolution + 1)
-		const positions = new Float32Array(vertexCount * 3)
-		const uvs = new Float32Array(vertexCount * 2)
-		const normals = new Float32Array(vertexCount * 3)
-		const step = tileSize / resolution
+	return true
+}
 
-		const normal = new Vector3()
+/**
+ * TerrainTile - Renders a single quadtree leaf node as terrain geometry with vegetation.
+ *
+ * @param {Object} props
+ * @param {Object} props.node - Quadtree node with centerX, centerZ, size, key
+ * @param {Object} props.terrainHelpers - Height/normal sampling functions
+ * @param {Object} props.edgeStitchInfo - Edge stitching configuration
+ * @param {THREE.Material} props.terrainMaterial - Shared terrain material instance
+ * @param {THREE.Material} props.waterMaterial - Shared water material instance
+ * @param {Object} props.vegetationModels - Vegetation LOD models from useVegetation
+ */
+const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMaterial, waterMaterial, vegetationModels }) => {
+	const { centerX, centerZ } = node
+	const position = useMemo(() => [centerX, 0, centerZ], [centerX, centerZ])
 
-		for (let i = 0; i <= resolution; i++) {
-			for (let j = 0; j <= resolution; j++) {
-				const worldX = position[0] + i * step - tileSize / 2
-				const worldZ = position[2] + j * step - tileSize / 2
+	// Track geometry refs for proper disposal
+	const terrainGeometryRef = useRef(null)
+	const waterGeometryRef = useRef(null)
 
-				const height = getRawHeight(worldX, worldZ)
-				values.push(height)
+	// Use effective edge stitch info for both terrain and water
+	const effectiveEdgeStitchInfo = edgeStitchInfo || DEFAULT_EDGE_STITCH_INFO
 
-				const vertIndex = i + (resolution + 1) * j
-				const posIndex = vertIndex * 3
-				positions[posIndex] = (i / resolution) * tileSize - tileSize / 2
-				positions[posIndex + 1] = height * maxHeight
-				positions[posIndex + 2] = (j / resolution) * tileSize - tileSize / 2
+	// Create geometries
+	const { terrainGeometry, waterGeometry, heightCache } = useTerrainGeometry(node, terrainHelpers, effectiveEdgeStitchInfo)
 
-				// Compute normal using shared helper
-				getNormal(worldX, worldZ, maxHeight, normal)
-
-				normals[posIndex] = normal.x
-				normals[posIndex + 1] = normal.y
-				normals[posIndex + 2] = normal.z
-
-				// Store UVs based on world position (computed once, reused in geometry)
-				const uvIndex = vertIndex * 2
-				uvs[uvIndex] = worldX
-				uvs[uvIndex + 1] = worldZ
+	// Build a physics collider only for the highest-detail tiles.
+	// Reuses heightCache from the visual geometry so we don't resample.
+	// Rapier's HeightfieldCollider expects heights in x-major / z-inner order;
+	// our cache is z-major / x-inner, so transpose into a fresh array.
+	const colliderArgs = useMemo(() => {
+		if (node.size !== QUADTREE_MIN_SIZE) return null
+		const sampleCount = TILE_RESOLUTION + 1
+		const transposed = new Float32Array(sampleCount * sampleCount)
+		for (let j = 0; j < sampleCount; j++) {
+			for (let i = 0; i < sampleCount; i++) {
+				transposed[i * sampleCount + j] = heightCache[j * sampleCount + i]
 			}
 		}
+		return [TILE_RESOLUTION, TILE_RESOLUTION, transposed, { x: node.size, y: 1, z: node.size }]
+	}, [node.size, heightCache])
 
-		return { values, positions, uvs, normals }
-	}, [position, tileSize, resolution, terrainHelpers, maxHeight])
+	// Helper to manage geometry lifecycle (disposal on change and unmount)
+	const useGeometryDisposal = (geometryRef, geometry) => {
+		useEffect(() => {
+			// Dispose previous geometry if it exists and is different
+			if (geometryRef.current && geometryRef.current !== geometry) {
+				geometryRef.current.dispose()
+			}
+			geometryRef.current = geometry
 
-	// Create geometry for terrain mesh
-	const geometry = useMemo(() => {
-		const geom = new PlaneGeometry(tileSize, tileSize, resolution, resolution)
-		geom.getAttribute('position').array.set(heights.positions)
+			return () => {
+				if (geometryRef.current) {
+					geometryRef.current.dispose()
+					geometryRef.current = null
+				}
+			}
+		}, [geometry])
+	}
 
-		// Apply pre-computed UVs (world-space coordinates for seamless tiling)
-		geom.getAttribute('uv').array.set(heights.uvs)
-		geom.getAttribute('uv').needsUpdate = true
+	// Dispose old geometries when they change and on unmount
+	useGeometryDisposal(terrainGeometryRef, terrainGeometry)
+	useGeometryDisposal(waterGeometryRef, waterGeometry)
 
-		// Apply pre-computed normals (calculated analytically from noise gradient)
-		geom.getAttribute('normal').array.set(heights.normals)
-		geom.getAttribute('normal').needsUpdate = true
-
-		return geom
-	}, [heights, tileSize, resolution])
-
-	// Dispose geometry when component unmounts or geometry changes
+	// Track this tile's contribution to the on-screen water count so the
+	// water material can skip its reflection pass when no water is visible.
 	useEffect(() => {
+		if (!waterGeometry) return
+		waterVisibility.visibleTileCount++
 		return () => {
-			geometry.dispose()
+			waterVisibility.visibleTileCount--
 		}
-	}, [geometry])
-
-	// Set collider arguments
-	const colliderArgs = useMemo(() => {
-		return [resolution, resolution, heights.values, { x: tileSize, y: maxHeight, z: tileSize }]
-	}, [resolution, heights, tileSize, maxHeight])
+	}, [waterGeometry])
 
 	return (
-		<RigidBody type='fixed' position={position} colliders={false}>
-			<HeightfieldCollider args={colliderArgs} name={`Tile-${position[0]}-${position[2]}`} />
-			<mesh geometry={geometry} receiveShadow>
-				<meshStandardMaterial ref={materialRef} map={map} normalMap={normalMap} transparent={opacityRef.current < 1} opacity={opacityRef.current} />
-			</mesh>
-		</RigidBody>
+		<>
+			<group position={position}>
+				{terrainMaterial && <mesh geometry={terrainGeometry} material={terrainMaterial} receiveShadow />}
+				{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} renderOrder={1} />}
+			</group>
+			{colliderArgs && (
+				<RigidBody type='fixed' position={position} colliders={false}>
+					<HeightfieldCollider args={colliderArgs} />
+				</RigidBody>
+			)}
+			<Vegetation node={node} terrainHelpers={terrainHelpers} vegetationModels={vegetationModels} />
+		</>
 	)
-})
+}, arePropsEqual)
 
 export default TerrainTile

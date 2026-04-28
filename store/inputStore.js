@@ -28,10 +28,18 @@ const defaultTouchInput = {
 	rightStickY: 0,
 }
 
+// Mouse input state
+const defaultMouseInput = {
+	movementX: 0,
+	movementY: 0,
+	isPointerLocked: false,
+}
+
 const useInputStore = create((set) => ({
 	keys: new Set(),
 	input: { ...defaultInput },
 	touchInput: { ...defaultTouchInput },
+	mouseInput: { ...defaultMouseInput },
 	setKey: (key, pressed) =>
 		set((state) => {
 			const keys = new Set(state.keys)
@@ -47,9 +55,25 @@ const useInputStore = create((set) => ({
 		set((state) => ({
 			touchInput: { ...state.touchInput, ...newTouchInput },
 		})),
+	setMouseInput: (newMouseInput) =>
+		set((state) => ({
+			mouseInput: { ...state.mouseInput, ...newMouseInput },
+		})),
+	// Consume mouse movement (returns current values and resets to zero)
+	consumeMouseMovement: () => {
+		const { mouseInput } = useInputStore.getState()
+		const movement = { x: mouseInput.movementX, y: mouseInput.movementY }
+		if (movement.x !== 0 || movement.y !== 0) {
+			set((state) => ({
+				mouseInput: { ...state.mouseInput, movementX: 0, movementY: 0 },
+			}))
+		}
+		return movement
+	},
 	resetInput: () =>
 		set(() => ({
 			input: { ...defaultInput },
+			mouseInput: { ...defaultMouseInput },
 		})),
 }))
 

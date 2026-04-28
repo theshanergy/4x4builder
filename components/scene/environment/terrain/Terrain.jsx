@@ -1,271 +1,48 @@
-import { useState, useRef, useMemo, useCallback } from 'react'
-import { useFrame, useLoader } from '@react-three/fiber'
-import { Vector3, TextureLoader } from 'three'
-import { Noise } from 'noisejs'
+import { useMemo, useEffect } from 'react'
 
-import useGameStore, { vehicleState } from '../../../../store/gameStore'
-import Grass from './Grass'
-import Water from '../Water'
-import DistantTerrain from './DistantTerrain'
+import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
+import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
+import useWaterMaterial from '../../../../hooks/useWaterMaterial'
+import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
+import useVegetation from '../../../../hooks/useVegetation'
+import useGameStore from '../../../../store/gameStore'
 import TerrainTile from './TerrainTile'
 
-// Ocean configuration
-const OCEAN_RADIUS = 1000
-const OCEAN_TRANSITION = 80 // Width of the beach transition zone
-const OCEAN_DEPTH = 5 // How far below 0 the ocean floor goes
-
-// Beach profile control point (like a Bezier curve)
-const BEACH_MIDPOINT_DEPTH = 0.2 // Intermediate depth at transition midpoint (0-1 range)
-
-// Epsilon for numerical gradient approximation
-const GRADIENT_EPSILON = 0.01
-
-// Regional height modulation scale (size of flat/hilly regions)
-const REGION_SCALE = 240
-
-// Default terrain configuration
-const DEFAULT_TERRAIN_CONFIG = {
-	viewDistance: 160,
-	tileSize: 32,
-	resolution: 16,
-	smoothness: 15,
-	maxHeight: 4,
-}
-
-// Shared terrain height calculation utilities
-const createTerrainHelpers = (noise, smoothness, flatAreaRadius, transitionEndDist) => {
-	const flatAreaRadiusSq = flatAreaRadius * flatAreaRadius
-	const transitionEndDistSq = transitionEndDist * transitionEndDist
-
-	// Ocean boundary calculations
-	const oceanTransitionStart = OCEAN_RADIUS - OCEAN_TRANSITION
-	const oceanTransitionStartSq = oceanTransitionStart * oceanTransitionStart
-
-	// Get raw height value at any world position (normalized 0-1, can go negative for ocean)
-	const getRawHeight = (worldX, worldZ) => {
-		const distSq = worldX * worldX + worldZ * worldZ
-		if (distSq < flatAreaRadiusSq) return 0
-
-		const noiseValue = noise.perlin2(worldX / smoothness, worldZ / smoothness)
-		const normalizedHeight = (noiseValue + 1) / 2
-
-		// Regional height modulation - creates dispersed flatter areas
-		const regionNoise = noise.perlin2(worldX / REGION_SCALE + 100, worldZ / REGION_SCALE + 100)
-		// Map to 0.1-1.0 range: some areas have 10% height (much flatter), others full height
-		const regionModifier = 0.1 + (regionNoise + 1) * 0.45
-
-		let baseHeight
-		if (distSq < transitionEndDistSq) {
-			const t = (Math.sqrt(distSq) - flatAreaRadius) / (transitionEndDist - flatAreaRadius)
-			baseHeight = normalizedHeight * (t * t * (3 - 2 * t)) * regionModifier
-		} else {
-			baseHeight = normalizedHeight * regionModifier
-		}
-
-		// Apply ocean tapering - realistic two-stage beach profile
-		if (distSq > oceanTransitionStartSq) {
-			const dist = Math.sqrt(distSq)
-			if (dist >= OCEAN_RADIUS) {
-				// Beyond ocean radius - full ocean depth (normalized)
-				return -OCEAN_DEPTH / 4 // Normalize relative to typical maxHeight
-			} else {
-				// In transition zone - smooth bezier-like curve through control point
-				const t = (dist - oceanTransitionStart) / OCEAN_TRANSITION // 0 at shore, 1 at deep ocean
-				
-				const oceanFloorHeight = -OCEAN_DEPTH / 4
-				const midpointHeight = oceanFloorHeight * BEACH_MIDPOINT_DEPTH
-				
-				// Quadratic bezier interpolation: start at baseHeight, through midpoint, to oceanFloorHeight
-				// First half: baseHeight → midpoint (gentle slope)
-				// Second half: midpoint → oceanFloorHeight (steeper drop)
-				const bezierT = t * t * (3 - 2 * t) // Smoothstep for natural curve
-				let finalHeight
-				
-				if (t < 0.5) {
-					// Shallow beach section
-					const localT = t * 2 // Map to 0-1
-					finalHeight = baseHeight * (1 - localT) + midpointHeight * localT
-				} else {
-					// Drop-off section
-					const localT = (t - 0.5) * 2 // Map to 0-1
-					const dropCurve = localT * localT // Quadratic for steeper descent
-					finalHeight = midpointHeight * (1 - dropCurve) + oceanFloorHeight * dropCurve
-				}
-				
-				// Suppress terrain noise as we enter water
-				const noiseSuppression = (1 - bezierT) * (1 - bezierT) * (1 - bezierT)
-				return baseHeight * noiseSuppression + finalHeight * (1 - noiseSuppression)
-			}
-		}
-
-		return baseHeight
-	}
-
-	// Get terrain height at any world position (in world units)
-	const getHeight = (worldX, worldZ, maxHeight) => {
-		return getRawHeight(worldX, worldZ) * maxHeight
-	}
-
-	// Get terrain normal at any world position
-	const getNormal = (worldX, worldZ, maxHeight, target) => {
-		const hL = getRawHeight(worldX - GRADIENT_EPSILON, worldZ) * maxHeight
-		const hR = getRawHeight(worldX + GRADIENT_EPSILON, worldZ) * maxHeight
-		const hD = getRawHeight(worldX, worldZ - GRADIENT_EPSILON) * maxHeight
-		const hU = getRawHeight(worldX, worldZ + GRADIENT_EPSILON) * maxHeight
-
-		const dhdx = (hR - hL) / (2 * GRADIENT_EPSILON)
-		const dhdz = (hU - hD) / (2 * GRADIENT_EPSILON)
-
-		return target.set(-dhdx, 1, -dhdz).normalize()
-	}
-
-	return { getRawHeight, getHeight, getNormal }
-}
-
-// Distance from ocean edge at which water starts loading (with hysteresis buffer)
-const WATER_LOAD_DISTANCE = 400 // Start loading water when this close to ocean edge
-const WATER_UNLOAD_BUFFER = 100 // Extra distance before unloading to prevent flicker
-
-// Main Terrain component
+// Main terrain component
 const Terrain = () => {
-	const { viewDistance, tileSize, resolution, smoothness, maxHeight } = DEFAULT_TERRAIN_CONFIG
-	const [activeTiles, setActiveTiles] = useState([])
-	const [showWater, setShowWater] = useState(false)
-	const lastTileCoord = useRef({ x: null, z: null })
-	const tileCache = useRef(new Map()) // Cache tile data to maintain stable references
+	// Use quadtree LOD system
+	const leafTiles = useTerrainQuadtree()
 
-	// Check if grass should be disabled (performance degraded, or mobile device)
-	const isMobile = useGameStore((state) => state.isMobile)
-	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
-	const showGrass = !performanceDegraded && !isMobile
+	// Create shared terrain helpers (height/normal/ridgemap sampling)
+	const terrainHelpers = useMemo(() => createTerrainHelpers(), [])
 
-	// Pre-compute view distance tile count
-	const tilesInViewDistance = useMemo(() => Math.ceil(viewDistance / tileSize), [viewDistance, tileSize])
+	// Register terrain helpers in the game store
+	useEffect(() => {
+		useGameStore.getState().setTerrainHelpers(terrainHelpers)
+	}, [terrainHelpers])
 
-	// Generate noise instance
-	const noise = useMemo(() => new Noise(1234), [])
+	// Terrain material shared by all terrain tiles
+	const terrainMaterial = useTerrainMaterial()
 
-	const [sandTexture, sandNormalMap] = useLoader(TextureLoader, ['/assets/images/ground/sand.jpg', '/assets/images/ground/sand_normal.jpg'])
+	// Water material shared by all water tiles
+	const waterMaterial = useWaterMaterial()
 
-	const distantTexture = useMemo(() => sandTexture.clone(), [sandTexture])
-
-	// Flat area and transition parameters
-	const flatAreaRadius = tileSize * 0.5
-	const transitionEndDist = tileSize * 2
-
-	// Create shared terrain helpers (memoized for stable reference)
-	const terrainHelpers = useMemo(() => createTerrainHelpers(noise, smoothness, flatAreaRadius, transitionEndDist), [noise, smoothness, flatAreaRadius, transitionEndDist])
-
-	// Scratch vector for normal calculations (reused to avoid allocations)
-	const normalScratch = useMemo(() => new Vector3(), [])
-
-	// Get terrain height at any world position (in world units)
-	const getTerrainHeight = useCallback(
-		(worldX, worldZ) => {
-			return terrainHelpers.getHeight(worldX, worldZ, maxHeight)
-		},
-		[terrainHelpers, maxHeight]
-	)
-
-	// Get terrain normal at any world position (optionally pass target vector to avoid allocation)
-	const getTerrainNormal = useCallback(
-		(worldX, worldZ, target = normalScratch) => {
-			return terrainHelpers.getNormal(worldX, worldZ, maxHeight, target)
-		},
-		[terrainHelpers, maxHeight, normalScratch]
-	)
-
-	// Update tiles based on vehicle position
-	useFrame((state) => {
-		const centerPosition = vehicleState.position
-		const currentTileX = Math.floor(centerPosition.x / tileSize)
-		const currentTileZ = Math.floor(centerPosition.z / tileSize)
-
-		// Only update tiles if the center position moved to a new tile
-		if (currentTileX === lastTileCoord.current.x && currentTileZ === lastTileCoord.current.z) {
-			return
-		}
-		lastTileCoord.current.x = currentTileX
-		lastTileCoord.current.z = currentTileZ
-
-		const newActiveTileKeys = new Set()
-		const isInitialLoad = tileCache.current.size === 0
-
-		// Check which tiles should be active
-		for (let x = -tilesInViewDistance; x <= tilesInViewDistance; x++) {
-			for (let z = -tilesInViewDistance; z <= tilesInViewDistance; z++) {
-				const tileX = currentTileX + x
-				const tileZ = currentTileZ + z
-				const tileKey = `${tileX},${tileZ}`
-
-				// Calculate distance from center position to tile center using simple math
-				const tileCenterX = tileX * tileSize + tileSize / 2
-				const tileCenterZ = tileZ * tileSize + tileSize / 2
-				const dx = centerPosition.x - tileCenterX
-				const dz = centerPosition.z - tileCenterZ
-				const distanceToTile = Math.sqrt(dx * dx + dz * dz)
-
-				// Add tile if within view distance
-				if (distanceToTile <= viewDistance) {
-					newActiveTileKeys.add(tileKey)
-
-					// Only create new tile data if not already cached
-					if (!tileCache.current.has(tileKey)) {
-						tileCache.current.set(tileKey, {
-							key: tileKey,
-							position: [tileX * tileSize, 0, tileZ * tileSize], // Stable reference
-							shouldFade: !isInitialLoad,
-						})
-					}
-				}
-			}
-		}
-
-		// Remove tiles that are no longer in view from cache
-		for (const key of tileCache.current.keys()) {
-			if (!newActiveTileKeys.has(key)) {
-				tileCache.current.delete(key)
-			}
-		}
-
-		// Build active tiles array from cache (stable references)
-		const newActiveTiles = Array.from(newActiveTileKeys).map((key) => tileCache.current.get(key))
-		setActiveTiles(newActiveTiles)
-
-		// Check if player is close enough to ocean to show water
-		const distFromOrigin = Math.sqrt(centerPosition.x * centerPosition.x + centerPosition.z * centerPosition.z)
-		const distFromOcean = OCEAN_RADIUS - distFromOrigin
-
-		// Use hysteresis to prevent flicker at boundary
-		setShowWater((wasShowing) => {
-			if (wasShowing) {
-				// Already showing - only hide if we've moved far enough away
-				return distFromOcean < WATER_LOAD_DISTANCE + WATER_UNLOAD_BUFFER
-			} else {
-				// Not showing - show when we get close enough
-				return distFromOcean < WATER_LOAD_DISTANCE
-			}
-		})
-	})
+	// Load vegetation models (LOD 0-3)
+	const vegetationModels = useVegetation()
 
 	return (
 		<group name='Terrain'>
-			<DistantTerrain noise={noise} map={distantTexture} />
-			{showWater && <Water oceanRadius={OCEAN_RADIUS} oceanTransition={OCEAN_TRANSITION} />}
-			{activeTiles.map(({ key, position, shouldFade }) => (
+			{leafTiles.map(({ node, edgeStitchInfo }) => (
 				<TerrainTile
-					key={key}
-					position={position}
-					shouldFade={shouldFade}
-					tileSize={tileSize}
-					resolution={resolution}
-					maxHeight={maxHeight}
+					key={node.key}
+					node={node}
 					terrainHelpers={terrainHelpers}
-					map={sandTexture}
-					normalMap={sandNormalMap}
+					edgeStitchInfo={edgeStitchInfo}
+					terrainMaterial={terrainMaterial}
+					waterMaterial={waterMaterial}
+					vegetationModels={vegetationModels}
 				/>
 			))}
-			{showGrass && <Grass getTerrainHeight={getTerrainHeight} getTerrainNormal={getTerrainNormal} />}
 		</group>
 	)
 }

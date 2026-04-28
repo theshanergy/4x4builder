@@ -15,299 +15,313 @@ import LightIcon from '../../assets/images/icons/Light.svg'
 
 // Group object by key.
 const groupObjectByKey = (object, key) => {
-    const groups = {}
-    for (const id of Object.keys(object)) {
-        const type = object[id][key]
-        if (!groups[type]) groups[type] = []
-        groups[type].push(id)
-    }
-    return groups
+	const groups = {}
+	for (const id of Object.keys(object)) {
+		const type = object[id][key]
+		if (!groups[type]) groups[type] = []
+		groups[type].push(id)
+	}
+	return groups
 }
 
 // Select list grouped by provided type.
 const GroupedSelect = ({ value, itemList, groupBy, ...restProps }) => {
-    const groupedList = useMemo(() => groupObjectByKey(itemList, groupBy), [itemList, groupBy])
+	const groupedList = useMemo(() => groupObjectByKey(itemList, groupBy), [itemList, groupBy])
 
-    return (
-        <select value={value || ''} {...restProps}>
-            {Object.keys(groupedList).map((type) => (
-                <optgroup key={type} label={type}>
-                    {groupedList[type].map((id) => (
-                        <option key={id} value={id}>
-                            {itemList[id].name}{itemList[id].year ? ` (${itemList[id].year})` : ''}
-                        </option>
-                    ))}
-                </optgroup>
-            ))}
-        </select>
-    )
+	return (
+		<select value={value || ''} {...restProps}>
+			{Object.keys(groupedList).map((type) => (
+				<optgroup key={type} label={type}>
+					{groupedList[type].map((id) => (
+						<option key={id} value={id}>
+							{itemList[id].name}{itemList[id].year ? ` (${itemList[id].year})` : ''}
+						</option>
+					))}
+				</optgroup>
+			))}
+		</select>
+	)
 }
 
 // Select list of different ranges in inches.
 const InchRangeSelect = ({ value, min, max, ...restProps }) => {
-    const elements = useMemo(() => {
-        const out = []
-        for (let i = min; i <= max; i++) {
-            out.push(
-                <option key={i} value={i}>
-                    {i}"
-                </option>
-            )
-        }
-        return out
-    }, [min, max])
+	const elements = useMemo(() => {
+		const out = []
+		for (let i = min; i <= max; i++) {
+			out.push(
+				<option key={i} value={i}>
+					{i}"
+				</option>
+			)
+		}
+		return out
+	}, [min, max])
 
-    return (
-        <select value={value || 0} {...restProps}>
-            {elements}
-        </select>
-    )
+	return (
+		<select value={value || 0} {...restProps}>
+			{elements}
+		</select>
+	)
 }
 
 function Editor() {
-    // Get vehicle state from store
-    const currentVehicle = useGameStore((state) => state.currentVehicle) || {}
+	// Get vehicle state from store
+	const currentVehicle = useGameStore((state) => state.currentVehicle) || {}
 
-    const setVehicle = useGameStore((state) => state.setVehicle)
-    const showNotification = useGameStore((state) => state.showNotification)
-    const physicsEnabled = useGameStore((state) => state.physicsEnabled)
-    const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
-    const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
-    const setCameraAutoRotate = useGameStore((state) => state.setCameraAutoRotate)
+	const setVehicle = useGameStore((state) => state.setVehicle)
+	const showNotification = useGameStore((state) => state.showNotification)
+	const physicsEnabled = useGameStore((state) => state.physicsEnabled)
+	const setPhysicsEnabled = useGameStore((state) => state.setPhysicsEnabled)
+	const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
+	const setCameraAutoRotate = useGameStore((state) => state.setCameraAutoRotate)
 
-    // Memoize vehicle config to avoid repeated lookups
-    const vehicleConfig = currentVehicle.body ? vehicleConfigs.vehicles[currentVehicle.body] : null
+	// Memoize vehicle config to avoid repeated lookups
+	const vehicleConfig = currentVehicle.body ? vehicleConfigs.vehicles[currentVehicle.body] : null
 
-    const requestVehicleFormRef = useRef()
+	const requestVehicleFormRef = useRef()
 
-    const handleRequestVehicle = () => {
-        const handleSuccess = () => {
-            showNotification({
-                type: 'success',
-                title: 'Thanks!',
-                text: 'Your vehicle request has been received. We appreciate your feedback.',
-                centered: true,
-                confirmButtonText: 'Close',
-            })
-        }
-        showNotification({
-            title: 'Request Vehicle',
-            content: <FeedbackForm ref={requestVehicleFormRef} onSuccess={handleSuccess} placeholder="Is there a particular vehicle or addon we're missing? Let us know!" />,
-            showCancelButton: true,
-            cancelButtonText: 'Close',
-            confirmButtonText: 'Send Request',
-            onConfirm: () => requestVehicleFormRef.current.submit(),
-        })
-    }
-    const hasAddons = vehicleConfig?.addons && Object.keys(vehicleConfig.addons).length > 0
-    const hasSpare = vehicleConfig?.spare_wheel
-    const hasLighting = vehicleConfig?.lighting && Object.keys(vehicleConfig.lighting).length > 0
+	const handleRequestVehicle = () => {
+		const handleSuccess = () => {
+			showNotification({
+				type: 'success',
+				title: 'Thanks!',
+				text: 'Your vehicle request has been received. We appreciate your feedback.',
+				centered: true,
+				confirmButtonText: 'Close',
+			})
+		}
+		showNotification({
+			title: 'Request Vehicle',
+			content: <FeedbackForm ref={requestVehicleFormRef} onSuccess={handleSuccess} placeholder="Is there a particular vehicle or addon we're missing? Let us know!" />,
+			showCancelButton: true,
+			cancelButtonText: 'Close',
+			confirmButtonText: 'Send Request',
+			onConfirm: () => requestVehicleFormRef.current.submit(),
+		})
+	}
 
-    return (
-        <div id='editor'>
-            {/* Vehicle */}
-            <EditorSection title='Vehicle' icon={<VehicleIcon className='icon' />} defaultActive={true}>
-                {/* Vehicle */}
-                <div className='field field-vehicle'>
-                    <label>Model</label>
-                    <GroupedSelect value={currentVehicle.body} itemList={vehicleConfigs.vehicles} groupBy={'make'} onChange={(e) => setVehicle({ body: e.target.value })} />
-                </div>
-                <button onClick={handleRequestVehicle} className='p-0 text-[11px] capitalize shadow-none text-stone-500 hover:text-stone-300 transition-colors bg-transparent border-none'>
-                    Request vehicle
-                </button>
-            </EditorSection>
+	const hasAddons = vehicleConfig?.addons && Object.keys(vehicleConfig.addons).length > 0
+	const hasSpare = vehicleConfig?.spare_wheel
+	const hasLighting = vehicleConfig?.lighting && Object.keys(vehicleConfig.lighting).length > 0
 
-            {/* Paint */}
-            <EditorSection title='Paint' icon={<PaintIcon className='icon' />}>
-                {/* Paint */}
-                <div className='field field-paint'>
-                    <div className='field field-vehicle-color'>
-                        <label>Paint</label>
-                        <input type='color' value={currentVehicle.color || ''} onChange={(e) => setVehicle({ color: e.target.value })} />
-                    </div>
+	return (
+		<div id='editor'>
+			{/* Vehicle */}
+			<EditorSection title='Vehicle' icon={<VehicleIcon className='icon' />} defaultActive={true}>
+				{/* Vehicle */}
+				<div className='field field-vehicle'>
+					<label>Model</label>
+					<GroupedSelect value={currentVehicle.body} itemList={vehicleConfigs.vehicles} groupBy={'make'} onChange={(e) => setVehicle({ body: e.target.value })} />
+				</div>
+				<button onClick={handleRequestVehicle} className='p-0 text-[11px] capitalize shadow-none text-stone-500 hover:text-stone-300 transition-colors bg-transparent border-none'>
+					Request vehicle
+				</button>
+			</EditorSection>
 
-                    {/* Roughness */}
-                    <div className='field field-vehicle-roughness'>
-                        <label style={{ visibility: 'hidden' }}>Finish</label>
-                        <select value={currentVehicle.roughness || 0} onChange={(e) => setVehicle({ roughness: parseFloat(e.target.value) })}>
-                            <option value='0.6'>Matte</option>
-                            <option value='0.2'>Semi Gloss</option>
-                            <option value='0'>High Gloss</option>
-                        </select>
-                    </div>
-                </div>
-            </EditorSection>
+			{/* Paint */}
+			<EditorSection title='Paint' icon={<PaintIcon className='icon' />}>
+				{/* Paint */}
+				<div className='field field-paint'>
+					<div className='field field-vehicle-color'>
+						<label>Paint</label>
+						<input type='color' value={currentVehicle.color || ''} onChange={(e) => setVehicle({ color: e.target.value })} />
+					</div>
 
-            {/* Suspension */}
-            <EditorSection title='Suspension' icon={<SuspensionIcon className='icon' />}>
-                {/* Vehicle Lift */}
-                <div className='field field-vehicle-lift'>
-                    <label>Lift</label>
-                    <InchRangeSelect value={currentVehicle.lift} min={-2} max={8} onChange={(e) => setVehicle({ lift: parseInt(e.target.value, 10) })} />
-                </div>
+					{/* Roughness */}
+					<div className='field field-vehicle-roughness'>
+						<label style={{ visibility: 'hidden' }}>Finish</label>
+						<select value={currentVehicle.roughness || 0} onChange={(e) => setVehicle({ roughness: parseFloat(e.target.value) })}>
+							<option value='0.6'>Matte</option>
+							<option value='0.2'>Semi Gloss</option>
+							<option value='0'>High Gloss</option>
+						</select>
+					</div>
+				</div>
+			</EditorSection>
 
-                {/* Wheel Offset */}
-                <div className='field field-wheel-offset'>
-                    <label>Offset</label>
-                    <input type='range' min='0' max='0.1' step='0.01' value={currentVehicle.wheel_offset || 0} onChange={(e) => setVehicle({ wheel_offset: parseFloat(e.target.value) })} />
-                </div>
-            </EditorSection>
+			{/* Suspension */}
+			<EditorSection title='Suspension' icon={<SuspensionIcon className='icon' />}>
+				{/* Vehicle Lift */}
+				<div className='field field-vehicle-lift'>
+					<label>Lift</label>
+					<InchRangeSelect value={currentVehicle.lift} min={-2} max={8} onChange={(e) => setVehicle({ lift: parseInt(e.target.value, 10) })} />
+				</div>
 
-            {/* Rims */}
-            <EditorSection title='Rims' icon={<RimIcon className='icon' />}>
-                {/* Rim */}
-                <div className='field field-rim'>
-                    <label>Type</label>
-                    <GroupedSelect value={currentVehicle.rim} itemList={vehicleConfigs.wheels.rims} groupBy={'make'} onChange={(e) => setVehicle({ rim: e.target.value })} />
-                </div>
+				{/* Wheel Offset */}
+				<div className='field field-wheel-offset'>
+					<label>Offset</label>
+					<input
+						type='range'
+						min='0'
+						max='0.1'
+						step='0.01'
+						value={currentVehicle.wheel_offset || 0}
+						onChange={(e) => setVehicle({ wheel_offset: parseFloat(e.target.value) })}
+					/>
+				</div>
+			</EditorSection>
 
-                {/* Primary Rim Color */}
-                <div className='field field-rim-color'>
-                    <label>Color</label>
-                    <select value={currentVehicle.rim_color || ''} onChange={(e) => setVehicle({ rim_color: e.target.value })}>
-                        <option value='flat_black'>Flat Black</option>
-                        <option value='gloss_black'>Gloss Black</option>
-                        <option value='silver'>Silver</option>
-                        <option value='chrome'>Chrome</option>
-                        <option value='bronze'>Bronze</option>
-                        <option value='body'>Body match</option>
-                    </select>
-                </div>
+			{/* Rims */}
+			<EditorSection title='Rims' icon={<RimIcon className='icon' />}>
+				{/* Rim */}
+				<div className='field field-rim'>
+					<label>Type</label>
+					<GroupedSelect value={currentVehicle.rim} itemList={vehicleConfigs.wheels.rims} groupBy={'make'} onChange={(e) => setVehicle({ rim: e.target.value })} />
+				</div>
 
-                {/* Secondary Rim Color */}
-                <div className='field field-rim-color'>
-                    <label>Accent</label>
-                    <select value={currentVehicle.rim_color_secondary || ''} onChange={(e) => setVehicle({ rim_color_secondary: e.target.value })}>
-                        <option value='flat_black'>Flat Black</option>
-                        <option value='gloss_black'>Gloss Black</option>
-                        <option value='silver'>Silver</option>
-                        <option value='chrome'>Chrome</option>
-                        <option value='bronze'>Bronze</option>
-                        <option value='body'>Body match</option>
-                    </select>
-                </div>
+				{/* Primary Rim Color */}
+				<div className='field field-rim-color'>
+					<label>Color</label>
+					<select value={currentVehicle.rim_color || ''} onChange={(e) => setVehicle({ rim_color: e.target.value })}>
+						<option value='flat_black'>Flat Black</option>
+						<option value='gloss_black'>Gloss Black</option>
+						<option value='silver'>Silver</option>
+						<option value='chrome'>Chrome</option>
+						<option value='bronze'>Bronze</option>
+						<option value='body'>Body match</option>
+					</select>
+				</div>
 
-                {/* Rim Size */}
-                <div className='field field-rim-size'>
-                    <div className='field field-rim-diameter'>
-                        <label>Diameter</label>
-                        <InchRangeSelect value={currentVehicle.rim_diameter} min={14} max={24} onChange={(e) => setVehicle({ rim_diameter: parseInt(e.target.value, 10) })} />
-                    </div>
+				{/* Secondary Rim Color */}
+				<div className='field field-rim-color'>
+					<label>Accent</label>
+					<select value={currentVehicle.rim_color_secondary || ''} onChange={(e) => setVehicle({ rim_color_secondary: e.target.value })}>
+						<option value='flat_black'>Flat Black</option>
+						<option value='gloss_black'>Gloss Black</option>
+						<option value='silver'>Silver</option>
+						<option value='chrome'>Chrome</option>
+						<option value='bronze'>Bronze</option>
+						<option value='body'>Body match</option>
+					</select>
+				</div>
 
-                    {/* Rim Width */}
-                    <div className='field field-rim-width'>
-                        <label>Width</label>
-                        <InchRangeSelect value={currentVehicle.rim_width} min={8} max={16} onChange={(e) => setVehicle({ rim_width: parseInt(e.target.value, 10) })} />
-                    </div>
-                </div>
-            </EditorSection>
+				{/* Rim Size */}
+				<div className='field field-rim-size'>
+					<div className='field field-rim-diameter'>
+						<label>Diameter</label>
+						<InchRangeSelect value={currentVehicle.rim_diameter} min={14} max={24} onChange={(e) => setVehicle({ rim_diameter: parseInt(e.target.value, 10) })} />
+					</div>
 
-            {/* Tires */}
-            <EditorSection title='Tires' icon={<TireIcon className='icon' />}>
-                <div className='field field-tire-type flex gap-4'>
-                    {/* Tire */}
-                    <div className='field field-tire-type'>
-                        <label>Type</label>
-                        <GroupedSelect value={currentVehicle.tire} itemList={vehicleConfigs.wheels.tires} groupBy={'make'} onChange={(e) => setVehicle({ tire: e.target.value })} />
-                    </div>
+					{/* Rim Width */}
+					<div className='field field-rim-width'>
+						<label>Width</label>
+						<InchRangeSelect value={currentVehicle.rim_width} min={8} max={16} onChange={(e) => setVehicle({ rim_width: parseInt(e.target.value, 10) })} />
+					</div>
+				</div>
+			</EditorSection>
 
-                    {/* Tire Size */}
-                    <div className='field field-tire-size'>
-                        <label>Size</label>
-                        <InchRangeSelect value={currentVehicle.tire_diameter} min={30} max={40} onChange={(e) => setVehicle({ tire_diameter: parseInt(e.target.value, 10) })} />
-                    </div>
-                </div>
+			{/* Tires */}
+			<EditorSection title='Tires' icon={<TireIcon className='icon' />}>
+				<div className='field field-tire-type flex gap-4'>
+					{/* Tire */}
+					<div className='field field-tire-type'>
+						<label>Type</label>
+						<GroupedSelect value={currentVehicle.tire} itemList={vehicleConfigs.wheels.tires} groupBy={'make'} onChange={(e) => setVehicle({ tire: e.target.value })} />
+					</div>
 
-                {/* Tire Muddiness */}
-                <div className='field field-tire-muddiness'>
-                    <label>Muddiness</label>
-                    <input type='range' min='0' max='1' step='0.05' value={currentVehicle.tire_muddiness || 0} onChange={(e) => setVehicle({ tire_muddiness: parseFloat(e.target.value) })} />
-                </div>
-            </EditorSection>
+					{/* Tire Size */}
+					<div className='field field-tire-size'>
+						<label>Size</label>
+						<InchRangeSelect value={currentVehicle.tire_diameter} min={30} max={40} onChange={(e) => setVehicle({ tire_diameter: parseInt(e.target.value, 10) })} />
+					</div>
+				</div>
 
-            {/* Addons */}
-            {(hasAddons || hasSpare) && (
-                <EditorSection title='Addons' icon={<ToolIcon className='icon' />}>
-                    {hasAddons && Object.keys(vehicleConfig.addons).map((addon) => (
-                        <div key={addon} className={`field field-${addon}`}>
-                            <label>{vehicleConfig.addons[addon].name}</label>
-                            <select value={currentVehicle.addons[addon] || ''} required onChange={(e) => setVehicle({ addons: { ...currentVehicle.addons, [addon]: e.target.value } })}>
-                                {!vehicleConfig.addons[addon].required && <option value=''>None</option>}
-                                {Object.keys(vehicleConfig.addons[addon].options).map((option) => (
-                                    <option key={option} value={option}>
-                                        {vehicleConfig.addons[addon].options[option].name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    ))}
-                    {hasSpare && (
-                        <div className='field field-spare-wheel'>
-                            <input
-                                type='checkbox'
-                                id='spare-wheel'
-                                checked={!!currentVehicle.spare}
-                                onChange={(e) => setVehicle({ spare: e.target.checked })}
-                            />
-                            <label htmlFor='spare-wheel'>Spare Wheel</label>
-                        </div>
-                    )}
-                </EditorSection>
-            )}
+				{/* Tire Muddiness */}
+				<div className='field field-tire-muddiness'>
+					<label>Muddiness</label>
+					<input
+						type='range'
+						min='0'
+						max='1'
+						step='0.05'
+						value={currentVehicle.tire_muddiness || 0}
+						onChange={(e) => setVehicle({ tire_muddiness: parseFloat(e.target.value) })}
+					/>
+				</div>
+			</EditorSection>
 
-            {/* Lights */}
-            {hasLighting && (
-                <EditorSection title='Lights' icon={<LightIcon className='icon' />}>
-                    {Object.keys(vehicleConfig.lighting).map((lightType) => {
-                        const lights = vehicleConfig.lighting[lightType]
-                        if (!Array.isArray(lights)) return null
-                        
-                        return lights.map((light, index) => {
-                            const lightKey = `${lightType}_${index}`
-                            const isChecked = currentVehicle.lighting?.[lightType]?.[index] === true
-                            
-                            return (
-                                <div key={lightKey} className={`field field-light-${lightType}`}>
-                                    <input
-                                        type='checkbox'
-                                        id={`light-${lightKey}`}
-                                        checked={isChecked}
-                                        onChange={(e) => {
-                                            const currentLighting = currentVehicle.lighting || {}
-                                            const updatedLightType = [...(currentLighting[lightType] || [])]
-                                            updatedLightType[index] = e.target.checked
-                                            setVehicle({ 
-                                                lighting: { 
-                                                    ...currentLighting, 
-                                                    [lightType]: updatedLightType 
-                                                } 
-                                            })
-                                        }}
-                                    />
-                                    <label htmlFor={`light-${lightKey}`}>{light.name}</label>
-                                </div>
-                            )
-                        })
-                    })}
-                </EditorSection>
-            )}
+			{/* Addons */}
+			{(hasAddons || hasSpare) && (
+				<EditorSection title='Addons' icon={<ToolIcon className='icon' />}>
+					{hasAddons &&
+						Object.keys(vehicleConfig.addons).map((addon) => (
+							<div key={addon} className={`field field-${addon}`}>
+								<label>{vehicleConfig.addons[addon].name}</label>
+								<select
+									value={currentVehicle.addons[addon] || ''}
+									required
+									onChange={(e) => setVehicle({ addons: { ...currentVehicle.addons, [addon]: e.target.value } })}>
+									{!vehicleConfig.addons[addon].required && <option value=''>None</option>}
+									{Object.keys(vehicleConfig.addons[addon].options).map((option) => (
+										<option key={option} value={option}>
+											{vehicleConfig.addons[addon].options[option].name}
+										</option>
+									))}
+								</select>
+							</div>
+						))}
+					{hasSpare && (
+						<div className='field field-spare-wheel'>
+							<input type='checkbox' id='spare-wheel' checked={!!currentVehicle.spare} onChange={(e) => setVehicle({ spare: e.target.checked })} />
+							<label htmlFor='spare-wheel'>Spare Wheel</label>
+						</div>
+					)}
+				</EditorSection>
+			)}
 
-            {/* Scene */}
-            <EditorSection title='Scene' icon={<GearIcon className='icon' />}>
-                {/* Auto Rotate */}
-                <div className='field field-camera-autorotate'>
-                    <input type='checkbox' id='camera-autorotate' checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} />
-                    <label htmlFor='camera-autorotate'>Auto Rotate</label>
-                </div>
+			{/* Lights */}
+			{hasLighting && (
+				<EditorSection title='Lights' icon={<LightIcon className='icon' />}>
+					{Object.keys(vehicleConfig.lighting).map((lightType) => {
+						const lights = vehicleConfig.lighting[lightType]
+						if (!Array.isArray(lights)) return null
 
-                {/* Physics */}
-                <div className='field field-physics'>
-                    <input type='checkbox' id='physics' checked={physicsEnabled} onChange={(e) => setPhysicsEnabled(e.target.checked)} />
-                    <label htmlFor='physics'>Physics</label>
-                </div>
-            </EditorSection>
-        </div>
-    )
+						return lights.map((light, index) => {
+							const lightKey = `${lightType}_${index}`
+							const isChecked = currentVehicle.lighting?.[lightType]?.[index] === true
+
+							return (
+								<div key={lightKey} className={`field field-light-${lightType}`}>
+									<input
+										type='checkbox'
+										id={`light-${lightKey}`}
+										checked={isChecked}
+										onChange={(e) => {
+											const currentLighting = currentVehicle.lighting || {}
+											const updatedLightType = [...(currentLighting[lightType] || [])]
+											updatedLightType[index] = e.target.checked
+											setVehicle({
+												lighting: {
+													...currentLighting,
+													[lightType]: updatedLightType,
+												},
+											})
+										}}
+									/>
+									<label htmlFor={`light-${lightKey}`}>{light.name}</label>
+								</div>
+							)
+						})
+					})}
+				</EditorSection>
+			)}
+
+			{/* Scene */}
+			<EditorSection title='Scene' icon={<GearIcon className='icon' />}>
+				{/* Auto Rotate */}
+				<div className='field field-camera-autorotate'>
+					<input type='checkbox' id='camera-autorotate' checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} />
+					<label htmlFor='camera-autorotate'>Auto Rotate</label>
+				</div>
+
+				{/* Physics */}
+				<div className='field field-physics'>
+					<input type='checkbox' id='physics' checked={physicsEnabled} onChange={(e) => setPhysicsEnabled(e.target.checked)} />
+					<label htmlFor='physics'>Physics</label>
+				</div>
+			</EditorSection>
+		</div>
+	)
 }
 
 export default Editor

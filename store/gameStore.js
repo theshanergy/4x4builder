@@ -25,6 +25,11 @@ export const vehicleState = {
 	heading: 0, // Vehicle heading/yaw in radians (updated every frame)
 }
 
+// Live count of visible terrain tiles that contain water geometry.
+// Used by the water material to skip its reflection render pass when no
+// water is on screen.
+export const waterVisibility = { visibleTileCount: 0 }
+
 // Game store
 const useGameStore = create((set, get) => {
 	// Set up resize listener for isMobile detection
@@ -73,6 +78,10 @@ const useGameStore = create((set, get) => {
 		cameraAutoRotate: false,
 		setCameraMode: (mode) => set({ cameraMode: mode }),
 		setCameraAutoRotate: (autoRotate) => set({ cameraAutoRotate: autoRotate }),
+
+		// Terrain helpers (set by terrain system)
+		terrainHelpers: null,
+		setTerrainHelpers: (helpers) => set({ terrainHelpers: helpers }),
 
 		// Saved vehicles
 		savedVehicles: (() => {

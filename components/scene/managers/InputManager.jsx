@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useEffect, useCallback } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import useInputStore from '../../../store/inputStore'
 import useMultiplayerStore from '../../../store/multiplayerStore'
 import useGameStore from '../../../store/gameStore'
@@ -27,8 +27,67 @@ const GAMEPAD = {
  * - Touch joystick input (via touchInput in store)
  */
 const InputManager = () => {
+	const gl = useThree((state) => state.gl)
 	const setKey = useInputStore((state) => state.setKey)
 	const setInput = useInputStore((state) => state.setInput)
+	const setMouseInput = useInputStore((state) => state.setMouseInput)
+
+	// Request pointer lock on the canvas
+	const requestPointerLock = useCallback(() => {
+		if (document.pointerLockElement !== gl.domElement) {
+			gl.domElement.requestPointerLock()
+		}
+	}, [gl.domElement])
+
+	// Exit pointer lock
+	const exitPointerLock = useCallback(() => {
+		if (document.pointerLockElement === gl.domElement) {
+			document.exitPointerLock()
+		}
+	}, [gl.domElement])
+
+	// Expose pointer lock functions on the store for external use
+	useEffect(() => {
+		useInputStore.setState({ requestPointerLock, exitPointerLock })
+	}, [requestPointerLock, exitPointerLock])
+
+	// Setup mouse and pointer lock event listeners
+	useEffect(() => {
+		const handleMouseMove = (event) => {
+			// Only track movement when pointer is locked
+			if (document.pointerLockElement === gl.domElement) {
+				// Accumulate movement between frames (not overwrite)
+				const { mouseInput } = useInputStore.getState()
+				setMouseInput({
+					movementX: mouseInput.movementX + event.movementX,
+					movementY: mouseInput.movementY + event.movementY,
+				})
+			}
+		}
+
+		const handlePointerLockChange = () => {
+			const isLocked = document.pointerLockElement === gl.domElement
+			const wasLocked = useInputStore.getState().mouseInput.isPointerLocked
+
+			setMouseInput({ isPointerLocked: isLocked })
+
+			// When pointer lock is released, clear all keys to prevent stuck inputs
+			if (wasLocked && !isLocked) {
+				const { keys } = useInputStore.getState()
+				keys.forEach((key) => {
+					setKey(key, false)
+				})
+			}
+		}
+
+		document.addEventListener('mousemove', handleMouseMove)
+		document.addEventListener('pointerlockchange', handlePointerLockChange)
+
+		return () => {
+			document.removeEventListener('mousemove', handleMouseMove)
+			document.removeEventListener('pointerlockchange', handlePointerLockChange)
+		}
+	}, [gl.domElement, setMouseInput, setKey])
 
 	// Setup keyboard event listeners
 	useEffect(() => {
