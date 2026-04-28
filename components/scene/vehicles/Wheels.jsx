@@ -5,7 +5,7 @@ import vehicleConfigs from '../../../config/vehicles'
 import Wheel from './Wheel'
 
 // Wheels - container component that positions wheel groups (including spare wheel)
-const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, color, roughness, wheelPositions, wheelRefs, spare, bodyId, bodyRef }) => {
+const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, color, roughness, wheelPositions, wheelRefs, wheelVisualRefs, spare, bodyId, bodyRef }) => {
 	const spareWheelRef = useRef()
 
 	// Get spare wheel position from vehicle config
@@ -50,20 +50,22 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 		<group name='Wheels'>
 			{allWheelPositions.map(({ key, rotation, isSpare, ...transform }, index) => (
 				<group key={key} ref={isSpare ? spareWheelRef : wheelRefs[index]} {...transform}>
-					{/* Add an inner group with the correct visual rotation */}
-					<group rotation={rotation}>
-						<Wheel
-							rim={rim}
-							rim_diameter={rim_diameter}
-							rim_width={rim_width}
-							rim_color={rim_color}
-							rim_color_secondary={rim_color_secondary}
-							tire={tire}
-							tire_diameter={tire_diameter}
-							tire_muddiness={isSpare ? 0 : tire_muddiness}
-							color={color}
-							roughness={roughness}
-						/>
+					<group ref={isSpare ? null : wheelVisualRefs?.[index]}>
+						{/* Add an inner group with the correct visual rotation */}
+						<group rotation={rotation}>
+							<Wheel
+								rim={rim}
+								rim_diameter={rim_diameter}
+								rim_width={rim_width}
+								rim_color={rim_color}
+								rim_color_secondary={rim_color_secondary}
+								tire={tire}
+								tire_diameter={tire_diameter}
+								tire_muddiness={isSpare ? 0 : tire_muddiness}
+								color={color}
+								roughness={roughness}
+							/>
+						</group>
 					</group>
 				</group>
 			))}

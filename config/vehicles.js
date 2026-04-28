@@ -465,6 +465,16 @@ const vehicleConfigs = {
 			wheelbase: 2.946,
 			driverPosition: [0.45, 1.65, 0],
 			spare_wheel: [0, 0.7, -2.2],
+			solid_axles: {
+				front: {
+					enabled: true,
+					differentialOffset: 0.18,
+				},
+				rear: {
+					enabled: true,
+					differentialScale: [1, 1, -1],
+				},
+			},
 			default_addons: {},
 			addons: {
 				bumper_f: {

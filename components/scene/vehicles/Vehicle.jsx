@@ -15,6 +15,7 @@ import VehicleAudio from './VehicleAudio'
 import WheelParticles from './WheelParticles'
 import TireTracks from './TireTracks'
 import Wheels from './Wheels'
+import SolidAxles from './SolidAxles'
 import VehicleBody from './VehicleBody'
 
 // Vehicle component with physics
@@ -41,12 +42,16 @@ const Vehicle = () => {
 	const bodyRef = useRef(null) // Reference to body group for spare wheel to follow
 	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
 	const wheelRefs = wheelRefsArray.current
+	const wheelVisualRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
+	const wheelVisualRefs = wheelVisualRefsArray.current
 
 	// Get vehicle dimensions and wheel positions from shared hook
-	const { axleHeight, vehicleHeight, wheelbase, wheelPositions } = useVehicleDimensions(config)
+	const { axleHeight, vehicleHeight, wheelbase, wheelPositions, vehicleData } = useVehicleDimensions(config)
+	const solidAxles = config.solid_axles || vehicleData.solid_axles
 
 	// Convert wheel width from inches to meters
 	const wheelWidth = (config.rim_width * 2.54) / 100
+	const rimDiameter = (config.rim_diameter * 2.54) / 100
 
 	// Create wheel configurations
 	const physicsWheels = useMemo(() => {
@@ -125,10 +130,12 @@ const Vehicle = () => {
 						roughness={config.roughness}
 						wheelPositions={wheelPositions}
 						wheelRefs={wheelRefs}
+						wheelVisualRefs={wheelVisualRefs}
 						spare={config.spare}
 						bodyId={config.body}
 						bodyRef={bodyRef}
 					/>
+					<SolidAxles solidAxles={solidAxles} wheelRefs={wheelRefs} wheelVisualRefs={wheelVisualRefs} wheelWidth={wheelWidth} rimDiameter={rimDiameter} frameHeight={vehicleHeight} />
 				</group>
 			</RigidBody>
 			{!performanceDegraded && !isMobile && (

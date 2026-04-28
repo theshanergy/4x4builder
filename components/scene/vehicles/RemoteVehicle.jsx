@@ -6,6 +6,7 @@ import vehicleConfigs from '../../../config/vehicles'
 import useVehicleDimensions from '../../../hooks/useVehicleDimensions'
 
 import Wheels from './Wheels'
+import SolidAxles from './SolidAxles'
 import VehicleBody from './VehicleBody'
 import VehicleAudio from './VehicleAudio'
 import PlayerLabel from './PlayerLabel'
@@ -116,6 +117,8 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 	const bufferRef = useRef(new TransformBuffer())
 	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
 	const wheelRefs = wheelRefsArray.current
+	const wheelVisualRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
+	const wheelVisualRefs = wheelVisualRefsArray.current
 
 	// Current interpolated state
 	const currentPosition = useRef(new Vector3())
@@ -135,7 +138,10 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 	const { color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, spare, addons, lighting } = config
 
 	// Get vehicle dimensions and wheel positions from shared hook
-	const { validBody, vehicleHeight, wheelPositions } = useVehicleDimensions(config)
+	const { validBody, vehicleData, vehicleHeight, wheelPositions } = useVehicleDimensions(config)
+	const solidAxles = config.solid_axles || vehicleData.solid_axles
+	const wheelWidth = (rim_width * 2.54) / 100
+	const rimDiameter = (rim_diameter * 2.54) / 100
 
 	// Initialize position from initial transform
 	useEffect(() => {
@@ -247,10 +253,12 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 					roughness={roughness}
 					wheelPositions={wheelPositions}
 					wheelRefs={wheelRefs}
+					wheelVisualRefs={wheelVisualRefs}
 					spare={spare}
 					bodyId={validBody}
 					bodyRef={bodyRef}
 				/>
+				<SolidAxles solidAxles={solidAxles} wheelRefs={wheelRefs} wheelVisualRefs={wheelVisualRefs} wheelWidth={wheelWidth} rimDiameter={rimDiameter} frameHeight={vehicleHeight} />
 			</group>
 		</group>
 	)
