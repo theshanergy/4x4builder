@@ -1,18 +1,23 @@
 import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { CanvasTexture, PlaneGeometry, ShaderMaterial, DoubleSide, Vector3, Matrix4, Quaternion, InstancedBufferAttribute } from 'three'
+import { CanvasTexture, ShaderMaterial, DoubleSide, Vector3, Quaternion, BufferGeometry, BufferAttribute, DynamicDrawUsage } from 'three'
+import useGameStore from '../../../store/gameStore'
 
 const MAX_TRACK_SEGMENTS = 1500
+const VERTICES_PER_SEGMENT = 4
+const INDICES_PER_SEGMENT = 6
 const SEGMENT_LENGTH = 0.3
 const MIN_SPAWN_DISTANCE = 0.15
 const MAX_SPAWN_DISTANCE = 2.0
 const TRACK_FADE_TIME = 30
 const TRACK_FADE_DURATION = 15
 const MAX_TRACK_DISTANCE = 80
+const MAX_TRACK_DISTANCE_SQ = MAX_TRACK_DISTANCE * MAX_TRACK_DISTANCE
+const TRACK_SURFACE_OFFSET = 0.004
 
 const SLIP_THRESHOLD = 2.0
 
-// Vertex shader - passes instance data to fragment shader
+// Vertex shader - passes per-vertex segment data to fragment shader
 const vertexShader = `
   #include <common>
   #include <logdepthbuf_pars_vertex>
@@ -28,7 +33,7 @@ const vertexShader = `
     vUv = uv;
     vSpawnTime = aSpawnTime;
     vSpawnOrder = aSpawnOrder;
-    gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 
     #include <logdepthbuf_vertex>
   }
@@ -186,11 +191,50 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 	// Create texture once
 	const trackTexture = useMemo(() => createTrackTexture(), [])
 
-	// Create geometry - a simple plane for each track segment
-	// We'll scale width per-instance, so use unit width here
+	// Create reusable quad geometry for all track segments. Each segment owns four
+	// vertices so corners can be snapped to the terrain height independently.
 	const geometry = useMemo(() => {
-		const geo = new PlaneGeometry(1, SEGMENT_LENGTH)
-		geo.rotateX(-Math.PI / 2) // Lay flat on ground
+		const vertexCount = MAX_TRACK_SEGMENTS * VERTICES_PER_SEGMENT
+		const positions = new Float32Array(vertexCount * 3)
+		const uvs = new Float32Array(vertexCount * 2)
+		const spawnTimes = new Float32Array(vertexCount).fill(-1000)
+		const spawnOrders = new Float32Array(vertexCount)
+		const indices = new Uint32Array(MAX_TRACK_SEGMENTS * INDICES_PER_SEGMENT)
+
+		for (let i = 0; i < MAX_TRACK_SEGMENTS; i++) {
+			const vertexBase = i * VERTICES_PER_SEGMENT
+			const indexBase = i * INDICES_PER_SEGMENT
+
+			for (let v = 0; v < VERTICES_PER_SEGMENT; v++) {
+				const positionIndex = (vertexBase + v) * 3
+				positions[positionIndex] = 0
+				positions[positionIndex + 1] = -1000
+				positions[positionIndex + 2] = 0
+			}
+
+			uvs[(vertexBase + 0) * 2] = 0
+			uvs[(vertexBase + 0) * 2 + 1] = 0
+			uvs[(vertexBase + 1) * 2] = 1
+			uvs[(vertexBase + 1) * 2 + 1] = 0
+			uvs[(vertexBase + 2) * 2] = 1
+			uvs[(vertexBase + 2) * 2 + 1] = 1
+			uvs[(vertexBase + 3) * 2] = 0
+			uvs[(vertexBase + 3) * 2 + 1] = 1
+
+			indices[indexBase] = vertexBase
+			indices[indexBase + 1] = vertexBase + 1
+			indices[indexBase + 2] = vertexBase + 2
+			indices[indexBase + 3] = vertexBase
+			indices[indexBase + 4] = vertexBase + 2
+			indices[indexBase + 5] = vertexBase + 3
+		}
+
+		const geo = new BufferGeometry()
+		geo.setAttribute('position', new BufferAttribute(positions, 3).setUsage(DynamicDrawUsage))
+		geo.setAttribute('uv', new BufferAttribute(uvs, 2))
+		geo.setAttribute('aSpawnTime', new BufferAttribute(spawnTimes, 1).setUsage(DynamicDrawUsage))
+		geo.setAttribute('aSpawnOrder', new BufferAttribute(spawnOrders, 1).setUsage(DynamicDrawUsage))
+		geo.setIndex(new BufferAttribute(indices, 1))
 		return geo
 	}, [])
 
@@ -209,6 +253,9 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 			fragmentShader,
 			transparent: true,
 			depthWrite: false,
+			polygonOffset: true,
+			polygonOffsetFactor: -2,
+			polygonOffsetUnits: -2,
 			side: DoubleSide,
 		})
 	}, [trackTexture])
@@ -220,7 +267,6 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 			data.push({
 				active: false,
 				position: new Vector3(),
-				rotation: 0,
 				spawnTime: 0,
 				wheelIndex: 0,
 				spawnOrder: 0,
@@ -248,35 +294,58 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 
 	// Temp objects for calculations
 	const tempVec = useMemo(() => new Vector3(), [])
-	const tempMatrix = useMemo(() => new Matrix4(), [])
 	const tempQuat = useMemo(() => new Quaternion(), [])
-	const tempScale = useMemo(() => new Vector3(1, 1, 1), [])
-	const upAxis = useMemo(() => new Vector3(0, 1, 0), [])
 	const tempRight = useMemo(() => new Vector3(), [])
 	const tempVelocity = useMemo(() => new Vector3(), [])
+	const terrainHelpers = useGameStore((state) => state.terrainHelpers)
 
 	// Temp vector for vehicle position
 	const vehiclePos = useMemo(() => new Vector3(), [])
 
-	// Initialize instanced mesh
-	useEffect(() => {
-		if (meshRef.current) {
-			// Initialize all instances to be invisible/off-screen
-			const hideMatrix = new Matrix4().makeTranslation(0, -1000, 0)
-			for (let i = 0; i < MAX_TRACK_SEGMENTS; i++) {
-				meshRef.current.setMatrixAt(i, hideMatrix)
-			}
+	const writeCorner = (positions, vertexIndex, x, z, fallbackY) => {
+		const positionIndex = vertexIndex * 3
+		positions[positionIndex] = x
+		positions[positionIndex + 1] = terrainHelpers ? terrainHelpers.getHeight(x, z) + TRACK_SURFACE_OFFSET : fallbackY
+		positions[positionIndex + 2] = z
+	}
 
-			// Initialize instance attributes for GPU fading
-			const spawnTimeAttr = new Float32Array(MAX_TRACK_SEGMENTS).fill(-1000) // Start with old time so they're fully faded
-			const spawnOrderAttr = new Float32Array(MAX_TRACK_SEGMENTS).fill(0)
+	const writeSegmentGeometry = (segIndex, center, forwardX, forwardZ, currentTime, spawnOrder, positionAttr, spawnTimeAttr, spawnOrderAttr) => {
+		const positions = positionAttr.array
+		const spawnTimes = spawnTimeAttr.array
+		const spawnOrders = spawnOrderAttr.array
+		const vertexBase = segIndex * VERTICES_PER_SEGMENT
+		const halfWidth = tireWidth * 0.5
+		const halfLength = SEGMENT_LENGTH * 0.5
+		const widthX = forwardZ
+		const widthZ = -forwardX
+		const fallbackY = center.y
 
-			meshRef.current.geometry.setAttribute('aSpawnTime', new InstancedBufferAttribute(spawnTimeAttr, 1))
-			meshRef.current.geometry.setAttribute('aSpawnOrder', new InstancedBufferAttribute(spawnOrderAttr, 1))
+		writeCorner(positions, vertexBase, center.x - widthX * halfWidth - forwardX * halfLength, center.z - widthZ * halfWidth - forwardZ * halfLength, fallbackY)
+		writeCorner(positions, vertexBase + 1, center.x + widthX * halfWidth - forwardX * halfLength, center.z + widthZ * halfWidth - forwardZ * halfLength, fallbackY)
+		writeCorner(positions, vertexBase + 2, center.x + widthX * halfWidth + forwardX * halfLength, center.z + widthZ * halfWidth + forwardZ * halfLength, fallbackY)
+		writeCorner(positions, vertexBase + 3, center.x - widthX * halfWidth + forwardX * halfLength, center.z - widthZ * halfWidth + forwardZ * halfLength, fallbackY)
 
-			meshRef.current.instanceMatrix.needsUpdate = true
+		for (let v = 0; v < VERTICES_PER_SEGMENT; v++) {
+			spawnTimes[vertexBase + v] = currentTime
+			spawnOrders[vertexBase + v] = spawnOrder
 		}
-	}, [])
+
+		positionAttr.addUpdateRange(vertexBase * 3, VERTICES_PER_SEGMENT * 3)
+		spawnTimeAttr.addUpdateRange(vertexBase, VERTICES_PER_SEGMENT)
+		spawnOrderAttr.addUpdateRange(vertexBase, VERTICES_PER_SEGMENT)
+	}
+
+	const hideSegmentGeometry = (segIndex, positionAttr) => {
+		const positions = positionAttr.array
+		const vertexBase = segIndex * VERTICES_PER_SEGMENT
+		for (let v = 0; v < VERTICES_PER_SEGMENT; v++) {
+			const positionIndex = (vertexBase + v) * 3
+			positions[positionIndex] = 0
+			positions[positionIndex + 1] = -1000
+			positions[positionIndex + 2] = 0
+		}
+		positionAttr.addUpdateRange(vertexBase * 3, VERTICES_PER_SEGMENT * 3)
+	}
 
 	// Cleanup Three.js resources on unmount
 	useEffect(() => {
@@ -319,13 +388,15 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 		const isSlipping = lateralSpeed > SLIP_THRESHOLD
 
 		// Get attribute references for updating
+		const positionAttr = meshRef.current.geometry.attributes.position
 		const aSpawnTime = meshRef.current.geometry.attributes.aSpawnTime
 		const aSpawnOrder = meshRef.current.geometry.attributes.aSpawnOrder
 
 		// Skip if attributes haven't been initialized yet
-		if (!aSpawnTime || !aSpawnOrder) return
+		if (!positionAttr || !aSpawnTime || !aSpawnOrder) return
 
 		let attributesNeedUpdate = false
+		let positionsNeedUpdate = false
 
 		// Process each wheel
 		for (let wi = 0; wi < wheelRefs.length; wi++) {
@@ -349,7 +420,7 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 
 			// Get current wheel position and calculate ground contact point
 			wheelRef.current.getWorldPosition(tempVec)
-			tempVec.y = tempVec.y - tireRadius + 0.01
+			tempVec.y = terrainHelpers ? terrainHelpers.getHeight(tempVec.x, tempVec.z) + TRACK_SURFACE_OFFSET : tempVec.y - tireRadius + TRACK_SURFACE_OFFSET
 
 			if (!isTracking.current[wi]) {
 				lastSpawnPos.current[wi].copy(tempVec)
@@ -358,7 +429,9 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 			}
 
 			// Check distance from last spawn
-			const dist = tempVec.distanceTo(lastSpawnPos.current[wi])
+			const distX = tempVec.x - lastSpawnPos.current[wi].x
+			const distZ = tempVec.z - lastSpawnPos.current[wi].z
+			const dist = Math.sqrt(distX * distX + distZ * distZ)
 
 			if (dist > MAX_SPAWN_DISTANCE) {
 				lastSpawnPos.current[wi].copy(tempVec)
@@ -367,15 +440,15 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 
 			// Only spawn tracks if wheel is slipping, moving enough, and above minimum distance
 			if (isSlipping && speed > 0.5 && dist >= MIN_SPAWN_DISTANCE) {
-				const dirX = tempVec.x - lastSpawnPos.current[wi].x
-				const dirZ = tempVec.z - lastSpawnPos.current[wi].z
-				const dirLen = Math.sqrt(dirX * dirX + dirZ * dirZ)
+				const dirX = distX
+				const dirZ = distZ
+				const dirLen = dist
 
 				if (dirLen > 0.001) {
-					const rotation = Math.atan2(dirX / dirLen, dirZ / dirLen)
-
 					// Spawn segments along the path to fill gaps
 					const numSegments = Math.ceil(dist / MIN_SPAWN_DISTANCE)
+					const forwardX = dirX / dirLen
+					const forwardZ = dirZ / dirLen
 					for (let s = 0; s < numSegments; s++) {
 						const t = (s + 1) / numSegments
 
@@ -387,20 +460,15 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 						// Interpolate position
 						seg.position.lerpVectors(lastSpawnPos.current[wi], tempVec, t)
 						seg.active = true
-						seg.rotation = rotation
 						seg.spawnTime = currentTime
 						seg.wheelIndex = wi
 						seg.spawnOrder = spawnCounter.current++
 
-						// Update instance matrix
-						tempQuat.setFromAxisAngle(upAxis, rotation)
-						tempScale.set(tireWidth, 1, 1)
-						tempMatrix.compose(seg.position, tempQuat, tempScale)
-						meshRef.current.setMatrixAt(segIndex, tempMatrix)
+						// Update segment quad
+						writeSegmentGeometry(segIndex, seg.position, forwardX, forwardZ, currentTime, seg.spawnOrder, positionAttr, aSpawnTime, aSpawnOrder)
 
 						// Update GPU attributes
-						aSpawnTime.setX(segIndex, currentTime)
-						aSpawnOrder.setX(segIndex, seg.spawnOrder)
+						positionsNeedUpdate = true
 						attributesNeedUpdate = true
 
 						activeSegments.current.add(segIndex)
@@ -426,10 +494,9 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 
 			for (const i of activeSegments.current) {
 				const seg = segments[i]
-				if (seg.position.distanceTo(vehiclePos) > MAX_TRACK_DISTANCE) {
+				if (seg.position.distanceToSquared(vehiclePos) > MAX_TRACK_DISTANCE_SQ) {
 					seg.active = false
-					tempMatrix.makeTranslation(0, -1000, 0)
-					meshRef.current.setMatrixAt(i, tempMatrix)
+					hideSegmentGeometry(i, positionAttr)
 					toRemove.push(i)
 					hasChanges = true
 				}
@@ -441,21 +508,21 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 			}
 
 			// Update GPU when needed
-			if (hasChanges || attributesNeedUpdate) {
-				meshRef.current.instanceMatrix.needsUpdate = true
+			if (hasChanges || positionsNeedUpdate) {
+				positionAttr.needsUpdate = true
 			}
 			if (attributesNeedUpdate) {
 				aSpawnTime.needsUpdate = true
 				aSpawnOrder.needsUpdate = true
 			}
 		} else if (attributesNeedUpdate) {
-			meshRef.current.instanceMatrix.needsUpdate = true
+			positionAttr.needsUpdate = true
 			aSpawnTime.needsUpdate = true
 			aSpawnOrder.needsUpdate = true
 		}
 	})
 
-	return <instancedMesh ref={meshRef} args={[geometry, material, MAX_TRACK_SEGMENTS]} frustumCulled={false} />
+	return <mesh ref={meshRef} geometry={geometry} material={material} frustumCulled={false} renderOrder={2} />
 }
 
 export default TireTracks
