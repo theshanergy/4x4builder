@@ -10,6 +10,7 @@ import Notification from './ui/Notification'
 import ControlsOverlay from './ui/ControlsOverlay'
 import Chat from './ui/Chat'
 import VehicleInfo from './ui/VehicleInfo'
+import DevConsole from './ui/DevConsole'
 
 export default function App() {
 	const infoMode = useGameStore((state) => state.infoMode)
@@ -37,6 +38,7 @@ export default function App() {
 			<VehicleInfo />
 
 			<Notification />
+			<DevConsole />
 		</div>
 	)
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import useMultiplayerStore from '../../store/multiplayerStore'
 import useGameStore from '../../store/gameStore'
+import useInputStore from '../../store/inputStore'
 import ChatIcon from '../../assets/images/icons/Chat.svg'
 
 // How long messages stay visible when chat is not focused
@@ -31,6 +32,7 @@ const Chat = () => {
 	const remotePlayers = useMultiplayerStore((state) => state.remotePlayers)
 	const chatOpen = useMultiplayerStore((state) => state.chatOpen)
 	const setChatOpen = useMultiplayerStore((state) => state.setChatOpen)
+	const setTextInputActive = useInputStore((state) => state.setTextInputActive)
 	const localVehicleColor = useGameStore((state) => state.currentVehicle?.color)
 
 	// Memoize player colors to avoid recalculating when other player data changes
@@ -127,11 +129,13 @@ const Chat = () => {
 	// Handle input focus/blur
 	const handleFocus = useCallback(() => {
 		setChatOpen(true)
-	}, [setChatOpen])
+		setTextInputActive(true)
+	}, [setChatOpen, setTextInputActive])
 
 	const handleBlur = useCallback(() => {
 		setChatOpen(false)
-	}, [setChatOpen])
+		setTextInputActive(false)
+	}, [setChatOpen, setTextInputActive])
 
 	// Scroll to bottom when new messages arrive
 	useEffect(() => {

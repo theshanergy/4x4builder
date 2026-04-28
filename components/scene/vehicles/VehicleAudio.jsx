@@ -3,7 +3,6 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { AudioListener, PositionalAudio } from 'three'
 import useGameStore, { vehicleState } from '../../../store/gameStore'
 import useInputStore from '../../../store/inputStore'
-import useMultiplayerStore from '../../../store/multiplayerStore'
 import engineWorklet from '../../../utils/sound/engineWorklet'
 
 // Track which AudioContexts have already registered the worklet processor
@@ -462,8 +461,8 @@ const VehicleAudio = memo(({ isRemote = false, getRemoteState = null }) => {
 
 			// Poll horn input directly (no re-renders)
 			const { keys, input } = useInputStore.getState()
-			const chatOpen = useMultiplayerStore.getState().chatOpen
-			const effectiveKeys = chatOpen ? EMPTY_SET : keys
+			const textInputActive = useInputStore.getState().textInputActive
+			const effectiveKeys = textInputActive ? EMPTY_SET : keys
 			hornActive = effectiveKeys.has('h') || input.leftBumper
 
 			// Update mutable state for network broadcast (avoids Zustand update in render loop)

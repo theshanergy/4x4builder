@@ -75,6 +75,9 @@ const useInputStore = create((set) => ({
 			input: { ...defaultInput },
 			mouseInput: { ...defaultMouseInput },
 		})),
+	// True when any text input (chat, dev console, etc.) is capturing keyboard events
+	textInputActive: false,
+	setTextInputActive: (active) => set({ textInputActive: active }),
 }))
 
 export default useInputStore
