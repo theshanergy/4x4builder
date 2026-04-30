@@ -9,6 +9,7 @@ import Wheels from './Wheels'
 import VehicleBody from './VehicleBody'
 import VehicleAudio from './VehicleAudio'
 import PlayerLabel from './PlayerLabel'
+import TrackLinks from './TrackLinks'
 
 // Interpolation settings
 const INTERPOLATION_DELAY = 100 // ms - buffer time for smooth interpolation
@@ -85,7 +86,7 @@ class TransformBuffer {
 		return {
 			position: before.position.map((v, i) => MathUtils.lerp(v, after.position[i], clampedT)),
 			rotation: this.slerpQuat(before.rotation, after.rotation, clampedT),
-			wheelRotations: before.wheelRotations?.map((v, i) => MathUtils.lerp(v, after.wheelRotations?.[i] || v, clampedT)) || [0, 0, 0, 0],
+			wheelRotations: before.wheelRotations?.map((v, i) => MathUtils.lerp(v, after.wheelRotations?.[i] || v, clampedT)) || [],
 			wheelYPositions: before.wheelYPositions?.map((v, i) => MathUtils.lerp(v, after.wheelYPositions?.[i] || v, clampedT)) || null,
 			steering: MathUtils.lerp(before.steering || 0, after.steering || 0, clampedT),
 			engineRpm: MathUtils.lerp(before.engineRpm || 850, after.engineRpm || 850, clampedT),
@@ -114,8 +115,6 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 	const groupRef = useRef()
 	const bodyRef = useRef(null) // Reference to body group for spare wheel to follow
 	const bufferRef = useRef(new TransformBuffer())
-	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
-	const wheelRefs = wheelRefsArray.current
 
 	// Current interpolated state
 	const currentPosition = useRef(new Vector3())
@@ -135,7 +134,9 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 	const { color, roughness, rim, rim_diameter, rim_width, rim_color, rim_color_secondary, tire, tire_diameter, tire_muddiness, spare, addons, lighting } = config
 
 	// Get vehicle dimensions and wheel positions from shared hook
-	const { validBody, vehicleHeight, wheelPositions } = useVehicleDimensions(config)
+	const { validBody, vehicleData, isTracked, vehicleHeight, wheelPositions, physicsWheelPositions } = useVehicleDimensions(config)
+	const wheelRefs = useMemo(() => wheelPositions.map(() => ({ current: null })), [wheelPositions])
+	const physicsWheelRefs = useMemo(() => physicsWheelPositions.map((wheel) => wheelRefs[wheel.visualIndex]), [physicsWheelPositions, wheelRefs])
 
 	// Initialize position from initial transform
 	useEffect(() => {
@@ -197,8 +198,8 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 			currentAudioState.current.rpm = interpolated.engineRpm || 850
 			currentAudioState.current.hornActive = interpolated.hornActive || false
 
-			// Update wheel rotations, positions, and steering
-			wheelRefs.forEach((ref, i) => {
+			// Update physics wheel rotations, positions, and steering
+			physicsWheelRefs.forEach((ref, i) => {
 				if (!ref.current) return
 
 				// Update wheel Y position for suspension movement
@@ -251,6 +252,14 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 					bodyId={validBody}
 					bodyRef={bodyRef}
 				/>
+				{isTracked && (
+					<TrackLinks
+						trackConfig={vehicleData.track}
+						wheelPositions={wheelPositions}
+						wheelRefs={wheelRefs}
+						physicsWheelPositions={physicsWheelPositions}
+					/>
+				)}
 			</group>
 		</group>
 	)

@@ -23,7 +23,7 @@ const round3 = (v) => Math.round(v * 1000) / 1000
  * @param {Object} chassisRef - Reference to the Rapier RigidBody
  * @param {Object} vehicleController - Rapier vehicle controller reference
  */
-const useVehicleBroadcast = (chassisRef, vehicleController) => {
+const useVehicleBroadcast = (chassisRef, vehicleController, wheelCount = 4) => {
 	const lastBroadcast = useRef(0)
 	const lastPosition = useRef({ x: 0, y: 0, z: 0 })
 	const lastRotation = useRef({ x: 0, y: 0, z: 0, w: 1 })
@@ -66,14 +66,14 @@ const useVehicleBroadcast = (chassisRef, vehicleController) => {
 		lastRotation.current = { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }
 		
 		// Get wheel data from vehicle controller
-		let wheelRotations = [0, 0, 0, 0]
-		let wheelYPositions = [0, 0, 0, 0]
+		let wheelRotations = Array.from({ length: wheelCount }, () => 0)
+		let wheelYPositions = Array.from({ length: wheelCount }, () => 0)
 		let steering = 0
 		
 		if (vehicleController.current) {
 			try {
 				// Get wheel spin rotations and Y positions from physics controller
-				for (let i = 0; i < 4; i++) {
+				for (let i = 0; i < wheelCount; i++) {
 					wheelRotations[i] = vehicleController.current.wheelRotation(i) || 0
 					// Get suspension compression for wheel Y position
 					const connection = vehicleController.current.wheelChassisConnectionPointCs(i)
@@ -81,7 +81,7 @@ const useVehicleBroadcast = (chassisRef, vehicleController) => {
 					wheelYPositions[i] = connection?.y - suspension
 				}
 				// Get steering angle from front wheel
-				steering = vehicleController.current.wheelSteering(0) || 0
+				steering = wheelCount > 0 ? vehicleController.current.wheelSteering(0) || 0 : 0
 			} catch (e) {
 				// Controller may not be ready
 			}

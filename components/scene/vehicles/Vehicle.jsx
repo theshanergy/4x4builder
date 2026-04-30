@@ -16,6 +16,7 @@ import WheelParticles from './WheelParticles'
 import TireTracks from './TireTracks'
 import Wheels from './Wheels'
 import VehicleBody from './VehicleBody'
+import TrackLinks from './TrackLinks'
 
 // Vehicle component with physics
 const Vehicle = () => {
@@ -39,34 +40,42 @@ const Vehicle = () => {
 	const chassisRef = useRef(null)
 	const chassisGroupRef = useRef(null) // Reference to the visual group that follows interpolated physics
 	const bodyRef = useRef(null) // Reference to body group for spare wheel to follow
-	const wheelRefsArray = useRef([{ current: null }, { current: null }, { current: null }, { current: null }])
-	const wheelRefs = wheelRefsArray.current
 
 	// Get vehicle dimensions and wheel positions from shared hook
-	const { axleHeight, vehicleHeight, wheelbase, wheelPositions } = useVehicleDimensions(config)
+	const { validBody, vehicleData, isTracked, axleHeight, vehicleHeight, wheelbase, wheelPositions, physicsWheelPositions } = useVehicleDimensions(config)
+	const wheelRefs = useMemo(() => wheelPositions.map(() => ({ current: null })), [wheelPositions])
+	const physicsWheelRefs = useMemo(() => physicsWheelPositions.map((wheel) => wheelRefs[wheel.visualIndex]), [physicsWheelPositions, wheelRefs])
 
 	// Convert wheel width from inches to meters
-	const wheelWidth = (config.rim_width * 2.54) / 100
+	const wheelWidth = useMemo(() => ((physicsWheelPositions[0]?.rim_width || config.rim_width) * 2.54) / 100, [physicsWheelPositions, config.rim_width])
+	const wheelRadius = physicsWheelPositions[0]?.physicsRadius || physicsWheelPositions[0]?.radius || axleHeight
 
 	// Create wheel configurations
 	const physicsWheels = useMemo(() => {
-		return wheelPositions.map((wheel, i) => ({
-			ref: wheelRefs[i],
+		return physicsWheelPositions.map((wheel) => ({
+			ref: wheelRefs[wheel.visualIndex],
 			axleCs: new Vector3(1, 0, 0),
 			position: new Vector3(...wheel.position),
 			suspensionDirection: new Vector3(0, -1, 0),
 			maxSuspensionTravel: 0.3,
 			suspensionRestLength: 0.1,
 			suspensionStiffness: 28,
-			radius: (config.tire_diameter * 2.54) / 100 / 2,
+			radius: wheel.physicsRadius || wheel.radius || (config.tire_diameter * 2.54) / 100 / 2,
+			steer: wheel.steer,
+			driveFactor: wheel.driveFactor,
+			brakeFactor: wheel.brakeFactor,
+			frictionRole: wheel.frictionRole,
+			side: wheel.side,
+			sideSign: wheel.sideSign,
+			differentialSteering: wheel.differentialSteering,
 		}))
-	}, [wheelPositions, config.tire_diameter])
+	}, [physicsWheelPositions, wheelRefs, config.tire_diameter])
 
 	// Use vehicle physics
 	const { vehicleController } = useVehiclePhysics(chassisRef, physicsWheels)
 
 	// Broadcast transform to multiplayer server
-	useVehicleBroadcast(chassisRef, vehicleController)
+	useVehicleBroadcast(chassisRef, vehicleController, physicsWheels.length)
 
 	// Reusable vectors/quaternions to avoid GC pressure
 	const tempWorldPos = useMemo(() => new Vector3(), [])
@@ -103,8 +112,8 @@ const Vehicle = () => {
 					<Suspense fallback={null}>
 						<VehicleBody
 							ref={bodyRef}
-							key={config.body}
-							id={config.body}
+							key={validBody}
+							id={validBody}
 							height={vehicleHeight}
 							color={config.color}
 							roughness={config.roughness}
@@ -126,15 +135,24 @@ const Vehicle = () => {
 						wheelPositions={wheelPositions}
 						wheelRefs={wheelRefs}
 						spare={config.spare}
-						bodyId={config.body}
+						bodyId={validBody}
 						bodyRef={bodyRef}
 					/>
+					{isTracked && (
+						<TrackLinks
+							trackConfig={vehicleData.track}
+							wheelPositions={wheelPositions}
+							wheelRefs={wheelRefs}
+							physicsWheelPositions={physicsWheelPositions}
+							vehicleController={vehicleController}
+						/>
+					)}
 				</group>
 			</RigidBody>
 			{!performanceDegraded && !isMobile && (
 				<>
-					<WheelParticles vehicleController={vehicleController} wheelRefs={wheelRefs} wheelRadius={axleHeight} wheelWidth={wheelWidth} />
-					<TireTracks vehicleController={vehicleController} wheelRefs={wheelRefs} tireWidth={wheelWidth} tireRadius={axleHeight} />
+					<WheelParticles vehicleController={vehicleController} wheelRefs={physicsWheelRefs} wheelRadius={wheelRadius} wheelWidth={wheelWidth} />
+					<TireTracks vehicleController={vehicleController} wheelRefs={physicsWheelRefs} tireWidth={wheelWidth} tireRadius={wheelRadius} />
 				</>
 			)}
 		</>

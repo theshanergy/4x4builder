@@ -27,6 +27,9 @@ const FORCES = {
 	brake: 0.5,
 	engineBrake: 0.3, // Engine braking force coefficient
 	steerAngle: Math.PI / 6,
+	trackedPivot: 240,
+	trackedSteerBrake: 2.2,
+	trackedYawAssist: 0.9,
 	airControl: 0.1, // Subtle air control force
 }
 
@@ -36,6 +39,7 @@ const REVERSE_THRESHOLD = 0.5
 // Default wheel side friction stiffness
 const FRONT_WHEEL_FRICTION = 0.95
 const REAR_WHEEL_FRICTION = 0.85
+const TRACK_WHEEL_FRICTION = 0.9
 
 // Transmission simulation
 const TRANSMISSION = {
@@ -115,6 +119,48 @@ const getShiftDownRpm = (gear) => {
 	return Math.max(TRANSMISSION.redlineRpm * shiftPercent, TRANSMISSION.idleRpm)
 }
 
+const getWheelSideFriction = (wheel, index) => {
+	if (typeof wheel.sideFrictionStiffness === 'number') return wheel.sideFrictionStiffness
+	if (wheel.frictionRole === 'front') return FRONT_WHEEL_FRICTION
+	if (wheel.frictionRole === 'rear') return REAR_WHEEL_FRICTION
+	if (wheel.frictionRole === 'track') return TRACK_WHEEL_FRICTION
+	return index < 2 ? FRONT_WHEEL_FRICTION : REAR_WHEEL_FRICTION
+}
+
+const getWheelDriveFactor = (wheel, index) => {
+	if (typeof wheel.driveFactor === 'number') return wheel.driveFactor
+	if (index < 2) return 0.4
+	if (index < 4) return 0.6
+	return 0
+}
+
+const getWheelBrakeFactor = (wheel) => {
+	if (typeof wheel.brakeFactor === 'number') return wheel.brakeFactor
+	return 1
+}
+
+const getWheelSteerable = (wheel, index) => {
+	if (typeof wheel.steer === 'boolean') return wheel.steer
+	return index < 2
+}
+
+const getWheelDriftFrictionEnabled = (wheel, index) => {
+	if (typeof wheel.driftFriction === 'boolean') return wheel.driftFriction
+	if (wheel.frictionRole) return wheel.frictionRole === 'rear' || wheel.frictionRole === 'track'
+	return index >= 2 && index < 4
+}
+
+const getWheelSideSign = (wheel) => {
+	if (typeof wheel.sideSign === 'number') return wheel.sideSign
+	if (wheel.side === 'L') return 1
+	if (wheel.side === 'R') return -1
+	return 0
+}
+
+const isDifferentialSteeringWheel = (wheel) => wheel.differentialSteering === true || wheel.frictionRole === 'track'
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
 /**
  * Generic vehicle physics hook for wheeled vehicles
  * @param {Object} vehicleRef - Reference to the vehicle rigid body
@@ -144,6 +190,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 	// Buoyancy hook for water physics
 	const { applyBuoyancy } = useBuoyancy(vehicleRef)
+
+	const usesDifferentialSteering = useMemo(() => wheels.some(isDifferentialSteeringWheel), [wheels])
 
 	// Engine load tracking
 	const smoothedLoad = useRef(0.5)
@@ -206,12 +254,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			vehicle.setWheelMaxSuspensionTravel(index, wheel.maxSuspensionTravel || 0.23)
 			vehicle.setWheelSuspensionCompression(index, wheel.suspensionCompression || 2.3)
 			vehicle.setWheelSuspensionRelaxation(index, wheel.suspensionRebound || 3.4)
-			// Only set reduced side friction for rear wheels (indices 2 and 3)
-			if (index < 2) {
-				vehicle.setWheelSideFrictionStiffness(index, FRONT_WHEEL_FRICTION)
-			} else {
-				vehicle.setWheelSideFrictionStiffness(index, REAR_WHEEL_FRICTION)
-			}
+			vehicle.setWheelSideFrictionStiffness(index, getWheelSideFriction(wheel, index))
 		})
 
 		// Store controller reference
@@ -296,6 +339,8 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 		// Get processed vehicle input
 		const { throttleInput, brakeInput, brakeJustPressed, steerInput, isDrifting, shouldReset, shouldToggleLights, pitchInput, rollInput, yawInput } = getVehicleInput(delta, forwardSpeed)
+		const steerMagnitude = Math.abs(steerInput)
+		const wantsTrackedPivot = usesDifferentialSteering && steerMagnitude > 0.05 && throttleInput === 0 && brakeInput === 0
 
 		// Handle reset
 		if (shouldReset) {
@@ -319,9 +364,11 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			currentRearWheelFriction.current += (targetFriction - currentRearWheelFriction.current) * lerpFactor
 		}
 
-		// Apply side friction to rear wheels (indices 2 and 3)
-		if (wheels.length > 2) vehicleController.current.setWheelSideFrictionStiffness(2, currentRearWheelFriction.current)
-		if (wheels.length > 3) vehicleController.current.setWheelSideFrictionStiffness(3, currentRearWheelFriction.current)
+		wheels.forEach((wheel, index) => {
+			if (getWheelDriftFrictionEnabled(wheel, index)) {
+				vehicleController.current.setWheelSideFrictionStiffness(index, currentRearWheelFriction.current)
+			}
+		})
 
 		// Calculate steering force from input
 		const steerForce = FORCES.steerAngle * steerInput
@@ -350,7 +397,14 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 
 		// Park gear logic - automatically engage when stopped
 		// Engages when vehicle is nearly stopped and not actively accelerating (reverse or forward)
-		if (absSpeed < TRANSMISSION.parkEngageSpeed && throttleInput === 0 && currentGear !== -1) {
+		if (isInPark.current && wantsTrackedPivot) {
+			isInPark.current = false
+			vehicleState.gear = 1
+			currentGear = 1
+			parkEngageTimer.current = 0
+		}
+
+		if (absSpeed < TRANSMISSION.parkEngageSpeed && throttleInput === 0 && currentGear !== -1 && !wantsTrackedPivot) {
 			// Vehicle is stopped and not accelerating - start park timer
 			parkEngageTimer.current += delta
 			if (parkEngageTimer.current >= TRANSMISSION.parkEngageDelay && !isInPark.current) {
@@ -359,7 +413,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 				isInPark.current = true
 				currentGear = 0
 			}
-		} else if (absSpeed >= TRANSMISSION.parkEngageSpeed || throttleInput > 0) {
+		} else if (absSpeed >= TRANSMISSION.parkEngageSpeed || throttleInput > 0 || wantsTrackedPivot) {
 			// Reset park timer if moving or accelerating
 			parkEngageTimer.current = 0
 		}
@@ -593,23 +647,40 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			}
 		}
 
-		// Front wheels
-		for (let i = 0; i < 2 && i < wheels.length; i++) {
-			// Set steering for front wheels
-			vehicleController.current.setWheelSteering(i, steerForce)
-			// Apply 40% of engine force to front wheels
-			vehicleController.current.setWheelEngineForce(i, -engineForce * 0.4)
-		}
+		wheels.forEach((wheel, index) => {
+			const driveFactor = getWheelDriveFactor(wheel, index)
+			const brakeFactor = getWheelBrakeFactor(wheel)
+			const sideSign = getWheelSideSign(wheel)
+			const useDifferentialSteering = usesDifferentialSteering && isDifferentialSteeringWheel(wheel) && sideSign !== 0
+			let wheelEngineForce = -engineForce * driveFactor
+			let wheelBrake = brakeForce * brakeFactor
 
-		// Rear wheels
-		for (let i = 2; i < 4 && i < wheels.length; i++) {
-			// 60% of engine force to rear wheels
-			vehicleController.current.setWheelEngineForce(i, -engineForce * 0.6)
-		}
+			if (useDifferentialSteering) {
+				const turnBias = steerInput * sideSign
+				const insideTurn = Math.max(0, turnBias)
+				const outsideTurn = Math.max(0, -turnBias)
+				const driveBias = clamp(1 + outsideTurn * 1.1 - insideTurn, 0.05, 2)
+				wheelEngineForce = -engineForce * driveFactor * driveBias
 
-		// All wheels braking
-		for (let i = 0; i < wheels.length; i++) {
-			vehicleController.current.setWheelBrake(i, brakeForce)
+				if (Math.abs(engineForce) > 0.01) {
+					wheelBrake += insideTurn * FORCES.trackedSteerBrake
+				} else if (brakeForce === 0 && steerMagnitude > 0.05) {
+					const pivotEngineForce = -steerInput * sideSign * FORCES.trackedPivot
+					wheelEngineForce += -pivotEngineForce * driveFactor
+				}
+			}
+
+			vehicleController.current.setWheelSteering(index, getWheelSteerable(wheel, index) ? steerForce : 0)
+			vehicleController.current.setWheelEngineForce(index, wheelEngineForce)
+			vehicleController.current.setWheelBrake(index, wheelBrake)
+		})
+
+		if (usesDifferentialSteering && steerMagnitude > 0.05 && vehicle && !isAirborne.current) {
+			tempQuat.copy(vehicle.rotation())
+			const speedAssist = Math.max(0.35, Math.min(absSpeed, 6) / 6)
+			const driftYawMultiplier = isDrifting ? 1.75 : 1
+			tempWorldTorque.copy(VECTORS.UP).applyQuaternion(tempQuat).multiplyScalar(FORCES.trackedYawAssist * driftYawMultiplier * steerInput * speedAssist)
+			vehicle.applyTorqueImpulse(tempWorldTorque, true)
 		}
 
 		// Airborne controls when all wheels are not in contact (disabled in water)

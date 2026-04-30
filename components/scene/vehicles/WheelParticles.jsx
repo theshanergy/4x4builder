@@ -125,6 +125,9 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 
 	// Track wheel state
 	const prevWheelRotations = useRef(wheelRefs.map(() => 0))
+	if (prevWheelRotations.current.length !== wheelRefs.length) {
+		prevWheelRotations.current = wheelRefs.map(() => 0)
+	}
 
 	// Reusable vectors
 	const tempVec = useMemo(() => new Vector3(), [])

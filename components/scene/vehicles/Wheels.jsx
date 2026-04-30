@@ -48,14 +48,14 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 
 	return (
 		<group name='Wheels'>
-			{allWheelPositions.map(({ key, rotation, isSpare, ...transform }, index) => (
-				<group key={key} ref={isSpare ? spareWheelRef : wheelRefs[index]} {...transform}>
+			{allWheelPositions.map(({ key, position, rotation, isSpare, rim: wheelRim, rim_diameter: wheelRimDiameter, rim_width: wheelRimWidth, showTire = true }, index) => (
+				<group key={key} ref={isSpare ? spareWheelRef : wheelRefs[index]} position={position}>
 					{/* Add an inner group with the correct visual rotation */}
 					<group rotation={rotation}>
 						<Wheel
-							rim={rim}
-							rim_diameter={rim_diameter}
-							rim_width={rim_width}
+							rim={wheelRim || rim}
+							rim_diameter={wheelRimDiameter || rim_diameter}
+							rim_width={wheelRimWidth || rim_width}
 							rim_color={rim_color}
 							rim_color_secondary={rim_color_secondary}
 							tire={tire}
@@ -63,6 +63,7 @@ const Wheels = memo(({ rim, rim_diameter, rim_width, rim_color, rim_color_second
 							tire_muddiness={isSpare ? 0 : tire_muddiness}
 							color={color}
 							roughness={roughness}
+							showTire={showTire}
 						/>
 					</group>
 				</group>
