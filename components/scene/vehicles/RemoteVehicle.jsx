@@ -15,12 +15,32 @@ import TrackLinks from './TrackLinks'
 const INTERPOLATION_DELAY = 100 // ms - buffer time for smooth interpolation
 const INTERPOLATION_SMOOTHING = 0.15 // lerp factor for position/rotation
 const MAX_EXTRAPOLATION_TIME = 200 // ms - max time to extrapolate before stopping
+const WHEEL_UP_AXIS = new Vector3(0, 1, 0)
+const WHEEL_AXLE_AXIS = new Vector3(1, 0, 0)
+
+const interpolateArray = (beforeArray = [], afterArray = [], t) => {
+	const beforeValues = beforeArray || []
+	const afterValues = afterArray || []
+	const length = Math.max(beforeValues.length, afterValues.length)
+	const result = new Array(length)
+
+	for (let i = 0; i < length; i++) {
+		const before = beforeValues[i] ?? afterValues[i] ?? 0
+		const after = afterValues[i] ?? before
+		result[i] = MathUtils.lerp(before, after, t)
+	}
+
+	return result
+}
 
 // Transform buffer for smooth interpolation
 class TransformBuffer {
 	constructor(bufferSize = 5) {
 		this.buffer = []
 		this.bufferSize = bufferSize
+		this.qa = new Quaternion()
+		this.qb = new Quaternion()
+		this.rotationResult = [0, 0, 0, 1]
 	}
 
 	push(transform) {
@@ -84,22 +104,26 @@ class TransformBuffer {
 		const clampedT = MathUtils.clamp(t, 0, 1)
 
 		return {
-			position: before.position.map((v, i) => MathUtils.lerp(v, after.position[i], clampedT)),
+			position: interpolateArray(before.position, after.position, clampedT),
 			rotation: this.slerpQuat(before.rotation, after.rotation, clampedT),
-			wheelRotations: before.wheelRotations?.map((v, i) => MathUtils.lerp(v, after.wheelRotations?.[i] || v, clampedT)) || [],
-			wheelYPositions: before.wheelYPositions?.map((v, i) => MathUtils.lerp(v, after.wheelYPositions?.[i] || v, clampedT)) || null,
-			steering: MathUtils.lerp(before.steering || 0, after.steering || 0, clampedT),
-			engineRpm: MathUtils.lerp(before.engineRpm || 850, after.engineRpm || 850, clampedT),
+			wheelRotations: before.wheelRotations || after.wheelRotations ? interpolateArray(before.wheelRotations, after.wheelRotations, clampedT) : [],
+			wheelYPositions: before.wheelYPositions || after.wheelYPositions ? interpolateArray(before.wheelYPositions, after.wheelYPositions, clampedT) : null,
+			steering: MathUtils.lerp(before.steering ?? 0, after.steering ?? 0, clampedT),
+			engineRpm: MathUtils.lerp(before.engineRpm ?? 850, after.engineRpm ?? 850, clampedT),
 			hornActive: after.hornActive || false,
 			velocity: after.velocity || before.velocity || [0, 0, 0],
 		}
 	}
 
 	slerpQuat(a, b, t) {
-		const qa = new Quaternion(a[0], a[1], a[2], a[3])
-		const qb = new Quaternion(b[0], b[1], b[2], b[3])
-		qa.slerp(qb, t)
-		return [qa.x, qa.y, qa.z, qa.w]
+		this.qa.set(a[0], a[1], a[2], a[3])
+		this.qb.set(b[0], b[1], b[2], b[3])
+		this.qa.slerp(this.qb, t)
+		this.rotationResult[0] = this.qa.x
+		this.rotationResult[1] = this.qa.y
+		this.rotationResult[2] = this.qa.z
+		this.rotationResult[3] = this.qa.w
+		return this.rotationResult
 	}
 
 	clear() {
@@ -121,6 +145,11 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 	const currentRotation = useRef(new Quaternion())
 	const currentSteering = useRef(0)
 	const currentAudioState = useRef({ rpm: 850, hornActive: false })
+	const currentWheelRotations = useRef([])
+	const targetPosition = useMemo(() => new Vector3(), [])
+	const targetRotation = useMemo(() => new Quaternion(), [])
+	const steeringQuat = useMemo(() => new Quaternion(), [])
+	const spinQuat = useMemo(() => new Quaternion(), [])
 
 	// Get vehicle config with defaults
 	const config = useMemo(
@@ -181,13 +210,13 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 
 		if (interpolated) {
 			// Smoothly lerp to target position
-			const targetPos = new Vector3(...interpolated.position)
-			currentPosition.current.lerp(targetPos, INTERPOLATION_SMOOTHING)
+			targetPosition.fromArray(interpolated.position)
+			currentPosition.current.lerp(targetPosition, INTERPOLATION_SMOOTHING)
 			groupRef.current.position.copy(currentPosition.current)
 
 			// Smoothly slerp to target rotation
-			const targetRot = new Quaternion(...interpolated.rotation)
-			currentRotation.current.slerp(targetRot, INTERPOLATION_SMOOTHING)
+			targetRotation.fromArray(interpolated.rotation)
+			currentRotation.current.slerp(targetRotation, INTERPOLATION_SMOOTHING)
 			groupRef.current.quaternion.copy(currentRotation.current)
 
 			// Update front wheel steering
@@ -197,6 +226,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 			// Update audio state for VehicleAudio
 			currentAudioState.current.rpm = interpolated.engineRpm || 850
 			currentAudioState.current.hornActive = interpolated.hornActive || false
+			currentWheelRotations.current = interpolated.wheelRotations || []
 
 			// Update physics wheel rotations, positions, and steering
 			physicsWheelRefs.forEach((ref, i) => {
@@ -208,14 +238,13 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 				}
 
 				// Apply wheel spin and steering using quaternion (matching physics behavior)
-				// Front wheels (0, 1) get steering, rear wheels (2, 3) don't
-				const wheelSteering = i < 2 ? currentSteering.current : 0
+				const wheelSteering = physicsWheelPositions[i]?.steer ? currentSteering.current : 0
 				const wheelSpin = interpolated.wheelRotations?.[i] || 0
 
 				// Create quaternion from steering (Y axis) and spin (X axis)
 				// This matches how the physics system applies wheel rotation
-				const steeringQuat = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), wheelSteering)
-				const spinQuat = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), wheelSpin)
+				steeringQuat.setFromAxisAngle(WHEEL_UP_AXIS, wheelSteering)
+				spinQuat.setFromAxisAngle(WHEEL_AXLE_AXIS, wheelSpin)
 				ref.current.quaternion.multiplyQuaternions(steeringQuat, spinQuat)
 			})
 		}
@@ -258,6 +287,7 @@ const RemoteVehicle = ({ playerId, playerName, vehicleConfig, initialTransform, 
 						wheelPositions={wheelPositions}
 						wheelRefs={wheelRefs}
 						physicsWheelPositions={physicsWheelPositions}
+						wheelRotationsRef={currentWheelRotations}
 					/>
 				)}
 			</group>

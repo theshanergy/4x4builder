@@ -15,6 +15,8 @@ const normalizeTrackWheelPosition = (position = [0, 0, 0]) => {
 	return [position[0] || 0, position[1] || 0, position[2] || 0]
 }
 
+const getTrackWheelRimRadius = (wheel, fallbackRimDiameter) => inchesToMeters(wheel.rim_diameter || fallbackRimDiameter) / 2
+
 /**
  * Hook to calculate common vehicle dimensions and wheel positions
  * Shared between Vehicle and RemoteVehicle components
@@ -29,6 +31,21 @@ const useVehicleDimensions = (config) => {
 	const isTracked = vehicleClass === VEHICLE_CLASS_TRACKED
 	const trackConfig = isTracked ? vehicleData.track : null
 	const trackDepth = isTracked ? trackConfig?.track_depth ?? trackConfig?.link_height ?? DEFAULT_TRACK_DEPTH : 0
+	const trackGroundOffset = useMemo(() => {
+		if (!isTracked) return 0
+
+		const wheels = trackConfig?.wheels || []
+		if (wheels.length === 0) return 0
+
+		const minGroundY = Math.min(
+			...wheels.map((wheel) => {
+				const [, y] = normalizeTrackWheelPosition(wheel.position)
+				return y - getTrackWheelRimRadius(wheel, rim_diameter) - trackDepth
+			})
+		)
+
+		return minGroundY < 0 ? -minGroundY : 0
+	}, [isTracked, trackConfig, rim_diameter, trackDepth])
 
 	// Get wheel (axle) height - tire radius
 	const axleHeight = useMemo(() => {
@@ -36,7 +53,7 @@ const useVehicleDimensions = (config) => {
 			return inchesToMeters(tire_diameter) / 2
 		}
 
-		const physicsWheelRadii = (trackConfig?.wheels || []).filter((wheel) => wheel.physics === true).map((wheel) => inchesToMeters(wheel.rim_diameter || rim_diameter) / 2 + trackDepth)
+		const physicsWheelRadii = (trackConfig?.wheels || []).filter((wheel) => wheel.physics === true).map((wheel) => getTrackWheelRimRadius(wheel, rim_diameter) + trackDepth)
 		return physicsWheelRadii.length > 0 ? Math.max(...physicsWheelRadii) : inchesToMeters(rim_diameter) / 2 + trackDepth
 	}, [isTracked, tire_diameter, trackConfig, rim_diameter, trackDepth])
 
@@ -44,7 +61,7 @@ const useVehicleDimensions = (config) => {
 	const liftHeight = useMemo(() => ((lift || 0) * 2.54) / 100, [lift])
 
 	// Get vehicle height (axle + lift)
-	const vehicleHeight = useMemo(() => (trackConfig?.body_height ?? axleHeight) + liftHeight, [trackConfig, axleHeight, liftHeight])
+	const vehicleHeight = useMemo(() => (trackConfig?.body_height ?? axleHeight) + liftHeight + trackGroundOffset, [trackConfig, axleHeight, liftHeight, trackGroundOffset])
 
 	// Memoize wheel offset calculation
 	const offset = useMemo(
@@ -81,7 +98,7 @@ const useVehicleDimensions = (config) => {
 		const positions = []
 		for (const [index, wheel] of (trackConfig?.wheels || []).entries()) {
 			const [x, y, z] = normalizeTrackWheelPosition(wheel.position)
-			const rimRadius = inchesToMeters(wheel.rim_diameter || rim_diameter) / 2
+			const rimRadius = getTrackWheelRimRadius(wheel, rim_diameter)
 			const physicsRadius = rimRadius + trackDepth
 
 			for (const side of ['L', 'R']) {
@@ -90,7 +107,7 @@ const useVehicleDimensions = (config) => {
 				positions.push({
 					key: `${wheel.key || `track_wheel_${index}`}_${side}`,
 					name: `${wheel.name || wheel.key || `Track Wheel ${index + 1}`} ${side}`,
-					position: [sideSign * (offset + x), y, z],
+					position: [sideSign * (offset + x), y + trackGroundOffset, z],
 					rotation: [0, sideSign * WHEEL_ROTATION, 0],
 					physics: wheel.physics === true,
 					radius: rimRadius,
@@ -120,7 +137,7 @@ const useVehicleDimensions = (config) => {
 			driveFactor: wheel.physics ? wheel.driveFactor ?? 2 / Math.max(physicsCount, 1) : 0,
 			brakeFactor: wheel.physics ? wheel.brakeFactor ?? 3 / Math.max(physicsCount, 1) : 0,
 		}))
-	}, [isTracked, offset, axleHeight, wheelbase, trackConfig, rim_diameter, rim_width, trackDepth])
+	}, [isTracked, offset, axleHeight, wheelbase, trackConfig, rim_diameter, rim_width, trackDepth, trackGroundOffset])
 
 	const physicsWheelPositions = useMemo(() => wheelPositions.filter((wheel) => wheel.physics), [wheelPositions])
 
@@ -131,6 +148,7 @@ const useVehicleDimensions = (config) => {
 		isTracked,
 		axleHeight,
 		liftHeight,
+		trackGroundOffset,
 		vehicleHeight,
 		offset,
 		wheelbase,

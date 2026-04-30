@@ -176,8 +176,9 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 	// Track airborne state
 	const isAirborne = useRef(false)
 
-	// Track current friction stiffness for smooth drift transitions
-	const currentRearWheelFriction = useRef(null)
+	// Track current side friction stiffness per wheel for smooth drift transitions
+	const currentWheelSideFriction = useRef([])
+	const currentDrivetrainGrip = useRef(REAR_WHEEL_FRICTION)
 
 	// Reusable objects to avoid GC pressure
 	const tempVelocity = useMemo(() => new Vector3(), [])
@@ -260,10 +261,16 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 		// Store controller reference
 		vehicleController.current = vehicle
 
-		// Initialize rear wheel friction tracking for drift mode
-		if (currentRearWheelFriction.current === null) {
-			currentRearWheelFriction.current = REAR_WHEEL_FRICTION
-		}
+		currentWheelSideFriction.current = wheels.map((wheel, index) => getWheelSideFriction(wheel, index))
+		let drivenGripTotal = 0
+		let drivenGripCount = 0
+		wheels.forEach((wheel, index) => {
+			if (getWheelDriveFactor(wheel, index) > 0) {
+				drivenGripTotal += getWheelSideFriction(wheel, index)
+				drivenGripCount++
+			}
+		})
+		currentDrivetrainGrip.current = drivenGripCount > 0 ? drivenGripTotal / drivenGripCount : REAR_WHEEL_FRICTION
 
 		return () => {
 			if (vehicleController.current) {
@@ -352,23 +359,32 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 			toggleLights()
 		}
 
-		// Handle drift mode with smooth transition
-		const targetFriction = isDrifting ? 0.1 : REAR_WHEEL_FRICTION
-
 		// Smoothly interpolate friction with different rates for entering/exiting drift
 		// Faster transition into drift (0.15), slower transition out (0.05) for smoother recovery
 		const lerpFactor = isDrifting ? 0.15 : 0.0015
-		if (currentRearWheelFriction.current === null) {
-			currentRearWheelFriction.current = targetFriction
-		} else {
-			currentRearWheelFriction.current += (targetFriction - currentRearWheelFriction.current) * lerpFactor
-		}
 
+		let drivenGripTotal = 0
+		let drivenGripCount = 0
 		wheels.forEach((wheel, index) => {
+			const baseFriction = getWheelSideFriction(wheel, index)
+			let currentFriction = currentWheelSideFriction.current[index] ?? baseFriction
+
 			if (getWheelDriftFrictionEnabled(wheel, index)) {
-				vehicleController.current.setWheelSideFrictionStiffness(index, currentRearWheelFriction.current)
+				const targetFriction = isDrifting ? 0.1 : baseFriction
+				currentFriction += (targetFriction - currentFriction) * lerpFactor
+				vehicleController.current.setWheelSideFrictionStiffness(index, currentFriction)
+			} else if (currentFriction !== baseFriction) {
+				currentFriction = baseFriction
+				vehicleController.current.setWheelSideFrictionStiffness(index, currentFriction)
+			}
+
+			currentWheelSideFriction.current[index] = currentFriction
+			if (getWheelDriveFactor(wheel, index) > 0) {
+				drivenGripTotal += currentFriction
+				drivenGripCount++
 			}
 		})
+		currentDrivetrainGrip.current = drivenGripCount > 0 ? drivenGripTotal / drivenGripCount : REAR_WHEEL_FRICTION
 
 		// Calculate steering force from input
 		const steerForce = FORCES.steerAngle * steerInput
@@ -503,7 +519,7 @@ export const useVehiclePhysics = (vehicleRef, wheels) => {
 				// Engine is spinning faster than ground speed and we're on throttle
 				// This is wheelspin territory - reduce coupling based on friction
 				// Lower friction = engine can overpower tire grip = wheelspin
-				couplingStiffness = baseCouplingStiffness * currentRearWheelFriction.current * currentRearWheelFriction.current
+				couplingStiffness = baseCouplingStiffness * currentDrivetrainGrip.current * currentDrivetrainGrip.current
 			} else {
 				// Engine braking or not on throttle - maintain normal coupling
 				couplingStiffness = baseCouplingStiffness

@@ -185,7 +185,7 @@ const createTrackTexture = () => {
 	return texture
 }
 
-const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius = 0.4 }) => {
+const TireTracks = ({ vehicleController, wheelRefs, wheelIndices, tireWidth = 0.28, tireRadius = 0.4 }) => {
 	const meshRef = useRef()
 
 	// Create texture once
@@ -401,6 +401,7 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 		// Process each wheel
 		for (let wi = 0; wi < wheelRefs.length; wi++) {
 			const wheelRef = wheelRefs[wi]
+			const controllerIndex = wheelIndices?.[wi] ?? wi
 
 			// Skip if tracking arrays are out of sync
 			if (wi >= lastSpawnPos.current.length) continue
@@ -408,7 +409,7 @@ const TireTracks = ({ vehicleController, wheelRefs, tireWidth = 0.28, tireRadius
 			// Check if wheel is touching ground
 			let inContact = false
 			try {
-				inContact = controller.wheelIsInContact(wi)
+				inContact = controller.wheelIsInContact(controllerIndex)
 			} catch (e) {
 				continue
 			}

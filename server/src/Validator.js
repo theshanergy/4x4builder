@@ -1,5 +1,7 @@
 import settings from '../config/settings.js'
 
+const MAX_WHEEL_STATE_COUNT = 24
+
 // Input validation functions
 export default class Validator {
 	// Validate position array
@@ -56,23 +58,23 @@ export default class Validator {
 	
 	// Validate wheel rotations array
 	static isValidWheelRotations(wheelRotations) {
-		if (!Array.isArray(wheelRotations) || wheelRotations.length !== 4) {
+		if (!Array.isArray(wheelRotations) || wheelRotations.length === 0 || wheelRotations.length > MAX_WHEEL_STATE_COUNT) {
 			return false
 		}
 		
 		return wheelRotations.every(v => 
-			typeof v === 'number' && !isNaN(v)
+			typeof v === 'number' && Number.isFinite(v)
 		)
 	}
 	
 	// Validate wheel Y positions array (suspension positions)
 	static isValidWheelYPositions(wheelYPositions) {
-		if (!Array.isArray(wheelYPositions) || wheelYPositions.length !== 4) {
+		if (!Array.isArray(wheelYPositions) || wheelYPositions.length === 0 || wheelYPositions.length > MAX_WHEEL_STATE_COUNT) {
 			return false
 		}
 		
 		return wheelYPositions.every(v => 
-			typeof v === 'number' && !isNaN(v)
+			typeof v === 'number' && Number.isFinite(v)
 		)
 	}
 	
@@ -102,6 +104,10 @@ export default class Validator {
 		
 		if (data.wheelYPositions && !this.isValidWheelYPositions(data.wheelYPositions)) {
 			errors.push('Invalid wheel Y positions')
+		}
+
+		if (data.wheelRotations && data.wheelYPositions && data.wheelRotations.length !== data.wheelYPositions.length) {
+			errors.push('Wheel state length mismatch')
 		}
 		
 		if (typeof data.steering !== 'undefined' && 

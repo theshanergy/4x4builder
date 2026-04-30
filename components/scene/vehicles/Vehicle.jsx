@@ -44,11 +44,27 @@ const Vehicle = () => {
 	// Get vehicle dimensions and wheel positions from shared hook
 	const { validBody, vehicleData, isTracked, axleHeight, vehicleHeight, wheelbase, wheelPositions, physicsWheelPositions } = useVehicleDimensions(config)
 	const wheelRefs = useMemo(() => wheelPositions.map(() => ({ current: null })), [wheelPositions])
-	const physicsWheelRefs = useMemo(() => physicsWheelPositions.map((wheel) => wheelRefs[wheel.visualIndex]), [physicsWheelPositions, wheelRefs])
+	const groundEffectWheels = useMemo(() => {
+		if (!isTracked) {
+			return physicsWheelPositions.map((wheel, physicsIndex) => ({ wheel, physicsIndex, ref: wheelRefs[wheel.visualIndex] }))
+		}
+
+		const wheelsBySide = new Map()
+		physicsWheelPositions.forEach((wheel, physicsIndex) => {
+			const side = wheel.side || (wheel.position[0] >= 0 ? 'L' : 'R')
+			const current = wheelsBySide.get(side)
+			if (!current || Math.abs(wheel.position[2]) < Math.abs(current.wheel.position[2])) {
+				wheelsBySide.set(side, { wheel, physicsIndex, ref: wheelRefs[wheel.visualIndex] })
+			}
+		})
+		return ['L', 'R'].map((side) => wheelsBySide.get(side)).filter(Boolean)
+	}, [isTracked, physicsWheelPositions, wheelRefs])
+	const groundEffectWheelRefs = useMemo(() => groundEffectWheels.map((wheel) => wheel.ref), [groundEffectWheels])
+	const groundEffectWheelIndices = useMemo(() => groundEffectWheels.map((wheel) => wheel.physicsIndex), [groundEffectWheels])
 
 	// Convert wheel width from inches to meters
-	const wheelWidth = useMemo(() => ((physicsWheelPositions[0]?.rim_width || config.rim_width) * 2.54) / 100, [physicsWheelPositions, config.rim_width])
-	const wheelRadius = physicsWheelPositions[0]?.physicsRadius || physicsWheelPositions[0]?.radius || axleHeight
+	const wheelWidth = useMemo(() => ((groundEffectWheels[0]?.wheel.rim_width || physicsWheelPositions[0]?.rim_width || config.rim_width) * 2.54) / 100, [groundEffectWheels, physicsWheelPositions, config.rim_width])
+	const wheelRadius = groundEffectWheels[0]?.wheel.physicsRadius || groundEffectWheels[0]?.wheel.radius || physicsWheelPositions[0]?.physicsRadius || physicsWheelPositions[0]?.radius || axleHeight
 
 	// Create wheel configurations
 	const physicsWheels = useMemo(() => {
@@ -151,8 +167,8 @@ const Vehicle = () => {
 			</RigidBody>
 			{!performanceDegraded && !isMobile && (
 				<>
-					<WheelParticles vehicleController={vehicleController} wheelRefs={physicsWheelRefs} wheelRadius={wheelRadius} wheelWidth={wheelWidth} />
-					<TireTracks vehicleController={vehicleController} wheelRefs={physicsWheelRefs} tireWidth={wheelWidth} tireRadius={wheelRadius} />
+					<WheelParticles vehicleController={vehicleController} wheelRefs={groundEffectWheelRefs} wheelIndices={groundEffectWheelIndices} wheelRadius={wheelRadius} wheelWidth={wheelWidth} />
+					<TireTracks vehicleController={vehicleController} wheelRefs={groundEffectWheelRefs} wheelIndices={groundEffectWheelIndices} tireWidth={wheelWidth} tireRadius={wheelRadius} />
 				</>
 			)}
 		</>

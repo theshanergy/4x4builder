@@ -112,7 +112,7 @@ const createParticleSystem = (maxParticles) => ({
 	opacities: new Float32Array(maxParticles),
 })
 
-const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, wheelWidth = 0.3 }) => {
+const WheelParticles = ({ vehicleController, wheelRefs, wheelIndices, wheelRadius = 0.35, wheelWidth = 0.3 }) => {
 	const sandTexture = useLoader(TextureLoader, '/assets/images/ground/sand.jpg')
 
 	// Geometry refs
@@ -315,9 +315,10 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 		for (let wi = 0; wi < wheelRefs.length; wi++) {
 			const wheelRef = wheelRefs[wi]
 			if (!wheelRef.current) continue
+			const controllerIndex = wheelIndices?.[wi] ?? wi
 
 			// Compute angular velocity from rotation delta
-			const currentRotation = controller.wheelRotation(wi) || 0
+			const currentRotation = controller.wheelRotation(controllerIndex) || 0
 			const angularVel = delta > 0 ? (currentRotation - prevWheelRotations.current[wi]) / delta : 0
 			prevWheelRotations.current[wi] = currentRotation
 
@@ -327,7 +328,7 @@ const WheelParticles = ({ vehicleController, wheelRefs, wheelRadius = 0.35, whee
 			const wheelTopY = wheelCenterY + wheelRadius
 			const inWater = wheelBottomY < WATER_CONFIG.level
 			const fullySubmerged = wheelTopY < WATER_CONFIG.level
-			const onGround = controller.wheelIsInContact(wi)
+			const onGround = controller.wheelIsInContact(controllerIndex)
 
 			// Water spray when partially submerged
 			if (inWater && !fullySubmerged) {
