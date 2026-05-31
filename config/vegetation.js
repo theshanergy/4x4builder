@@ -4,10 +4,6 @@ const VEGETATION_CONFIG = [
 	{
 		name: 'grass',
 		meshFactory: createGrassMesh, // Use procedural grass mesh factory
-		distance: {
-			min: 1, // Start placing outside flat spawn area
-			max: 100, // Match original viewDistance
-		},
 		scale: {
 			min: 1.0,
 			max: 1.2,

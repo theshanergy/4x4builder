@@ -120,12 +120,11 @@ const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex)
  *
  * @param {Object} node - Quadtree node (tile) with centerX, centerZ, size
  * @param {Object} terrainHelpers - Terrain height/normal sampling functions
- * @param {number} lodLevel - LOD level (unused, kept for API compatibility)
  * @param {Object} vegetationTypeConfig - Configuration for this vegetation type
  * @param {number} typeIndex - Index of this vegetation type (used for seeding)
  * @returns {Array} Array of vegetation matrices
  */
-export const generateVegetationForType = (node, terrainHelpers, lodLevel, vegetationTypeConfig, typeIndex) => {
+export const generateVegetationForType = (node, terrainHelpers, vegetationTypeConfig, typeIndex) => {
 	const { centerX, centerZ, size } = node
 	const matrices = []
 

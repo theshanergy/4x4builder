@@ -94,7 +94,7 @@ const Vegetation = memo(({ node, terrainHelpers, vegetationModels }) => {
 			}
 
 			// Generate vegetation matrices for this type
-			const vegetationMatrices = generateVegetationForType(node, terrainHelpers, actualLod, vegetationType.config, typeIndex)
+			const vegetationMatrices = generateVegetationForType(node, terrainHelpers, vegetationType.config, typeIndex)
 
 			if (vegetationMatrices.length === 0) {
 				return
