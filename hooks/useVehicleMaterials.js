@@ -50,7 +50,7 @@ const useVehicleMaterials = () => {
 						material.metalness = 1
 						material.roughness = 0
 						material.opacity = 0.2
-						material.depthWrite = true
+						material.depthWrite = false
 						material.color.set(COLORS.LIGHT_GREY)
 						break
 					case 'glass_tint':
@@ -58,7 +58,7 @@ const useVehicleMaterials = () => {
 						material.metalness = 1
 						material.roughness = 0
 						material.opacity = 0.5
-						material.depthWrite = true
+						material.depthWrite = false
 						material.color.set(COLORS.BLACK)
 						break
 					case 'glass_dark':
@@ -66,7 +66,7 @@ const useVehicleMaterials = () => {
 						material.metalness = 1
 						material.roughness = 0
 						material.opacity = 0.7
-						material.depthWrite = true
+						material.depthWrite = false
 						material.color.set(COLORS.BLACK)
 						break
 					case 'rubber':

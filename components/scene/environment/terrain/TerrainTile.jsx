@@ -6,6 +6,9 @@ import useTerrainGeometry from '../../../../hooks/useTerrainGeometry'
 import { waterVisibility } from '../../../../store/gameStore'
 import Vegetation from './Vegetation'
 
+const TERRAIN_RENDER_ORDER = -2
+const WATER_RENDER_ORDER = -1
+
 // Default edge stitch info (no stitching needed)
 const DEFAULT_EDGE_STITCH_INFO = {
 	north: { needsStitch: false, neighborStep: 32 / TILE_RESOLUTION },
@@ -137,8 +140,8 @@ const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMateria
 	return (
 		<>
 			<group position={position}>
-				{terrainMaterial && <mesh geometry={terrainGeometry} material={terrainMaterial} receiveShadow />}
-				{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} renderOrder={1} />}
+				{terrainMaterial && <mesh geometry={terrainGeometry} material={terrainMaterial} receiveShadow renderOrder={TERRAIN_RENDER_ORDER} />}
+				{waterMaterial && waterGeometry && <mesh geometry={waterGeometry} material={waterMaterial} renderOrder={WATER_RENDER_ORDER} />}
 			</group>
 			{colliderArgs && (
 				<RigidBody type='fixed' position={position} colliders={false}>
