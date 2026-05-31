@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react'
-import { Vector3, Raycaster, MathUtils, Quaternion, Matrix4 } from 'three'
+import { Vector3, MathUtils, Quaternion, Matrix4 } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 
@@ -18,9 +18,7 @@ const CameraMode = {
 const CAMERA_MODES = [CameraMode.ORBIT, CameraMode.CHASE, CameraMode.FIRST_PERSON]
 
 // Shared constants
-const TERRAIN_CACHE_INTERVAL = 60
 const UP_VECTOR = new Vector3(0, 1, 0)
-const DOWN_VECTOR = new Vector3(0, -1, 0)
 
 // Get driver position for a vehicle body, with fallback to default
 const getDriverPosition = (bodyId) => {
@@ -39,43 +37,22 @@ const dampVector3 = (current, target, lambda, delta) => {
 	current.z = MathUtils.damp(current.z, target.z, lambda, delta)
 }
 
-// Custom hook for ground avoidance with terrain caching
-const useGroundAvoidance = (positionRef, minGroundDistance, terrainMeshesCache, lastTerrainCacheFrame) => {
-	const scene = useThree((state) => state.scene)
-	const raycaster = useRef(new Raycaster())
+// Custom hook for ground avoidance using direct terrain sampling.
+const useGroundAvoidance = (positionRef, minGroundDistance) => {
+	const terrainHelpers = useGameStore((state) => state.terrainHelpers)
+	const getTerrainHeight = terrainHelpers?.getHeight
 
 	const checkGroundAvoidance = useCallback(
-		(elapsedTime) => {
-			// Refresh terrain mesh cache periodically
-			const frameCount = (elapsedTime * 60) | 0
-			if (frameCount - lastTerrainCacheFrame.current > TERRAIN_CACHE_INTERVAL || terrainMeshesCache.current.length === 0) {
-				lastTerrainCacheFrame.current = frameCount
-				terrainMeshesCache.current.length = 0
+		() => {
+			if (!getTerrainHeight) return
 
-				for (let i = 0; i < scene.children.length; i++) {
-					const obj = scene.children[i]
-					if (obj.name === 'Terrain' || obj.name.includes('Terrain')) {
-						obj.traverse((child) => {
-							if (child.isMesh) {
-								terrainMeshesCache.current.push(child)
-							}
-						})
-					}
-				}
-			}
-
-			// Check for intersections with terrain
-			raycaster.current.set(positionRef.current, DOWN_VECTOR)
-			const intersects = raycaster.current.intersectObjects(terrainMeshesCache.current, true)
-
-			if (intersects.length > 0) {
-				const groundDistance = intersects[0].distance
-				if (groundDistance < minGroundDistance) {
-					positionRef.current.y += minGroundDistance - groundDistance
-				}
+			const position = positionRef.current
+			const minAllowedHeight = getTerrainHeight(position.x, position.z) + minGroundDistance
+			if (position.y < minAllowedHeight) {
+				position.y = minAllowedHeight
 			}
 		},
-		[scene, minGroundDistance, terrainMeshesCache, lastTerrainCacheFrame]
+		[getTerrainHeight, minGroundDistance, positionRef]
 	)
 
 	return checkGroundAvoidance
@@ -105,7 +82,7 @@ const useVehicleGroup = () => {
 }
 
 // Orbit/Chase camera controller
-const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastTerrainCacheFrame, transitionFromInfo }) => {
+const OrbitCamera = ({ followSpeed, minGroundDistance, transitionFromInfo }) => {
 	const cameraAutoRotate = useGameStore((state) => state.cameraAutoRotate)
 	const camera = useThree((state) => state.camera)
 	const orbitControlsRef = useRef()
@@ -129,7 +106,7 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastT
 	}, [transitionFromInfo, camera])
 
 	// Use shared ground avoidance hook
-	const checkGroundAvoidance = useGroundAvoidance(cameraPosition, minGroundDistance, terrainMeshesCache, lastTerrainCacheFrame)
+	const checkGroundAvoidance = useGroundAvoidance(cameraPosition, minGroundDistance)
 
 	// Initialize controls target to vehicle position to prevent swooping from origin
 	useEffect(() => {
@@ -185,7 +162,7 @@ const OrbitCamera = ({ followSpeed, minGroundDistance, terrainMeshesCache, lastT
 
 		// Ground avoidance logic
 		camera.getWorldPosition(cameraPosition.current)
-		checkGroundAvoidance(state.clock.elapsedTime)
+		checkGroundAvoidance()
 
 		// Apply ground avoidance adjustment to camera if needed
 		if (cameraPosition.current.y !== camera.position.y) {
@@ -328,7 +305,7 @@ const FirstPersonCamera = () => {
 }
 
 // Chase camera controller
-const ChaseCamera = ({ terrainMeshesCache, lastTerrainCacheFrame }) => {
+const ChaseCamera = () => {
 	const camera = useThree((state) => state.camera)
 
 	const currentPosition = useRef(camera.position.clone())
@@ -346,9 +323,9 @@ const ChaseCamera = ({ terrainMeshesCache, lastTerrainCacheFrame }) => {
 
 	// Use shared hooks
 	const getVehicleGroup = useVehicleGroup()
-	const checkGroundAvoidance = useGroundAvoidance(currentPosition, minGroundDistance, terrainMeshesCache, lastTerrainCacheFrame)
+	const checkGroundAvoidance = useGroundAvoidance(currentPosition, minGroundDistance)
 
-	useFrame((state, delta) => {
+	useFrame((_, delta) => {
 		const vehicleGroup = getVehicleGroup()
 		if (!vehicleGroup) return
 
@@ -383,7 +360,7 @@ const ChaseCamera = ({ terrainMeshesCache, lastTerrainCacheFrame }) => {
 		}
 
 		// Ground avoidance logic using shared hook
-		checkGroundAvoidance(state.clock.elapsedTime)
+		checkGroundAvoidance()
 
 		camera.position.copy(currentPosition.current)
 		camera.lookAt(currentLookAt.current)
@@ -411,7 +388,7 @@ const InfoCamera = () => {
 	// Use shared hooks
 	const getVehicleGroup = useVehicleGroup()
 
-	useFrame((state, delta) => {
+	useFrame((_, delta) => {
 		const vehicleGroup = getVehicleGroup()
 		if (!vehicleGroup) return
 
@@ -467,10 +444,6 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 	// Track key state to detect press (not hold)
 	const keyPressedLastFrame = useRef(false)
 
-	// Shared terrain cache for cameras that need ground avoidance
-	const terrainMeshesCache = useRef([])
-	const lastTerrainCacheFrame = useRef(0)
-
 	// Handle camera mode cycling with C key
 	const cycleCameraMode = useCallback(() => {
 		const currentIndex = CAMERA_MODES.indexOf(cameraMode)
@@ -500,15 +473,13 @@ const CameraManager = ({ followSpeed = 8, minGroundDistance = 0.5 }) => {
 		case CameraMode.FIRST_PERSON:
 			return <FirstPersonCamera />
 		case CameraMode.CHASE:
-			return <ChaseCamera terrainMeshesCache={terrainMeshesCache} lastTerrainCacheFrame={lastTerrainCacheFrame} />
+			return <ChaseCamera />
 		case CameraMode.ORBIT:
 		default:
 			return (
 				<OrbitCamera
 					followSpeed={followSpeed}
 					minGroundDistance={minGroundDistance}
-					terrainMeshesCache={terrainMeshesCache}
-					lastTerrainCacheFrame={lastTerrainCacheFrame}
 					transitionFromInfo={prevInfoMode.current}
 				/>
 			)
