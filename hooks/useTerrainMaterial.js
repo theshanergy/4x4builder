@@ -25,6 +25,13 @@ const UNIFORM_FIELDS = [
 
 // Get nested property value from object using dot notation
 const getNestedValue = (obj, path) => path.split('.').reduce((acc, key) => acc?.[key], obj)
+const ROAD_WEIGHT_CHANNELS = ['x', 'y', 'z', 'w']
+const glslFloat = (value) => {
+	const number = Number(value)
+	if (!Number.isFinite(number)) return '0.0'
+	return Number.isInteger(number) ? `${number}.0` : `${number}`
+}
+const glslVec3 = (value) => `vec3(${glslFloat(value[0])}, ${glslFloat(value[1])}, ${glslFloat(value[2])})`
 
 // Generate shader uniforms and declarations from layer config (single pass)
 const generateLayerUniformsAndDeclarations = (layers) => {
@@ -57,6 +64,13 @@ const generateLayerUniformsAndDeclarations = (layers) => {
 const generateBlendCode = (layer, index) => {
 	const hasHeight = layer.height
 	const hasSlope = layer.slope
+
+	if (layer.road) {
+		const channel = ROAD_WEIGHT_CHANNELS[layer.road.weightChannel ?? 0] ?? ROAD_WEIGHT_CHANNELS[0]
+		return `
+		// Layer ${index} (${layer.name}) - spline road mask
+		float layer${index}Blend = clamp(vRoadWeights.${channel}, 0.0, 1.0);`
+	}
 
 	// Base layer or layer with no blend params - always fully visible
 	if (!hasHeight && !hasSlope) {
@@ -137,10 +151,31 @@ const generateBlendCode = (layer, index) => {
 	return code
 }
 
+const generateRoadSurfaceCode = (layer, index) => {
+	if (!layer.road) return ''
+
+	let code = ''
+	if (Array.isArray(layer.road.tint)) {
+		code += `
+		layer${index}Color.rgb *= ${glslVec3(layer.road.tint)};`
+	}
+
+	if (layer.road.rutDarkening !== undefined) {
+		const laneOffset = glslFloat(layer.road.laneOffset ?? 1.2)
+		const laneWidth = layer.road.laneWidth ?? 0.35
+		const laneFeather = layer.road.laneFeather ?? laneWidth
+		code += `
+		float roadLane${index} = 1.0 - smoothstep(${glslFloat(laneWidth)}, ${glslFloat(laneWidth + laneFeather)}, abs(abs(vRoadParams.y) - ${laneOffset}));
+		layer${index}Color.rgb *= mix(vec3(1.0), vec3(${glslFloat(layer.road.rutDarkening)}), roadLane${index});`
+	}
+
+	return code
+}
+
 // Generate color sampling code for a layer
 const generateSamplingCode = (layer, index) => {
 	const prefix = `uLayer${index}`
-	const hasBlendConditions = layer.height || layer.slope
+	const hasBlendConditions = layer.height || layer.slope || layer.road
 	const normalScaleStr = layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'
 
 	// Skip sampling if blend is near zero (optimization for layers with blend conditions)
@@ -179,8 +214,9 @@ const generateSamplingCode = (layer, index) => {
 			normalSample${index}.y + vWorldNormal.z
 		));`
 	} else {
+		const uvExpression = layer.road?.usePathUV ? `vec2(vRoadParams.x, vRoadParams.y) * ${prefix}TextureScale` : `vWorldPos.xz * ${prefix}TextureScale`
 		code += `
-		vec2 layer${index}UV = vWorldPos.xz * ${prefix}TextureScale;
+		vec2 layer${index}UV = ${uvExpression};
 		layer${index}Color = sRGBToLinear(texture(${prefix}Texture, layer${index}UV));
 		vec3 layer${index}NormalSample = texture(${prefix}NormalMap, layer${index}UV).xyz * 2.0 - 1.0;
 		layer${index}NormalSample.xy *= ${normalScaleStr};
@@ -189,7 +225,7 @@ const generateSamplingCode = (layer, index) => {
 			layer${index}NormalSample.x + vWorldNormal.x,
 			abs(layer${index}NormalSample.z) * vWorldNormal.y,
 			layer${index}NormalSample.y + vWorldNormal.z
-		));`
+		));${generateRoadSurfaceCode(layer, index)}`
 	}
 
 	code += conditionalEnd
@@ -315,15 +351,21 @@ const useTerrainMaterial = () => {
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <common>',
 				`#include <common>
+				attribute vec4 roadWeights;
+				attribute vec4 roadParams;
 				varying vec3 vWorldPos;
-				varying vec3 vWorldNormal;`
+				varying vec3 vWorldNormal;
+				varying vec4 vRoadWeights;
+				varying vec4 vRoadParams;`
 			)
 
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <worldpos_vertex>',
 				`#include <worldpos_vertex>
 				vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-				vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);`
+				vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+				vRoadWeights = roadWeights;
+				vRoadParams = roadParams;`
 			)
 
 			// Fragment shader - add terrain blending
@@ -339,6 +381,8 @@ const useTerrainMaterial = () => {
 				// Varyings
 				varying vec3 vWorldPos;
 				varying vec3 vWorldNormal;
+				varying vec4 vRoadWeights;
+				varying vec4 vRoadParams;
 
 				// Blend factors for each layer
 				${TERRAIN_LAYERS.map((_, i) => `float layer${i}Blend;`).join('\n				')}

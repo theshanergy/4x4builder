@@ -80,6 +80,9 @@ const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex)
 		const vegX = minX + random() * QUADTREE_MIN_SIZE
 		const vegZ = minZ + random() * QUADTREE_MIN_SIZE
 
+		const surface = terrainHelpers.getSurface?.(vegX, vegZ)
+		if (surface?.vegetationClearance > 0.05) continue
+
 		// Height check
 		const vegY = getHeight(vegX, vegZ)
 		if (vegY < height.min || vegY > height.max) continue

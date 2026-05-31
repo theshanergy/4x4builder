@@ -6,6 +6,7 @@ import { Vector3 } from 'three'
 
 import TERRAIN_CONFIG from '../../config/terrain'
 import WATER_CONFIG from '../../config/water'
+import { createSplineCorridorSystem } from './splineCorridors'
 
 // -------------------------------------------------------------------------
 // Hash / gradient noise (port of shader `hash` + `noised`). Returns
@@ -382,28 +383,18 @@ export const createTerrainHelpers = () => {
 		}
 	}
 
-	// Full sample in world space. Caches the shader-space sample and applies
-	// the world-space height remap (scale + origin shift + spawn flatten).
-	// Returns all derived quantities — callers pick what they need.
-	const sample = (x, z) => {
-		const key = cacheKey(x, z)
-		const cached = cache.get(key)
-		if (cached !== undefined) {
-			// LRU touch — re-insert
-			cache.delete(key)
-			cache.set(key, cached)
-			return cached
-		}
-
+	// Base terrain sample in world space before spline corridor deformation.
+	// Returns all derived quantities; road/rivers are applied in sample().
+	const sampleBase = (x, z) => {
 		const distSq = x * x + z * z
 		if (distSq >= oceanRadiusSq) {
-			return cacheResult(key, {
+			return {
 				height: oceanFloorHeight,
 				slopeX: 0,
 				slopeZ: 0,
 				ridgeMap: 1,
 				erosion: 0,
-			})
+			}
 		}
 
 		const px = x / worldScale
@@ -459,12 +450,44 @@ export const createTerrainHelpers = () => {
 			ridgeMap = mix(ridgeMap, 1, bezierT)
 		}
 
-		const result = {
+		return {
 			height: worldHeight,
 			slopeX: worldSlopeX,
 			slopeZ: worldSlopeZ,
 			ridgeMap,
 			erosion: raw.erosion,
+		}
+	}
+
+	const splineCorridors = createSplineCorridorSystem(TERRAIN_CONFIG.roads, sampleBase)
+
+	// Full sample in world space. Caches the shader-space sample and applies
+	// the world-space height remap, spawn/ocean shaping, and spline corridors.
+	// Returns all derived quantities — callers pick what they need.
+	const sample = (x, z) => {
+		const key = cacheKey(x, z)
+		const cached = cache.get(key)
+		if (cached !== undefined) {
+			// LRU touch — re-insert
+			cache.delete(key)
+			cache.set(key, cached)
+			return cached
+		}
+
+		const base = sampleBase(x, z)
+		const result = splineCorridors.applyToSample(x, z, base)
+		const roadConfig = TERRAIN_CONFIG.roads
+		const spawnSafeRadius = roadConfig?.spawnSafeRadius ?? 0
+		const spawnSafeTransition = roadConfig?.spawnSafeTransition ?? 0
+		const spawnSafeEnd = spawnSafeRadius + spawnSafeTransition
+
+		if (result.height > 0 && spawnSafeEnd > 0) {
+			const distSq = x * x + z * z
+			if (distSq < spawnSafeEnd * spawnSafeEnd) {
+				const dist = Math.sqrt(distSq)
+				const safeWeight = dist <= spawnSafeRadius ? 1 : 1 - smoothstepF(spawnSafeRadius, spawnSafeEnd, dist)
+				result.height = mix(result.height, 0, safeWeight)
+			}
 		}
 
 		return cacheResult(key, result)
@@ -474,6 +497,20 @@ export const createTerrainHelpers = () => {
 
 	const getNormal = (x, z, target = new Vector3()) => {
 		const s = sample(x, z)
+		if (s.surface?.heightInfluence > 0.001) {
+			const step = TERRAIN_CONFIG.roads?.normalSampleStep ?? 2
+			const hL = getHeight(x - step, z)
+			const hR = getHeight(x + step, z)
+			const hD = getHeight(x, z - step)
+			const hU = getHeight(x, z + step)
+			const dhdx = (hR - hL) / (step * 2)
+			const dhdz = (hU - hD) / (step * 2)
+			const nx = -dhdx
+			const nz = -dhdz
+			const invLen = 1 / Math.sqrt(nx * nx + 1 + nz * nz)
+			return target.set(nx * invLen, invLen, nz * invLen)
+		}
+
 		// Normal perpendicular to (slopeX, 1, slopeZ) — matches existing convention.
 		const nx = -s.slopeX
 		const nz = -s.slopeZ
@@ -482,10 +519,12 @@ export const createTerrainHelpers = () => {
 	}
 
 	const isWater = (x, z) => sample(x, z).height < WATER_CONFIG.level
+	const getSurface = (x, z) => sample(x, z).surface
 
 	return {
 		getHeight,
 		getNormal,
+		getSurface,
 		isWater,
 		// Exposed for debugging / future shader-side use.
 		sample,
