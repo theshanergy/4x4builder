@@ -47,6 +47,62 @@ const estimateControlLength = (points) => {
 	return length
 }
 
+const normalizePointTuple = (point) => {
+	if (Array.isArray(point)) return point
+	return [point?.x ?? 0, point?.z ?? point?.y ?? 0]
+}
+
+const createProceduralControlPoints = (route, seed) => {
+	const generator = route.procedural
+	if (!generator?.enabled) return route.controlPoints
+
+	const random = createSeededRandom(hashString(`${seed}:${route.id}:${route.type}:procedural-route`))
+	const fallbackPoints = route.controlPoints ?? []
+	const start = normalizePointTuple(generator.start ?? fallbackPoints[0] ?? [0, 0])
+	const end = normalizePointTuple(generator.end ?? fallbackPoints[fallbackPoints.length - 1] ?? [0, 0])
+	const count = Math.max(2, generator.controlPointCount ?? fallbackPoints.length ?? 8)
+	const dx = end[0] - start[0]
+	const dz = end[1] - start[1]
+	const length = Math.max(1e-6, Math.sqrt(dx * dx + dz * dz))
+	const dirX = dx / length
+	const dirZ = dz / length
+	const rightX = -dirZ
+	const rightZ = dirX
+	const lateralAmplitude = generator.lateralAmplitude ?? 260
+	const lateralJitter = generator.lateralJitter ?? lateralAmplitude * 0.35
+	const alongJitter = generator.alongJitter ?? 0
+	const frequency = generator.frequency ?? 2.5
+	const secondaryAmplitude = generator.secondaryAmplitude ?? lateralAmplitude * 0.28
+	const secondaryFrequency = generator.secondaryFrequency ?? frequency * 2.1
+	const phase = generator.phase ?? random() * Math.PI * 2
+	const secondaryPhase = generator.secondaryPhase ?? random() * Math.PI * 2
+	const anchors = new Map((generator.anchors ?? []).map((anchor) => [anchor.index, normalizePointTuple(anchor.point)]))
+	const points = []
+
+	for (let i = 0; i < count; i++) {
+		const t = count === 1 ? 0 : i / (count - 1)
+		const anchor = anchors.get(i)
+		if (anchor) {
+			points.push(anchor)
+			continue
+		}
+
+		const endpointEnvelope = Math.sin(Math.PI * t)
+		const lateral =
+			(Math.sin(t * Math.PI * 2 * frequency + phase) * lateralAmplitude +
+				Math.sin(t * Math.PI * 2 * secondaryFrequency + secondaryPhase) * secondaryAmplitude +
+				(random() - 0.5) * lateralJitter) *
+			endpointEnvelope
+		const along = (random() - 0.5) * alongJitter * endpointEnvelope
+		const baseX = mix(start[0], end[0], t)
+		const baseZ = mix(start[1], end[1], t)
+
+		points.push([baseX + rightX * lateral + dirX * along, baseZ + rightZ * lateral + dirZ * along])
+	}
+
+	return points
+}
+
 const smoothHeights = (heights, sampleSpacing, smoothingDistance, blendAmount) => {
 	if (!smoothingDistance || !blendAmount) return heights.slice()
 
@@ -119,11 +175,12 @@ const bridgeLowSpots = (heights, sampleSpacing, options) => {
 
 const jitterControlPoints = (route, seed) => {
 	const random = createSeededRandom(hashString(`${seed}:${route.id}:${route.type}`))
+	const controlPoints = createProceduralControlPoints(route, seed)
 	const jitter = route.jitter ?? 0
 	const endpointJitter = route.endpointJitter ?? 0
 	const fixedIndices = new Set(route.fixedControlPointIndices ?? [])
-	const points = route.controlPoints.map(([x, z], index) => {
-		const isEndpoint = index === 0 || index === route.controlPoints.length - 1
+	const points = controlPoints.map(([x, z], index) => {
+		const isEndpoint = index === 0 || index === controlPoints.length - 1
 		if (fixedIndices.has(index)) return new Vector3(x, 0, z)
 
 		const pointJitter = isEndpoint ? endpointJitter : jitter

@@ -4,6 +4,7 @@ import { CanvasTexture, ClampToEdgeWrapping, LinearFilter, LinearMipmapLinearFil
 
 import TERRAIN_CONFIG from '../config/terrain'
 import { QUADTREE_VIEW_RANGE, QUADTREE_ROOT_SIZE } from '../config/lod'
+import { createProceduralRoadTexture } from '../utils/terrain/proceduralRoadTextures'
 
 // Uniform field definitions - maps layer properties to shader uniform names and values
 const UNIFORM_FIELDS = [
@@ -26,6 +27,8 @@ const UNIFORM_FIELDS = [
 // Get nested property value from object using dot notation
 const getNestedValue = (obj, path) => path.split('.').reduce((acc, key) => acc?.[key], obj)
 const ROAD_WEIGHT_CHANNELS = ['x', 'y', 'z', 'w']
+const isTexturePath = (texture) => typeof texture === 'string'
+const isProceduralTexture = (texture) => texture?.procedural === 'road'
 const glslFloat = (value) => {
 	const number = Number(value)
 	if (!Number.isFinite(number)) return '0.0'
@@ -458,18 +461,43 @@ const useTerrainMaterial = (terrainHelpers) => {
 		return createRoadProjectionMask(routes, roadLayer)
 	}, [terrainHelpers, roadLayer])
 
-	// Build texture paths array from layer config
-	const texturePaths = useMemo(() => TERRAIN_LAYERS.flatMap((layer) => [layer.textures.albedo, layer.textures.normal]), [TERRAIN_LAYERS])
+	// Build texture paths array from layer config. Procedural textures are created
+	// below so image loading still works for the other terrain layers.
+	const texturePaths = useMemo(
+		() => TERRAIN_LAYERS.flatMap((layer) => [layer.textures.albedo, layer.textures.normal]).filter(isTexturePath),
+		[TERRAIN_LAYERS]
+	)
 
 	// Load all layer textures
 	const loadedTextures = useLoader(TextureLoader, texturePaths)
 
+	const proceduralTextures = useMemo(() => {
+		const result = {}
+
+		TERRAIN_LAYERS.forEach((layer) => {
+			for (const textureType of ['albedo', 'normal']) {
+				const textureDefinition = layer.textures[textureType]
+				if (isProceduralTexture(textureDefinition)) {
+					result[`${layer.name}:${textureType}`] = createProceduralRoadTexture(textureDefinition)
+				}
+			}
+		})
+
+		return result
+	}, [TERRAIN_LAYERS])
+
 	// Layer textures mapped by layer name, with wrapping configured
 	const layerTextures = useMemo(() => {
 		const result = {}
+		let loadedTextureIndex = 0
+
 		TERRAIN_LAYERS.forEach((layer, index) => {
-			const albedo = loadedTextures[index * 2]
-			const normal = loadedTextures[index * 2 + 1]
+			const albedo = isTexturePath(layer.textures.albedo)
+				? loadedTextures[loadedTextureIndex++]
+				: proceduralTextures[`${layer.name}:albedo`]
+			const normal = isTexturePath(layer.textures.normal)
+				? loadedTextures[loadedTextureIndex++]
+				: proceduralTextures[`${layer.name}:normal`]
 
 			// Configure wrapping
 			if (albedo) albedo.wrapS = albedo.wrapT = RepeatWrapping
@@ -478,7 +506,7 @@ const useTerrainMaterial = (terrainHelpers) => {
 			result[layer.name] = { albedo, normal }
 		})
 		return result
-	}, [loadedTextures, TERRAIN_LAYERS])
+	}, [loadedTextures, proceduralTextures, TERRAIN_LAYERS])
 
 	// Pre-generate shader code from config
 	const shaderCode = useMemo(() => {
@@ -683,6 +711,13 @@ const useTerrainMaterial = (terrainHelpers) => {
 			currentTexture?.dispose()
 		}
 	}, [roadProjection])
+
+	useEffect(() => {
+		const currentTextures = Object.values(proceduralTextures).filter(Boolean)
+		return () => {
+			currentTextures.forEach((texture) => texture.dispose())
+		}
+	}, [proceduralTextures])
 
 	return material
 }
