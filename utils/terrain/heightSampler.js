@@ -6,7 +6,7 @@ import { Vector3 } from 'three'
 
 import TERRAIN_CONFIG from '../../config/terrain'
 import WATER_CONFIG from '../../config/water'
-import { createSplineCorridorSystem } from './splineCorridors'
+import { createRoadVisualRoutes, createSplineCorridorSystem } from './splineCorridors'
 
 // -------------------------------------------------------------------------
 // Hash / gradient noise (port of shader `hash` + `noised`). Returns
@@ -460,6 +460,7 @@ export const createTerrainHelpers = () => {
 	}
 
 	const splineCorridors = createSplineCorridorSystem(TERRAIN_CONFIG.roads, sampleBase)
+	const roadVisualRoutes = createRoadVisualRoutes(TERRAIN_CONFIG.roads, sampleBase)
 
 	// Full sample in world space. Caches the shader-space sample and applies
 	// the world-space height remap, spawn/ocean shaping, and spline corridors.
@@ -526,6 +527,7 @@ export const createTerrainHelpers = () => {
 		getNormal,
 		getSurface,
 		isWater,
+		getRoadVisualRoutes: () => roadVisualRoutes,
 		// Exposed for debugging / future shader-side use.
 		sample,
 	}

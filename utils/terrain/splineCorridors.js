@@ -317,6 +317,51 @@ const createSegments = (routes, config, sampleBase) => {
 	return segments
 }
 
+export const createRoadVisualRoutes = (config, sampleBase) => {
+	if (!config?.enabled || !config.routes?.length) return []
+
+	const types = config.types ?? {}
+
+	return config.routes
+		.map((route) => {
+			const typeConfig = types[route.type]
+			if (!typeConfig) return null
+
+			const edgeFeather = typeConfig.edgeFeather ?? Math.max(0.5, (config.sampleSpacing ?? DEFAULT_SAMPLE_SPACING) * 0.2)
+			const halfWidth = typeConfig.width * 0.5
+			const routePoints = buildRoutePoints(route, typeConfig, config, sampleBase)
+			let distanceAlong = 0
+
+			const samples = routePoints.map((point, index) => {
+				if (index > 0) {
+					const prev = routePoints[index - 1]
+					const dx = point.x - prev.x
+					const dz = point.z - prev.z
+					distanceAlong += Math.sqrt(dx * dx + dz * dz)
+				}
+
+				return {
+					x: point.x,
+					z: point.z,
+					height: point.height,
+					distanceAlong,
+				}
+			})
+
+			return {
+				id: route.id,
+				type: route.type,
+				closed: Boolean(route.closed),
+				halfWidth,
+				visualHalfWidth: route.visualHalfWidth ?? typeConfig.visualHalfWidth ?? halfWidth + edgeFeather,
+				laneOffset: typeConfig.laneOffset ?? 1.2,
+				rutWidth: typeConfig.rutWidth ?? 0.35,
+				samples,
+			}
+		})
+		.filter(Boolean)
+}
+
 const buildSpatialIndex = (segments, cellSize) => {
 	const index = new Map()
 

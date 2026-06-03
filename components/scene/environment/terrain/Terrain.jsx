@@ -22,7 +22,7 @@ const Terrain = () => {
 	}, [terrainHelpers])
 
 	// Terrain material shared by all terrain tiles
-	const terrainMaterial = useTerrainMaterial()
+	const terrainMaterial = useTerrainMaterial(terrainHelpers)
 
 	// Water material shared by all water tiles
 	const waterMaterial = useWaterMaterial()
