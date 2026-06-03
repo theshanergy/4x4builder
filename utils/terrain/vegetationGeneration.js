@@ -15,6 +15,33 @@ import { QUADTREE_MIN_SIZE } from '../../config/lod'
 // Pre-allocated scratch objects for matrix generation
 const _scratchDummy = new Object3D()
 const _normalScratch = new Vector3()
+const VEGETATION_CELL_CACHE_LIMIT = 8192
+const _vegetationCellCaches = new WeakMap()
+
+const getVegetationCellCache = (terrainHelpers, config) => {
+	let helperCaches = _vegetationCellCaches.get(terrainHelpers)
+	if (!helperCaches) {
+		helperCaches = new WeakMap()
+		_vegetationCellCaches.set(terrainHelpers, helperCaches)
+	}
+
+	let cache = helperCaches.get(config)
+	if (!cache) {
+		cache = new Map()
+		helperCaches.set(config, cache)
+	}
+
+	return cache
+}
+
+const cacheCellVegetation = (cache, key, matrices) => {
+	cache.set(key, matrices)
+	if (cache.size > VEGETATION_CELL_CACHE_LIMIT) {
+		const firstKey = cache.keys().next().value
+		cache.delete(firstKey)
+	}
+	return matrices
+}
 
 /**
  * Generate vegetation for a single minimum-size cell.
@@ -27,7 +54,7 @@ const _normalScratch = new Vector3()
  * @param {number} typeIndex - Vegetation type index for seeding
  * @returns {Array} Array of matrices for this cell
  */
-const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex) => {
+const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex, gridX, gridZ) => {
 	const { getHeight, getNormal } = terrainHelpers
 	const { scale, slope, height, density } = config
 
@@ -41,8 +68,6 @@ const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex)
 	const minZ = cellZ - halfCell
 
 	// Deterministic seed based on cell grid position
-	const gridX = Math.floor(cellX / QUADTREE_MIN_SIZE)
-	const gridZ = Math.floor(cellZ / QUADTREE_MIN_SIZE)
 	const cellSeed = hashCoords(gridX, gridZ, 88888 + typeIndex * 1000)
 	const random = createSeededRandom(cellSeed)
 
@@ -111,6 +136,22 @@ const generateCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex)
 	return matrices
 }
 
+const getCachedCellVegetation = (cellX, cellZ, terrainHelpers, config, typeIndex) => {
+	const gridX = Math.floor(cellX / QUADTREE_MIN_SIZE)
+	const gridZ = Math.floor(cellZ / QUADTREE_MIN_SIZE)
+	const cache = getVegetationCellCache(terrainHelpers, config)
+	const key = `${typeIndex}:${gridX}:${gridZ}`
+	const cached = cache.get(key)
+
+	if (cached) {
+		cache.delete(key)
+		cache.set(key, cached)
+		return cached
+	}
+
+	return cacheCellVegetation(cache, key, generateCellVegetation(cellX, cellZ, terrainHelpers, config, typeIndex, gridX, gridZ))
+}
+
 /**
  * Generate vegetation matrices for a terrain tile.
  *
@@ -144,7 +185,7 @@ export const generateVegetationForType = (node, terrainHelpers, vegetationTypeCo
 			const cellZ = minZ + (cz + 0.5) * QUADTREE_MIN_SIZE
 
 			// Generate vegetation for this cell and add to matrices
-			const cellMatrices = generateCellVegetation(cellX, cellZ, terrainHelpers, vegetationTypeConfig, typeIndex)
+			const cellMatrices = getCachedCellVegetation(cellX, cellZ, terrainHelpers, vegetationTypeConfig, typeIndex)
 
 			// Concat arrays more efficiently than spread operator
 			for (let i = 0; i < cellMatrices.length; i++) {

@@ -280,7 +280,7 @@ const erosionFilter = (noise, px, py, hIn, sxIn, syIn, fadeTargetIn, cfg, out, t
 // isWater all hit this, sharing the ~80 noise evaluations per sample.
 // -------------------------------------------------------------------------
 const CACHE_QUANT = 0.001 // sub-millimeter — effectively exact for fp32 grids
-const CACHE_LIMIT = 4096
+const CACHE_LIMIT = 32768
 const cacheKey = (x, z) => {
 	// Pack quantized coords into a string key. Integer mult keeps numeric.
 	const qx = Math.round(x / CACHE_QUANT)

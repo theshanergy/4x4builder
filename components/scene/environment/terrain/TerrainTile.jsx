@@ -90,19 +90,10 @@ const TerrainTile = memo(({ node, terrainHelpers, edgeStitchInfo, terrainMateria
 	const { terrainGeometry, waterGeometry, heightCache } = useTerrainGeometry(node, terrainHelpers, effectiveEdgeStitchInfo)
 
 	// Build a physics collider only for the highest-detail tiles.
-	// Reuses heightCache from the visual geometry so we don't resample.
-	// Rapier's HeightfieldCollider expects heights in x-major / z-inner order;
-	// our cache is z-major / x-inner, so transpose into a fresh array.
+	// Reuses heightCache from the visual geometry so we don't resample or transpose.
 	const colliderArgs = useMemo(() => {
 		if (node.size !== QUADTREE_MIN_SIZE) return null
-		const sampleCount = TILE_RESOLUTION + 1
-		const transposed = new Float32Array(sampleCount * sampleCount)
-		for (let j = 0; j < sampleCount; j++) {
-			for (let i = 0; i < sampleCount; i++) {
-				transposed[i * sampleCount + j] = heightCache[j * sampleCount + i]
-			}
-		}
-		return [TILE_RESOLUTION, TILE_RESOLUTION, transposed, { x: node.size, y: 1, z: node.size }]
+		return [TILE_RESOLUTION, TILE_RESOLUTION, heightCache, { x: node.size, y: 1, z: node.size }]
 	}, [node.size, heightCache])
 
 	// Helper to manage geometry lifecycle (disposal on change and unmount)

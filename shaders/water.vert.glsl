@@ -24,7 +24,10 @@ uniform float shallowDepthThreshold;
 
 // Per-vertex depth attribute (distance from water surface to terrain)
 attribute float depth;
-// Per-vertex flow velocity. Zero means static open-water noi
+// Exact world X/Z for this water vertex. This avoids tiny per-tile transform
+// differences showing as cracks at glancing camera angles.
+attribute vec2 waterWorldPosition;
+// Per-vertex flow velocity. Zero means static open-water noise.
 attribute vec2 flowDir;
 
 vec3 GerstnerWave(vec4 wave, vec3 p, float waveScale) {
@@ -44,13 +47,12 @@ void main() {
 	float waveScale = smoothstep(shorelineDepthThreshold, shallowDepthThreshold, depth);
 	waveScale = waveScale * waveScale * (3.0 - 2.0 * waveScale);
 
-	// UV coordinates are in world space
-	// At LOD boundaries, these match the coarse neighbor due to interpolation
-	// This ensures seamless wave calculations across tiles
-	vec3 worldSpacePos = vec3(uv.x, 0.0, uv.y);
+	// World-space coordinates are shared by neighboring water tiles and stitched
+	// to coarse neighbors, so waves/reflections stay continuous across tile edges.
+	vec3 worldSpacePos = vec3(waterWorldPosition.x, 0.0, waterWorldPosition.y);
 
 	// Pass to fragment shader for noise calculation
-	vWorldXZ = uv;
+	vWorldXZ = waterWorldPosition;
 
 	// Compute Gerstner wave displacement
 	vec3 waveDisplacement = vec3(0.0);
@@ -58,11 +60,12 @@ void main() {
 	waveDisplacement += GerstnerWave(waveB, worldSpacePos, waveScale);
 	waveDisplacement += GerstnerWave(waveC, worldSpacePos, waveScale);
 
-	// Apply displacement to local position
-	vec3 displacedPosition = position + waveDisplacement;
-
-	// Transform to world space
-	vec4 worldPos = modelMatrix * vec4(displacedPosition, 1.0);
+	vec4 worldPos = vec4(
+		waterWorldPosition.x + waveDisplacement.x,
+		position.y + waveDisplacement.y,
+		waterWorldPosition.y + waveDisplacement.z,
+		1.0
+	);
 	worldPosition = worldPos;
 	mirrorCoord = textureMatrix * worldPos;
 

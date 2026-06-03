@@ -4,6 +4,45 @@ import { TILE_RESOLUTION } from '../config/lod'
 import WATER_CONFIG from '../config/water'
 import { writeSurfaceWeights } from '../utils/terrain/splineCorridors'
 
+const SAMPLE_COUNT = TILE_RESOLUTION + 1
+const TOTAL_SAMPLES = SAMPLE_COUNT * SAMPLE_COUNT
+const NUM_TRIANGLES = TILE_RESOLUTION * TILE_RESOLUTION * 2
+const TERRAIN_INDEX_COUNT = NUM_TRIANGLES * 3
+
+const TERRAIN_INDICES = (() => {
+	const indices = new Uint16Array(TERRAIN_INDEX_COUNT)
+	let idx = 0
+
+	for (let j = 0; j < TILE_RESOLUTION; j++) {
+		const rowOffset = SAMPLE_COUNT * j
+		for (let i = 0; i < TILE_RESOLUTION; i++) {
+			const a = i + rowOffset
+			const b = a + 1
+			const c = a + SAMPLE_COUNT
+			const d = c + 1
+
+			indices[idx++] = a
+			indices[idx++] = c
+			indices[idx++] = b
+			indices[idx++] = b
+			indices[idx++] = c
+			indices[idx++] = d
+		}
+	}
+
+	return indices
+})()
+
+const WATER_NORMALS = (() => {
+	const normals = new Float32Array(TOTAL_SAMPLES * 3)
+	for (let i = 0; i < TOTAL_SAMPLES; i++) {
+		normals[i * 3 + 1] = 1
+	}
+	return normals
+})()
+
+const WATER_FLOW_DIRS = new Float32Array(TOTAL_SAMPLES * 2)
+
 /**
  * Create geometry for a quadtree terrain tile.
  * Handles edge stitching to prevent cracks between LOD levels.
@@ -19,8 +58,8 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		const { size, centerX, centerZ } = node
 		const resolution = TILE_RESOLUTION
 		const segments = resolution
-		const sampleCount = segments + 1
-		const totalSamples = sampleCount * sampleCount
+		const sampleCount = SAMPLE_COUNT
+		const totalSamples = TOTAL_SAMPLES
 		const step = size / segments
 		const halfSize = size / 2
 		const originX = centerX - halfSize
@@ -32,18 +71,15 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		const roadWeights = new Float32Array(totalSamples * 4)
 		const roadParams = new Float32Array(totalSamples * 4)
 
-		// Track water depth for each vertex
-		const depths = new Float32Array(totalSamples)
+		// Track water depth only for tiles that need water geometry.
+		let depths = null
 		let hasWater = false
+		let allWater = true
 
 		// Cache for height samples - avoids recomputing for normal calculation
-		// Layout: heightCache[j * sampleCount + i] = world height at grid position (i, j)
+		// Layout matches Rapier HeightfieldCollider: x-major / z-inner.
+		// heightCache[i * sampleCount + j] = world height at grid position (i, j)
 		const heightCache = new Float32Array(totalSamples)
-
-		// Track interpolated world coordinates for UVs
-		// At LOD boundaries, these are snapped to match coarse neighbor
-		const worldXForUV = new Float32Array(totalSamples)
-		const worldZForUV = new Float32Array(totalSamples)
 
 		// Pre-check edge stitch conditions to avoid repeated property access
 		const westNeedsStitch = edgeStitchInfo.west.needsStitch
@@ -81,29 +117,6 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			}
 		}
 
-		// Pre-compute stitch decisions for all edge vertices to avoid redundant checks
-		// This caches which vertices need stitching and what parameters to use
-		const stitchCache = new Map()
-		for (let j = 0; j < sampleCount; j++) {
-			const onSouthEdge = j === 0
-			const onNorthEdge = j === segments
-			for (let i = 0; i < sampleCount; i++) {
-				const onWestEdge = i === 0
-				const onEastEdge = i === segments
-
-				// Only cache edge vertices that need stitching
-				if (onWestEdge && westNeedsStitch) {
-					stitchCache.set(j * sampleCount + i, { step: westStep, axis: 'z' })
-				} else if (onEastEdge && eastNeedsStitch) {
-					stitchCache.set(j * sampleCount + i, { step: eastStep, axis: 'z' })
-				} else if (onSouthEdge && southNeedsStitch) {
-					stitchCache.set(j * sampleCount + i, { step: southStep, axis: 'x' })
-				} else if (onNorthEdge && northNeedsStitch) {
-					stitchCache.set(j * sampleCount + i, { step: northStep, axis: 'x' })
-				}
-			}
-		}
-
 		// First pass: sample heights and cache them
 		let vertIndex = 0
 		for (let j = 0; j < sampleCount; j++) {
@@ -119,27 +132,40 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				let uvWorldX = worldX
 				let uvWorldZ = worldZ
 
-				// Check stitch cache for this vertex
-				const stitchInfo = stitchCache.get(vertIndex)
-				if (stitchInfo) {
-					// Apply cached stitch parameters
-					height = getStitchedHeight(worldX, worldZ, stitchInfo.step, stitchInfo.axis)
-					heightCache[vertIndex] = height
+				let stitchStep = 0
+				let stitchAxis = null
+				if (i === 0 && westNeedsStitch) {
+					stitchStep = westStep
+					stitchAxis = 'z'
+				} else if (i === segments && eastNeedsStitch) {
+					stitchStep = eastStep
+					stitchAxis = 'z'
+				} else if (j === 0 && southNeedsStitch) {
+					stitchStep = southStep
+					stitchAxis = 'x'
+				} else if (j === segments && northNeedsStitch) {
+					stitchStep = northStep
+					stitchAxis = 'x'
+				}
+
+				if (stitchAxis) {
+					height = getStitchedHeight(worldX, worldZ, stitchStep, stitchAxis)
 					sampleInfo = terrainHelpers.sample?.(worldX, worldZ)
 
 					// Snap UVs to coarse neighbor's grid points
 					// Water shader uses UVs for wave calculations
-					if (stitchInfo.axis === 'z') {
-						uvWorldZ = Math.round(worldZ / stitchInfo.step) * stitchInfo.step
+					if (stitchAxis === 'z') {
+						uvWorldZ = Math.round(worldZ / stitchStep) * stitchStep
 					} else {
-						uvWorldX = Math.round(worldX / stitchInfo.step) * stitchInfo.step
+						uvWorldX = Math.round(worldX / stitchStep) * stitchStep
 					}
 				} else {
 					// No stitching needed - sample directly
 					sampleInfo = terrainHelpers.sample?.(worldX, worldZ)
 					height = sampleInfo?.height ?? terrainHelpers.getHeight(worldX, worldZ)
-					heightCache[vertIndex] = height
 				}
+
+				heightCache[i * sampleCount + j] = height
 				const posIndex = vertIndex * 3
 				const uvIndex = vertIndex * 2
 
@@ -155,18 +181,16 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				uvs[uvIndex] = uvWorldX
 				uvs[uvIndex + 1] = uvWorldZ
 
-				// Store for water geometry construction
-				worldXForUV[vertIndex] = uvWorldX
-				worldZForUV[vertIndex] = uvWorldZ
 				writeSurfaceWeights(sampleInfo?.surface, roadWeights, roadParams, vertIndex)
 
 				// Calculate water depth. Flow defaults to zero; future splines can
 				// populate the water geometry's flowDir attribute without terrain sampling.
 				if (height < WATER_CONFIG.level) {
+					if (!depths) depths = new Float32Array(totalSamples)
 					depths[vertIndex] = WATER_CONFIG.level - height
 					hasWater = true
 				} else {
-					depths[vertIndex] = 0
+					allWater = false
 				}
 				vertIndex++
 			}
@@ -181,7 +205,6 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			const worldZ = originZ + localZ
 			const onSouthEdge = j === 0
 			const onNorthEdge = j === segments
-			const rowOffset = j * sampleCount
 
 			for (let i = 0; i < sampleCount; i++) {
 				const localX = i * step
@@ -198,34 +221,34 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				if (onWestEdge) {
 					// Sample one step outside tile boundary to the west
 					hL = terrainHelpers.getHeight(worldX - step, worldZ)
-					hR = heightCache[rowOffset + 1]
+					hR = heightCache[sampleCount + j]
 					dx = 2 * step
 				} else if (onEastEdge) {
 					// Sample one step outside tile boundary to the east
-					hL = heightCache[rowOffset + segments - 1]
+					hL = heightCache[(segments - 1) * sampleCount + j]
 					hR = terrainHelpers.getHeight(worldX + step, worldZ)
 					dx = 2 * step
 				} else {
 					// Interior vertex - use cached heights
-					hL = heightCache[rowOffset + i - 1]
-					hR = heightCache[rowOffset + i + 1]
+					hL = heightCache[(i - 1) * sampleCount + j]
+					hR = heightCache[(i + 1) * sampleCount + j]
 					dx = 2 * step
 				}
 
 				if (onSouthEdge) {
 					// Sample one step outside tile boundary to the south
 					hD = terrainHelpers.getHeight(worldX, worldZ - step)
-					hU = heightCache[sampleCount + i]
+					hU = heightCache[i * sampleCount + 1]
 					dz = 2 * step
 				} else if (onNorthEdge) {
 					// Sample one step outside tile boundary to the north
-					hD = heightCache[(segments - 1) * sampleCount + i]
+					hD = heightCache[i * sampleCount + segments - 1]
 					hU = terrainHelpers.getHeight(worldX, worldZ + step)
 					dz = 2 * step
 				} else {
 					// Interior vertex - use cached heights
-					hD = heightCache[(j - 1) * sampleCount + i]
-					hU = heightCache[(j + 1) * sampleCount + i]
+					hD = heightCache[i * sampleCount + j - 1]
+					hU = heightCache[i * sampleCount + j + 1]
 					dz = 2 * step
 				}
 
@@ -247,29 +270,6 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 			}
 		}
 
-		// Build indices for the grid - pre-allocate for performance
-		const numTriangles = segments * segments * 2
-		const indices = new Uint32Array(numTriangles * 3)
-		let idx = 0
-
-		for (let j = 0; j < segments; j++) {
-			const rowOffset = sampleCount * j
-			for (let i = 0; i < segments; i++) {
-				const a = i + rowOffset
-				const b = a + 1
-				const c = a + sampleCount
-				const d = c + 1
-
-				// Two triangles per quad
-				indices[idx++] = a
-				indices[idx++] = c
-				indices[idx++] = b
-				indices[idx++] = b
-				indices[idx++] = c
-				indices[idx++] = d
-			}
-		}
-
 		// Build terrain geometry
 		const terrainGeom = new BufferGeometry()
 		terrainGeom.setAttribute('position', new BufferAttribute(positions, 3))
@@ -277,15 +277,13 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		terrainGeom.setAttribute('uv', new BufferAttribute(uvs, 2))
 		terrainGeom.setAttribute('roadWeights', new BufferAttribute(roadWeights, 4))
 		terrainGeom.setAttribute('roadParams', new BufferAttribute(roadParams, 4))
-		terrainGeom.setIndex(new BufferAttribute(indices, 1))
+		terrainGeom.setIndex(new BufferAttribute(TERRAIN_INDICES, 1))
 
 		// Build water geometry if there's water in this tile
 		let waterGeom = null
 		if (hasWater) {
-			// Create water positions and normals (reuse terrain UVs)
+			// Create water positions (reuse terrain UVs and constant normals).
 			const waterPositions = new Float32Array(totalSamples * 3)
-			const waterNormals = new Float32Array(totalSamples * 3)
-			const flowDirs = new Float32Array(totalSamples * 2)
 
 			// Build water geometry with snapped positions at LOD boundaries
 			// Both positions AND UVs need to match for seamless rendering
@@ -295,56 +293,54 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 
 				// Water position - use snapped UV coords (world space) converted to local
 				// This ensures edge vertices have identical positions as coarse neighbor
-				const localX = worldXForUV[i] - originX - halfSize
-				const localZ = worldZForUV[i] - originZ - halfSize
+				const localX = uvs[uvIndex] - originX - halfSize
+				const localZ = uvs[uvIndex + 1] - originZ - halfSize
 
 				waterPositions[posIndex] = localX
 				waterPositions[posIndex + 1] = WATER_CONFIG.level
 				waterPositions[posIndex + 2] = localZ
-
-				// Normal pointing up (waves added in shader)
-				waterNormals[posIndex] = 0
-				waterNormals[posIndex + 1] = 1
-				waterNormals[posIndex + 2] = 0
 			}
 
-			// Build water indices - only create triangles where at least one vertex is underwater
-			// Pre-allocate maximum possible size (all quads underwater)
-			const maxWaterIndices = numTriangles * 3
-			const waterIndicesArray = new Uint32Array(maxWaterIndices)
-			let waterIdx = 0
+			let waterIndices = TERRAIN_INDICES
+			let waterIdx = TERRAIN_INDEX_COUNT
 
-			for (let j = 0; j < segments; j++) {
-				const rowOffset = sampleCount * j
-				for (let i = 0; i < segments; i++) {
-					const a = i + rowOffset
-					const b = a + 1
-					const c = a + sampleCount
-					const d = c + 1
+			if (!allWater) {
+				// Build water indices - only create triangles where at least one vertex is underwater.
+				const waterIndicesArray = new Uint16Array(TERRAIN_INDEX_COUNT)
+				waterIdx = 0
 
-					// Check if any vertex in this quad is underwater
-					if (depths[a] > 0 || depths[b] > 0 || depths[c] > 0 || depths[d] > 0) {
-						// Two triangles per quad
-						waterIndicesArray[waterIdx++] = a
-						waterIndicesArray[waterIdx++] = c
-						waterIndicesArray[waterIdx++] = b
-						waterIndicesArray[waterIdx++] = b
-						waterIndicesArray[waterIdx++] = c
-						waterIndicesArray[waterIdx++] = d
+				for (let j = 0; j < segments; j++) {
+					const rowOffset = sampleCount * j
+					for (let i = 0; i < segments; i++) {
+						const a = i + rowOffset
+						const b = a + 1
+						const c = a + sampleCount
+						const d = c + 1
+
+						if (depths[a] > 0 || depths[b] > 0 || depths[c] > 0 || depths[d] > 0) {
+							waterIndicesArray[waterIdx++] = a
+							waterIndicesArray[waterIdx++] = c
+							waterIndicesArray[waterIdx++] = b
+							waterIndicesArray[waterIdx++] = b
+							waterIndicesArray[waterIdx++] = c
+							waterIndicesArray[waterIdx++] = d
+						}
 					}
 				}
+
+				waterIndices = waterIndicesArray.slice(0, waterIdx)
 			}
 
 			// Only create water geometry if we have triangles
 			if (waterIdx > 0) {
 				waterGeom = new BufferGeometry()
 				waterGeom.setAttribute('position', new BufferAttribute(waterPositions, 3))
-				waterGeom.setAttribute('normal', new BufferAttribute(waterNormals, 3))
+				waterGeom.setAttribute('normal', new BufferAttribute(WATER_NORMALS, 3))
 				waterGeom.setAttribute('uv', new BufferAttribute(uvs, 2)) // Reuse terrain UVs
+				waterGeom.setAttribute('waterWorldPosition', new BufferAttribute(uvs, 2))
 				waterGeom.setAttribute('depth', new BufferAttribute(depths, 1))
-				waterGeom.setAttribute('flowDir', new BufferAttribute(flowDirs, 2)) // Reserved for spline-derived flow
-				// Use slice to trim to actual size used
-				waterGeom.setIndex(new BufferAttribute(waterIndicesArray.slice(0, waterIdx), 1))
+				waterGeom.setAttribute('flowDir', new BufferAttribute(WATER_FLOW_DIRS, 2)) // Reserved for spline-derived flow
+				waterGeom.setIndex(new BufferAttribute(waterIndices, 1))
 			}
 		}
 
