@@ -74,7 +74,13 @@ const smoothHeights = (heights, sampleSpacing, smoothingDistance, blendAmount) =
 }
 
 const bridgeLowSpots = (heights, sampleSpacing, options) => {
-	if (!options?.enabled) return heights
+	const emptyBridgeRaise = new Array(heights.length).fill(0)
+	if (!options?.enabled) {
+		return {
+			heights: heights.slice(),
+			bridgeRaise: emptyBridgeRaise,
+		}
+	}
 
 	const minRadius = Math.max(1, Math.round(((options.minSpan ?? 20) * 0.5) / sampleSpacing))
 	const maxRadius = Math.max(minRadius, Math.round(((options.maxSpan ?? 80) * 0.5) / sampleSpacing))
@@ -102,7 +108,13 @@ const bridgeLowSpots = (heights, sampleSpacing, options) => {
 		}
 	}
 
-	return smoothHeights(bridged, sampleSpacing, options.smoothingDistance ?? 24, options.smoothingStrength ?? 0.35)
+	const smoothed = smoothHeights(bridged, sampleSpacing, options.smoothingDistance ?? 24, options.smoothingStrength ?? 0.35)
+	const bridgeRaise = smoothed.map((height, index) => Math.max(0, height - heights[index]))
+
+	return {
+		heights: smoothed,
+		bridgeRaise,
+	}
 }
 
 const jitterControlPoints = (route, seed) => {
@@ -225,13 +237,19 @@ const buildRoutePoints = (route, typeConfig, config, sampleBase) => {
 	const sampled = curve.getSpacedPoints(divisions)
 	const baseHeights = sampled.map((point) => sampleBase(point.x, point.z).height)
 	const smoothedHeights = smoothHeights(baseHeights, sampleSpacing, typeConfig.heightSmoothing ?? 0, typeConfig.gradeSmoothing ?? 0)
-	const roadHeights = bridgeLowSpots(smoothedHeights, sampleSpacing, typeConfig.bridgeLowSpots)
+	const bridgeResult = bridgeLowSpots(smoothedHeights, sampleSpacing, typeConfig.bridgeLowSpots)
+	const roadHeights = bridgeResult.heights
 	const heightOffset = typeConfig.heightOffset ?? 0
+	const bridgeOptions = typeConfig.bridgeLowSpots
+	const fillMultiplier = bridgeOptions?.fillMultiplier ?? 1.1
+	const extraFill = bridgeOptions?.extraFill ?? 0.25
 
 	return sampled.map((point, index) => ({
 		x: point.x,
 		z: point.z,
 		height: roadHeights[index] + heightOffset,
+		bridgeRaise: bridgeResult.bridgeRaise[index],
+		fillAllowance: Math.max(0, roadHeights[index] + heightOffset - baseHeights[index]) * fillMultiplier + extraFill,
 	}))
 }
 
@@ -279,7 +297,14 @@ const createSegments = (routes, config, sampleBase) => {
 			const length = Math.sqrt(lengthSq)
 			const halfWidth = typeConfig.width * 0.5
 			const shoulderWidth = typeConfig.shoulderWidth ?? 0
-			const influenceRadius = halfWidth + shoulderWidth
+			const bridgeOptions = typeConfig.bridgeLowSpots
+			const fillAllowance = Math.max(a.fillAllowance ?? 0, b.fillAllowance ?? 0)
+			const shoulderStartFill = bridgeOptions?.shoulderStartFill ?? 1.5
+			const bridgeShoulderWidth = Math.min(
+				bridgeOptions?.maxShoulderWidth ?? 36,
+				Math.max(0, fillAllowance - shoulderStartFill) * (bridgeOptions?.shoulderWidthPerFillMeter ?? 1.15)
+			)
+			const influenceRadius = halfWidth + shoulderWidth + bridgeShoulderWidth
 
 			segments.push({
 				routeId: route.id,
@@ -299,6 +324,11 @@ const createSegments = (routes, config, sampleBase) => {
 				distanceStart: distanceAlong,
 				heightA: a.height,
 				heightB: b.height,
+				bridgeRaiseA: a.bridgeRaise,
+				bridgeRaiseB: b.bridgeRaise,
+				fillAllowanceA: a.fillAllowance,
+				fillAllowanceB: b.fillAllowance,
+				bridgeShoulderWidth,
 				halfWidth,
 				influenceRadius,
 				influenceRadiusSq: influenceRadius * influenceRadius,
@@ -437,6 +467,8 @@ export const createSplineCorridorSystem = (config, sampleBase) => {
 			const materialWeight = 1 - smoothstep(surfaceEdgeStart, surfaceEdgeEnd, distance)
 			const signedLateral = offX * -segment.dirZ + offZ * segment.dirX
 			const pathHeight = mix(segment.heightA, segment.heightB, t) + getProfileOffset(segment.typeConfig, signedLateral, segment.halfWidth)
+			const bridgeRaise = mix(segment.bridgeRaiseA, segment.bridgeRaiseB, t)
+			const fillAllowance = mix(segment.fillAllowanceA, segment.fillAllowanceB, t)
 			const vegetationClearance =
 				1 - smoothstep(Math.max(0, segment.vegetationClearanceWidth - segment.edgeFeather), segment.vegetationClearanceWidth, distance)
 			const score = segment.priority * 10 + heightInfluence + materialWeight
@@ -451,11 +483,13 @@ export const createSplineCorridorSystem = (config, sampleBase) => {
 					materialWeight,
 					vegetationClearance,
 					targetHeight: pathHeight,
+					bridgeRaise,
+					fillAllowance,
 					distanceAlong: segment.distanceStart + segment.length * t,
 					lateralOffset: signedLateral,
 					halfWidth: segment.halfWidth,
 					maxCut: segment.maxCut,
-					maxFill: segment.maxFill,
+					maxFill: segment.maxFill + fillAllowance,
 				}
 			}
 		}
