@@ -331,8 +331,9 @@ const getProfileOffset = (typeConfig, lateralOffset, halfWidth) => {
 	return offset
 }
 
-const createSegments = (routes, config, sampleBase) => {
+const createRouteArtifacts = (routes, config, sampleBase) => {
 	const segments = []
+	const visualRoutes = []
 	const types = config.types ?? {}
 	const sampleSpacing = config.sampleSpacing ?? DEFAULT_SAMPLE_SPACING
 
@@ -342,6 +343,37 @@ const createSegments = (routes, config, sampleBase) => {
 
 		const routePoints = buildRoutePoints(route, typeConfig, config, sampleBase)
 		let distanceAlong = 0
+		const visualSamples = routePoints.map((point, index) => {
+			if (index > 0) {
+				const prev = routePoints[index - 1]
+				const dx = point.x - prev.x
+				const dz = point.z - prev.z
+				distanceAlong += Math.sqrt(dx * dx + dz * dz)
+			}
+
+			return {
+				x: point.x,
+				z: point.z,
+				height: point.height,
+				distanceAlong,
+			}
+		})
+
+		const edgeFeather = typeConfig.edgeFeather ?? Math.max(0.5, sampleSpacing * 0.2)
+		const halfWidth = typeConfig.width * 0.5
+
+		visualRoutes.push({
+			id: route.id,
+			type: route.type,
+			closed: Boolean(route.closed),
+			halfWidth,
+			visualHalfWidth: route.visualHalfWidth ?? typeConfig.visualHalfWidth ?? halfWidth + edgeFeather,
+			laneOffset: typeConfig.laneOffset ?? 1.2,
+			rutWidth: typeConfig.rutWidth ?? 0.35,
+			samples: visualSamples,
+		})
+
+		distanceAlong = 0
 
 		for (let i = 1; i < routePoints.length; i++) {
 			const a = routePoints[i - 1]
@@ -401,52 +433,13 @@ const createSegments = (routes, config, sampleBase) => {
 		}
 	}
 
-	return segments
+	return { segments, visualRoutes }
 }
 
 export const createRoadVisualRoutes = (config, sampleBase) => {
 	if (!config?.enabled || !config.routes?.length) return []
 
-	const types = config.types ?? {}
-
-	return config.routes
-		.map((route) => {
-			const typeConfig = types[route.type]
-			if (!typeConfig) return null
-
-			const edgeFeather = typeConfig.edgeFeather ?? Math.max(0.5, (config.sampleSpacing ?? DEFAULT_SAMPLE_SPACING) * 0.2)
-			const halfWidth = typeConfig.width * 0.5
-			const routePoints = buildRoutePoints(route, typeConfig, config, sampleBase)
-			let distanceAlong = 0
-
-			const samples = routePoints.map((point, index) => {
-				if (index > 0) {
-					const prev = routePoints[index - 1]
-					const dx = point.x - prev.x
-					const dz = point.z - prev.z
-					distanceAlong += Math.sqrt(dx * dx + dz * dz)
-				}
-
-				return {
-					x: point.x,
-					z: point.z,
-					height: point.height,
-					distanceAlong,
-				}
-			})
-
-			return {
-				id: route.id,
-				type: route.type,
-				closed: Boolean(route.closed),
-				halfWidth,
-				visualHalfWidth: route.visualHalfWidth ?? typeConfig.visualHalfWidth ?? halfWidth + edgeFeather,
-				laneOffset: typeConfig.laneOffset ?? 1.2,
-				rutWidth: typeConfig.rutWidth ?? 0.35,
-				samples,
-			}
-		})
-		.filter(Boolean)
+	return createRouteArtifacts(config.routes, config, sampleBase).visualRoutes
 }
 
 const buildSpatialIndex = (segments, cellSize) => {
@@ -489,11 +482,12 @@ export const createSplineCorridorSystem = (config, sampleBase) => {
 		return {
 			evaluate: () => NO_SURFACE,
 			applyToSample: (x, z, baseSample) => ({ ...baseSample, surface: NO_SURFACE }),
+			getRoadVisualRoutes: () => [],
 		}
 	}
 
 	const cellSize = config.spatialCellSize ?? DEFAULT_SPATIAL_CELL_SIZE
-	const segments = createSegments(config.routes, config, sampleBase)
+	const { segments, visualRoutes } = createRouteArtifacts(config.routes, config, sampleBase)
 	const spatialIndex = buildSpatialIndex(segments, cellSize)
 
 	const evaluate = (x, z) => {
@@ -573,6 +567,7 @@ export const createSplineCorridorSystem = (config, sampleBase) => {
 	return {
 		evaluate,
 		applyToSample,
+		getRoadVisualRoutes: () => visualRoutes,
 	}
 }
 

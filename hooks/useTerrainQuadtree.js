@@ -25,16 +25,16 @@ const useTerrainQuadtree = () => {
 		const centerPosition = camera.position
 		const vehiclePos = vehicleState.position
 		const currentTime = clock.getElapsedTime()
+		const isFirstUpdate = lastUpdatePosition.current.x === null
 
 		// Throttle updates more aggressively - update at most every 100ms
 		// This ensures vehicle rendering stays smooth
-		if (currentTime - lastUpdateTime.current < 0.1) {
+		if (!isFirstUpdate && currentTime - lastUpdateTime.current < 0.1) {
 			return
 		}
 
 		// Only update if camera or vehicle moved more than threshold since last update
 		const updateThreshold = QUADTREE_MIN_SIZE
-		const isFirstUpdate = lastUpdatePosition.current.x === null
 
 		// Calculate movement distance only if we have a previous position
 		let cameraMoved = Infinity

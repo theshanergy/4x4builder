@@ -4,6 +4,7 @@ import { CanvasTexture, ClampToEdgeWrapping, LinearFilter, LinearMipmapLinearFil
 
 import TERRAIN_CONFIG from '../config/terrain'
 import { QUADTREE_VIEW_RANGE, QUADTREE_ROOT_SIZE } from '../config/lod'
+import { terrainUsesRoadAttributes } from '../utils/terrain/materialFeatures'
 import { createProceduralRoadTexture } from '../utils/terrain/proceduralRoadTextures'
 
 // Uniform field definitions - maps layer properties to shader uniform names and values
@@ -456,6 +457,7 @@ const useTerrainMaterial = (terrainHelpers) => {
 	const terrainConfig = TERRAIN_CONFIG
 	const TERRAIN_LAYERS = terrainConfig.layers
 	const roadLayer = useMemo(() => getRoadLayer(TERRAIN_LAYERS), [TERRAIN_LAYERS])
+	const useRoadAttributes = useMemo(() => terrainUsesRoadAttributes(TERRAIN_LAYERS), [TERRAIN_LAYERS])
 	const roadProjection = useMemo(() => {
 		const routes = terrainHelpers?.getRoadVisualRoutes?.() ?? []
 		return createRoadProjectionMask(routes, roadLayer)
@@ -528,6 +530,24 @@ const useTerrainMaterial = (terrainHelpers) => {
 	const onBeforeCompile = useMemo(() => {
 		if (!layerTextures) return () => {}
 		return (shader) => {
+			const roadVertexDeclarations = useRoadAttributes
+				? `
+				attribute vec4 roadWeights;
+				attribute vec4 roadParams;
+				varying vec4 vRoadWeights;
+				varying vec4 vRoadParams;`
+				: ''
+			const roadVertexAssignments = useRoadAttributes
+				? `
+				vRoadWeights = roadWeights;
+				vRoadParams = roadParams;`
+				: ''
+			const roadFragmentVaryings = useRoadAttributes
+				? `
+				varying vec4 vRoadWeights;
+				varying vec4 vRoadParams;`
+				: ''
+
 			// Set texture uniforms
 			TERRAIN_LAYERS.forEach((layer, index) => {
 				const prefix = `uLayer${index}`
@@ -555,21 +575,15 @@ const useTerrainMaterial = (terrainHelpers) => {
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <common>',
 				`#include <common>
-				attribute vec4 roadWeights;
-				attribute vec4 roadParams;
 				varying vec3 vWorldPos;
-				varying vec3 vWorldNormal;
-				varying vec4 vRoadWeights;
-				varying vec4 vRoadParams;`
+				varying vec3 vWorldNormal;${roadVertexDeclarations}`
 			)
 
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <worldpos_vertex>',
 				`#include <worldpos_vertex>
 				vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-				vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
-				vRoadWeights = roadWeights;
-				vRoadParams = roadParams;`
+				vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);${roadVertexAssignments}`
 			)
 
 			// Fragment shader - add terrain blending
@@ -586,9 +600,7 @@ const useTerrainMaterial = (terrainHelpers) => {
 
 				// Varyings
 				varying vec3 vWorldPos;
-				varying vec3 vWorldNormal;
-				varying vec4 vRoadWeights;
-				varying vec4 vRoadParams;
+				varying vec3 vWorldNormal;${roadFragmentVaryings}
 
 				// Blend factors for each layer
 				${TERRAIN_LAYERS.map((_, i) => `float layer${i}Blend;`).join('\n				')}
@@ -677,7 +689,7 @@ const useTerrainMaterial = (terrainHelpers) => {
 				gl_FragColor.a *= distanceFade;`
 			)
 		}
-	}, [layerTextures, shaderCode, TERRAIN_LAYERS, fadeStartDistance, fadeEndDistance, roadProjection])
+	}, [layerTextures, shaderCode, TERRAIN_LAYERS, fadeStartDistance, fadeEndDistance, roadProjection, useRoadAttributes])
 
 	// We don't need map/normalMap props since all layers are sampled in custom shader code
 	// But we need a normalMap to trigger USE_NORMALMAP define, so pass the first layer's normal

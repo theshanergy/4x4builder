@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { BufferGeometry, BufferAttribute } from 'three'
 import { TILE_RESOLUTION } from '../config/lod'
+import TERRAIN_CONFIG from '../config/terrain'
 import WATER_CONFIG from '../config/water'
+import { terrainUsesRoadAttributes } from '../utils/terrain/materialFeatures'
 import { writeSurfaceWeights } from '../utils/terrain/splineCorridors'
 
 const SAMPLE_COUNT = TILE_RESOLUTION + 1
@@ -42,6 +44,7 @@ const WATER_NORMALS = (() => {
 })()
 
 const WATER_FLOW_DIRS = new Float32Array(TOTAL_SAMPLES * 2)
+const USE_ROAD_ATTRIBUTES = terrainUsesRoadAttributes(TERRAIN_CONFIG.layers)
 
 /**
  * Create geometry for a quadtree terrain tile.
@@ -68,8 +71,8 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		const positions = new Float32Array(totalSamples * 3)
 		const normals = new Float32Array(totalSamples * 3)
 		const uvs = new Float32Array(totalSamples * 2)
-		const roadWeights = new Float32Array(totalSamples * 4)
-		const roadParams = new Float32Array(totalSamples * 4)
+		const roadWeights = USE_ROAD_ATTRIBUTES ? new Float32Array(totalSamples * 4) : null
+		const roadParams = USE_ROAD_ATTRIBUTES ? new Float32Array(totalSamples * 4) : null
 
 		// Track water depth only for tiles that need water geometry.
 		let depths = null
@@ -150,7 +153,9 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 
 				if (stitchAxis) {
 					height = getStitchedHeight(worldX, worldZ, stitchStep, stitchAxis)
-					sampleInfo = terrainHelpers.sample?.(worldX, worldZ)
+					if (USE_ROAD_ATTRIBUTES) {
+						sampleInfo = terrainHelpers.sample?.(worldX, worldZ)
+					}
 
 					// Snap UVs to coarse neighbor's grid points
 					// Water shader uses UVs for wave calculations
@@ -181,7 +186,9 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 				uvs[uvIndex] = uvWorldX
 				uvs[uvIndex + 1] = uvWorldZ
 
-				writeSurfaceWeights(sampleInfo?.surface, roadWeights, roadParams, vertIndex)
+				if (USE_ROAD_ATTRIBUTES) {
+					writeSurfaceWeights(sampleInfo?.surface, roadWeights, roadParams, vertIndex)
+				}
 
 				// Calculate water depth. Flow defaults to zero; future splines can
 				// populate the water geometry's flowDir attribute without terrain sampling.
@@ -275,8 +282,10 @@ const useTerrainGeometry = (node, terrainHelpers, edgeStitchInfo) => {
 		terrainGeom.setAttribute('position', new BufferAttribute(positions, 3))
 		terrainGeom.setAttribute('normal', new BufferAttribute(normals, 3))
 		terrainGeom.setAttribute('uv', new BufferAttribute(uvs, 2))
-		terrainGeom.setAttribute('roadWeights', new BufferAttribute(roadWeights, 4))
-		terrainGeom.setAttribute('roadParams', new BufferAttribute(roadParams, 4))
+		if (USE_ROAD_ATTRIBUTES) {
+			terrainGeom.setAttribute('roadWeights', new BufferAttribute(roadWeights, 4))
+			terrainGeom.setAttribute('roadParams', new BufferAttribute(roadParams, 4))
+		}
 		terrainGeom.setIndex(new BufferAttribute(TERRAIN_INDICES, 1))
 
 		// Build water geometry if there's water in this tile
