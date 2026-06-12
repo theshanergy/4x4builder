@@ -153,11 +153,14 @@ const createGrassPatchGeometry = (config, patchSize = 0.5, bladeCount = 50) => {
  *
  * @param {Object} options - Configuration options
  * @param {string} options.colorHex - Hex color for grass blades (default: '#c1ad79' for desert)
+ * @param {number} options.bladeHeight - Blade height in meters (default: 0.22)
+ * @param {number} options.bladeCount - Blades per patch (default: 50)
+ * @param {number} options.patchSize - Patch radius in meters (default: 0.5)
  * @returns {{ geometry: BufferGeometry, material: MeshStandardMaterial }}
  */
 export const createGrassMesh = (options = {}) => {
-	const { colorHex = '#c1ad79' } = options
-	const geometry = createGrassPatchGeometry(BLADE_CONFIG)
+	const { colorHex = '#c1ad79', bladeHeight = BLADE_CONFIG.height, bladeCount = 50, patchSize = 0.5 } = options
+	const geometry = createGrassPatchGeometry({ ...BLADE_CONFIG, height: bladeHeight }, patchSize, bladeCount)
 
 	const material = new MeshStandardMaterial({
 		color: new Color(colorHex),

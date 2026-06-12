@@ -35,7 +35,9 @@ const hashString = (value) => {
 	return hash >>> 0
 }
 
-const cellKey = (x, z) => `${x}:${z}`
+// Numeric spatial-index key — avoids per-sample string allocation.
+// 2^17 supports cell coords within ±65k cells (±6,000 km at 96 m cells).
+const cellKey = (x, z) => x * 131072 + z
 
 const estimateControlLength = (points) => {
 	let length = 0
@@ -481,7 +483,10 @@ export const createSplineCorridorSystem = (config, sampleBase) => {
 	if (!config?.enabled || !config.routes?.length) {
 		return {
 			evaluate: () => NO_SURFACE,
-			applyToSample: (x, z, baseSample) => ({ ...baseSample, surface: NO_SURFACE }),
+			applyToSample: (x, z, baseSample) => {
+				baseSample.surface = NO_SURFACE
+				return baseSample
+			},
 			getRoadVisualRoutes: () => [],
 		}
 	}
@@ -548,20 +553,17 @@ export const createSplineCorridorSystem = (config, sampleBase) => {
 		return bestSurface
 	}
 
+	// Mutates and returns baseSample (callers own the freshly created sample;
+	// avoiding the per-sample object spread measurably reduces GC pressure).
 	const applyToSample = (x, z, baseSample) => {
 		const surface = evaluate(x, z)
-		if (surface === NO_SURFACE) {
-			return { ...baseSample, surface }
+		baseSample.surface = surface
+		if (surface !== NO_SURFACE) {
+			const targetDelta = clamp(surface.targetHeight - baseSample.height, -surface.maxCut, surface.maxFill)
+			baseSample.height = baseSample.height + targetDelta * surface.heightInfluence
 		}
 
-		const targetDelta = clamp(surface.targetHeight - baseSample.height, -surface.maxCut, surface.maxFill)
-		const height = baseSample.height + targetDelta * surface.heightInfluence
-
-		return {
-			...baseSample,
-			height,
-			surface,
-		}
+		return baseSample
 	}
 
 	return {

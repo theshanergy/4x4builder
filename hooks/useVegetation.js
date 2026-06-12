@@ -51,28 +51,31 @@ const useVegetation = () => {
 		const vegetationModels = VEGETATION_CONFIG.map((type) => {
 			const lods = {}
 
-			// Handle meshFactory-based vegetation (e.g., procedural grass)
+			// Handle meshFactory-based vegetation (procedural grass, trees, etc.)
+			// Factories return either { geometry, material } (used for all LODs)
+			// or { lods: { 0: { geometry, material }, 2: {...} } } with sparse LOD
+			// keys that carry forward to the next defined level.
 			if (type.meshFactory) {
-				// Call the factory function to get geometry and material
-				const { geometry, material } = type.meshFactory()
+				const factoryResult = type.meshFactory()
+				const factoryLods = factoryResult.lods ?? { 0: factoryResult }
 
-				if (!geometry || !material) {
+				if (!factoryLods[0]?.geometry || !factoryLods[0]?.material) {
 					console.warn(`[useVegetation] meshFactory for ${type.name} did not return geometry/material`)
 					return null
 				}
 
-				// Use the same mesh for all LOD levels (can be optimized later)
-				const meshData = [
-					{
-						geometry,
-						material,
-						transform: new Matrix4(), // Identity matrix
-					},
-				]
-
-				// Populate all LOD levels with the same mesh
+				let currentMeshData = null
 				for (let i = 0; i <= 3; i++) {
-					lods[i] = meshData
+					const lodEntry = factoryLods[i]
+					if (lodEntry) {
+						currentMeshData = [
+							{
+								geometry: lodEntry.geometry,
+								material: lodEntry.material,
+							},
+						]
+					}
+					lods[i] = currentMeshData
 				}
 
 				return {
@@ -157,15 +160,16 @@ const useVegetation = () => {
 							}
 						}
 
-						// Bake the mesh's local transform into a matrix
-						// This captures the mesh's position, rotation, and scale relative to its parent
+						// Bake the mesh's local transform (position/rotation/scale from
+						// the GLTF) directly into the cloned geometry, so instancing can
+						// use raw placement matrices without per-instance composition.
 						const meshTransform = new Matrix4()
 						meshTransform.compose(child.position, child.quaternion, child.scale)
+						geometry.applyMatrix4(meshTransform)
 
 						meshes.push({
 							geometry: geometry,
 							material: child.material,
-							transform: meshTransform,
 						})
 					}
 				})

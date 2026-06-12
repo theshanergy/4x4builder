@@ -1,87 +1,26 @@
-// Terrain Height Sampler — Phacelle-noise erosion (CPU port of the shader in
-// docs/advanced-terrain-erosion.html). Drives both the visual mesh and the
-// physics heightfield.
+// Terrain Height Sampler — climate-driven infinite biome terrain.
+//
+// Pipeline per sample (all deterministic from TERRAIN_CONFIG.seed, all with
+// analytic derivatives so normals/physics/vegetation agree exactly):
+//   1. Climate fields (continentalness / moisture / mountainness) — see climate.js
+//   2. Base elevation spline over continentalness (ocean floor → shore → inland)
+//   3. Rolling-hills fractal noise (faded out across the shoreline)
+//   4. Ridged-fractal mountains, gated to inland high-mountainness regions
+//   5. Phacelle-noise erosion over the combined surface (gullies follow the
+//      real slope, so mountains erode like mountains), suppressed near
+//      shorelines and skipped entirely underwater
+//   6. Spawn flattening and spline road corridors
+//
+// Drives the visual mesh, the physics heightfields, material climate
+// attributes, and vegetation placement.
 
 import { Vector3 } from 'three'
 
 import TERRAIN_CONFIG from '../../config/terrain'
 import WATER_CONFIG from '../../config/water'
+import { createNoise, fractalNoise, ridgedFractalNoise, smoothstepD } from './noise'
+import { createClimateSampler, evaluateElevationSpline } from './climate'
 import { createSplineCorridorSystem } from './splineCorridors'
-
-// -------------------------------------------------------------------------
-// Hash / gradient noise (port of shader `hash` + `noised`). Returns
-// (value, dvalue/dx, dvalue/dy) in [-1,1]. Deterministic from seed via a
-// per-instance offset baked into the hash.
-// -------------------------------------------------------------------------
-const createNoise = (seed) => {
-	// Seed acts as a 2D offset applied before hashing so the noise is stable
-	// across runs but varies with TERRAIN_CONFIG.seed.
-	const seedA = Math.sin(seed * 12.9898) * 43758.5453
-	const seedB = Math.sin(seed * 78.233) * 43758.5453
-	const seedOffX = seedA - Math.floor(seedA)
-	const seedOffY = seedB - Math.floor(seedB)
-
-	// shader's hash returns a vec2 in [-1, 1]
-	const hash = (ix, iy, out) => {
-		const kx = 0.3183099
-		const ky = 0.3678794
-		// x = x * k + k.yx
-		let x = (ix + seedOffX) * kx + ky
-		let y = (iy + seedOffY) * ky + kx
-		// fract(x.x * x.y * (x.x + x.y))
-		let s = x * y * (x + y)
-		s = s - Math.floor(s)
-		// 16 * k * fract(...)
-		const fx = 16 * kx * s
-		const fy = 16 * ky * s
-		// fract again, map to [-1,1]
-		out.x = -1 + 2 * (fx - Math.floor(fx))
-		out.y = -1 + 2 * (fy - Math.floor(fy))
-	}
-
-	// scratch gradients reused per noised() call
-	const ga = { x: 0, y: 0 }
-	const gb = { x: 0, y: 0 }
-	const gc = { x: 0, y: 0 }
-	const gd = { x: 0, y: 0 }
-
-	// out: [value, dvalue/dx, dvalue/dy]
-	const noised = (x, y, out) => {
-		const ix = Math.floor(x)
-		const iy = Math.floor(y)
-		const fx = x - ix
-		const fy = y - iy
-
-		// quintic smoothstep and its derivative
-		const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10)
-		const uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10)
-		const dux = 30 * fx * fx * (fx * (fx - 2) + 1)
-		const duy = 30 * fy * fy * (fy * (fy - 2) + 1)
-
-		hash(ix, iy, ga)
-		hash(ix + 1, iy, gb)
-		hash(ix, iy + 1, gc)
-		hash(ix + 1, iy + 1, gd)
-
-		// dot products of gradients with corner-relative positions
-		const va = ga.x * fx + ga.y * fy
-		const vb = gb.x * (fx - 1) + gb.y * fy
-		const vc = gc.x * fx + gc.y * (fy - 1)
-		const vd = gd.x * (fx - 1) + gd.y * (fy - 1)
-
-		const value = va + ux * (vb - va) + uy * (vc - va) + ux * uy * (va - vb - vc + vd)
-
-		// analytic derivatives (matches shader's noised())
-		const dx = ga.x + ux * (gb.x - ga.x) + uy * (gc.x - ga.x) + ux * uy * (ga.x - gb.x - gc.x + gd.x) + dux * (uy * (va - vb - vc + vd) + (vb - va))
-		const dy = ga.y + ux * (gb.y - ga.y) + uy * (gc.y - ga.y) + ux * uy * (ga.y - gb.y - gc.y + gd.y) + duy * (ux * (va - vb - vc + vd) + (vc - va))
-
-		out[0] = value
-		out[1] = dx
-		out[2] = dy
-	}
-
-	return { noised }
-}
 
 // -------------------------------------------------------------------------
 // Phacelle noise (port of shader `PhacelleNoise`). Returns four scalars:
@@ -90,6 +29,11 @@ const createNoise = (seed) => {
 // perpendicular-to-slope direction used to drive gully orientation.
 // -------------------------------------------------------------------------
 const TAU = Math.PI * 2
+
+// exp(-d²·2) ≤ 0.01111 ⟺ d² ≥ ln(1/0.01111)/2 — beyond this the clamped
+// phacelle cell weight is exactly 0, so cos/sin/exp can be skipped with no
+// change in output. Roughly half the 4×4 cells qualify.
+const ZERO_WEIGHT_DIST_SQ = Math.log(1 / 0.01111) / 2
 
 const phacelleNoise = (noise, px, py, normDirX, normDirY, freq, offset, normalization, out, tmpHash) => {
 	// sideDir = normDir.yx * vec2(-1,1) * freq * TAU
@@ -108,15 +52,15 @@ const phacelleNoise = (noise, px, py, normDirX, normDirY, freq, offset, normaliz
 
 	for (let i = -1; i <= 2; i++) {
 		for (let j = -1; j <= 2; j++) {
-			// random point offset within the cell [0, 0.5]
-			// shader uses hash(gridPoint) * 0.5 — hash returns [-1,1],
-			// so this is actually in [-0.5, 0.5]. Match shader behaviour exactly.
+			// random point offset within the cell — hash returns [-1,1], so this
+			// is in [-0.5, 0.5]. Matches shader behaviour exactly.
 			noise.hashRaw(pIntX + i, pIntY + j, tmpHash)
 			const randOffX = tmpHash.x * 0.5
 			const randOffY = tmpHash.y * 0.5
 			const vx = pFracX - i - randOffX
 			const vy = pFracY - j - randOffY
 			const sqrDist = vx * vx + vy * vy
+			if (sqrDist >= ZERO_WEIGHT_DIST_SQ) continue
 			let weight = Math.exp(-sqrDist * 2)
 			weight = weight - 0.01111
 			if (weight < 0) weight = 0
@@ -143,6 +87,7 @@ const phacelleNoise = (noise, px, py, normDirX, normDirY, freq, offset, normaliz
 // Helpers — direct ports of GLSL functions
 // -------------------------------------------------------------------------
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x)
+const clamp = (x, lo, hi) => (x < lo ? lo : x > hi ? hi : x)
 const easeOut = (t) => {
 	const v = 1 - clamp01(t)
 	return 1 - v * v
@@ -159,35 +104,13 @@ const smoothstepF = (edge0, edge1, x) => {
 }
 
 // -------------------------------------------------------------------------
-// Fractal noise (port of shader `FractalNoise`). Accumulates (value, dx, dy)
-// with proper frequency scaling of the derivatives (× freq per octave).
-// -------------------------------------------------------------------------
-const fractalNoise = (noise, px, py, freq, octaves, lacunarity, gain, outND, tmpND) => {
-	let nv = 0
-	let nvx = 0
-	let nvy = 0
-	let nf = freq
-	let na = 1
-	for (let i = 0; i < octaves; i++) {
-		noise.noised(px * nf, py * nf, tmpND)
-		nv += tmpND[0] * na
-		nvx += tmpND[1] * na * nf
-		nvy += tmpND[2] * na * nf
-		na *= gain
-		nf *= lacunarity
-	}
-	outND[0] = nv
-	outND[1] = nvx
-	outND[2] = nvy
-}
-
-// -------------------------------------------------------------------------
 // Erosion filter (port of shader `ErosionFilter`). Mutates an in/out
 // heightAndSlope vec3 and returns { dHeight, dSlopeX, dSlopeY, magnitude,
-// ridgeMap }. Strength is pre-scaled.
+// ridgeMap }. `strengthMult` scales the whole filter so biomes can dial
+// erosion up (mountains) or down (shorelines) smoothly.
 // -------------------------------------------------------------------------
-const erosionFilter = (noise, px, py, hIn, sxIn, syIn, fadeTargetIn, cfg, out, tmpPhac, tmpHash) => {
-	let strength = cfg.strength * cfg.scale
+const erosionFilter = (noise, px, py, hIn, sxIn, syIn, fadeTargetIn, cfg, strengthMult, octaves, out, tmpPhac, tmpHash) => {
+	let strength = cfg.strength * cfg.scale * strengthMult
 	let fadeTarget = fadeTargetIn < -1 ? -1 : fadeTargetIn > 1 ? 1 : fadeTargetIn
 	let h = hIn
 	let sx = sxIn
@@ -211,7 +134,7 @@ const erosionFilter = (noise, px, py, hIn, sxIn, syIn, fadeTargetIn, cfg, out, t
 	let gullySx = mix(sx, normSx * cfg.assumedSlopeValue, cfg.assumedSlopeAmount)
 	let gullySy = mix(sy, normSy * cfg.assumedSlopeValue, cfg.assumedSlopeAmount)
 
-	for (let i = 0; i < cfg.octaves; i++) {
+	for (let i = 0; i < octaves; i++) {
 		// Normalize gullySlope for the phacelle orientation
 		let glen = Math.sqrt(gullySx * gullySx + gullySy * gullySy)
 		let ndx, ndy
@@ -278,14 +201,49 @@ const erosionFilter = (noise, px, py, hIn, sxIn, syIn, fadeTargetIn, cfg, out, t
 // -------------------------------------------------------------------------
 // Sample cache — a small LRU keyed by quantized (x,z). getHeight / getNormal /
 // isWater all hit this, sharing the ~80 noise evaluations per sample.
+//
+// Keys are packed numerically (string keys cost ~0.4µs/lookup in allocation
+// and hashing). Coordinates quantize to 1/64 m — all terrain grids are
+// multiples of 2 m so grid samples are exact, and 1.5 cm of positional
+// quantization is invisible for free-position queries (vegetation, tire
+// tracks, buoyancy) on terrain with slope ≤ ~1.5.
 // -------------------------------------------------------------------------
-const CACHE_QUANT = 0.001 // sub-millimeter — effectively exact for fp32 grids
+const CACHE_QUANT_MULT = 64 // 1/64 m
+const KEY_SCALE = 134217728 // 2^27 — collision-free for |coord| < ~1,000 km
+const MAX_CACHED_COORD = 1000000
 const CACHE_LIMIT = 32768
-const cacheKey = (x, z) => {
-	// Pack quantized coords into a string key. Integer mult keeps numeric.
-	const qx = Math.round(x / CACHE_QUANT)
-	const qz = Math.round(z / CACHE_QUANT)
-	return qx + ':' + qz
+const cacheKey = (x, z) => Math.round(x * CACHE_QUANT_MULT) * KEY_SCALE + Math.round(z * CACHE_QUANT_MULT)
+
+// -------------------------------------------------------------------------
+// LOD bands — geometric band-limiting of the noise stack.
+//
+// A tile whose vertices are `step` meters apart cannot represent features
+// with wavelength < 2·step (Nyquist); evaluating those octaves just samples
+// aliased noise. Each band drops octaves whose wavelength falls below
+// BAND_CUTOFF_K · step. Band 0 (step ≤ 2 m: physics tiles, gameplay queries,
+// vegetation placement) always evaluates the full stack, so collisions and
+// close-up visuals are bit-exact.
+//
+// Steps are powers of two (tileSize / TILE_RESOLUTION), so the band index is
+// just log2(step / 2).
+// -------------------------------------------------------------------------
+const BAND_CUTOFF_K = 1.5
+const MAX_BAND = 7
+export const bandForStep = (step) => {
+	if (!step || step <= 2) return 0
+	const band = Math.round(Math.log2(step / 2))
+	return band < 0 ? 0 : band > MAX_BAND ? MAX_BAND : band
+}
+
+// Number of leading octaves whose wavelength stays ≥ the cutoff.
+const octavesAboveCutoff = (baseWavelength, octaves, lacunarity, cutoff) => {
+	let kept = 0
+	let wavelength = baseWavelength
+	while (kept < octaves && wavelength >= cutoff) {
+		kept++
+		wavelength /= lacunarity
+	}
+	return kept
 }
 
 // -------------------------------------------------------------------------
@@ -293,128 +251,162 @@ const cacheKey = (x, z) => {
 // -------------------------------------------------------------------------
 export const createTerrainHelpers = () => {
 	const seed = TERRAIN_CONFIG.seed
-	const baseNoise = createNoise(seed)
-
-	// Seed offsets baked into the hash, matching createNoise().
-	const seedA = Math.sin(seed * 12.9898) * 43758.5453
-	const seedB = Math.sin(seed * 78.233) * 43758.5453
-	const seedOffX = seedA - Math.floor(seedA)
-	const seedOffY = seedB - Math.floor(seedB)
-
-	// Raw hash for phacelleNoise (needs the unsmoothed hash, not noised()).
-	const hashRaw = (ix, iy, out) => {
-		const kx = 0.3183099
-		const ky = 0.3678794
-		let x = (ix + seedOffX) * kx + ky
-		let y = (iy + seedOffY) * ky + kx
-		let s = x * y * (x + y)
-		s = s - Math.floor(s)
-		const fx = 16 * kx * s
-		const fy = 16 * ky * s
-		out.x = -1 + 2 * (fx - Math.floor(fx))
-		out.y = -1 + 2 * (fy - Math.floor(fy))
-	}
-
-	const noise = {
-		noised: baseNoise.noised,
-		hashRaw,
-	}
-
-	const { worldScale, heightScale, heightOrigin, spawnRadius, ocean } = TERRAIN_CONFIG
-	const cfg = TERRAIN_CONFIG.erosion
+	const { worldScale, heightScale, spawnRadius } = TERRAIN_CONFIG
+	const erosionCfg = TERRAIN_CONFIG.erosion
+	const hillsCfg = TERRAIN_CONFIG.hills
+	const mountainsCfg = TERRAIN_CONFIG.mountains
+	const splinePoints = TERRAIN_CONFIG.elevationSpline
 	const spawnRadiusSq = spawnRadius * spawnRadius
-	const oceanRadiusSq = ocean.radius * ocean.radius
-	const oceanTransitionStart = ocean.radius - ocean.transition
-	const oceanTransitionStartSq = oceanTransitionStart * oceanTransitionStart
-	const oceanFloorHeight = WATER_CONFIG.level - ocean.depth
-	const oceanMidpointHeight = oceanFloorHeight * ocean.beachMidpointDepth
+
+	const erosionNoise = createNoise(seed)
+	const hillsNoise = createNoise(seed * 1.61 + 7.07)
+	const mountainsNoise = createNoise(seed * 5.21 + 91.91)
+	const climateSampler = createClimateSampler(seed, TERRAIN_CONFIG.climate, worldScale)
+
+	// Per-band octave counts (geometric band-limiting). Climate fields are so
+	// low-frequency that every band keeps all their octaves — they are left
+	// unbanded so biome values stay identical across LODs.
+	const bandTables = []
+	for (let band = 0; band <= MAX_BAND; band++) {
+		const step = 2 * 2 ** band
+		const cutoff = BAND_CUTOFF_K * step
+		bandTables.push({
+			hillsOctaves: octavesAboveCutoff(worldScale / hillsCfg.frequency, hillsCfg.octaves, hillsCfg.lacunarity, cutoff),
+			mountainOctaves: octavesAboveCutoff(worldScale / mountainsCfg.frequency, mountainsCfg.octaves, mountainsCfg.lacunarity, cutoff),
+			erosionOctaves: octavesAboveCutoff(erosionCfg.scale * erosionCfg.cellScale * worldScale, erosionCfg.octaves, erosionCfg.lacunarity, cutoff),
+		})
+	}
 
 	// Scratch buffers
 	const tmpND = [0, 0, 0]
 	const tmpND2 = [0, 0, 0]
 	const tmpPhac = [0, 0, 0, 0]
 	const tmpHash = { x: 0, y: 0 }
+	const splineOut = [0, 0]
+	const ssShore = [0, 0]
+	const ssGateC = [0, 0]
+	const ssGateP = [0, 0]
+	const ssHillFade = [0, 0]
+	const climScratch = { c: 0, dcx: 0, dcz: 0, m: 0, p: 0, dpx: 0, dpz: 0 }
 	const erosionOut = { dHeight: 0, dSlopeX: 0, dSlopeY: 0, magnitude: 0, ridgeMap: 0, fadeTarget: 0 }
 
-	// LRU cache (Map preserves insertion order)
-	const cache = new Map()
-	const cacheResult = (key, result) => {
-		cache.set(key, result)
-		if (cache.size > CACHE_LIMIT) {
-			// Evict oldest entry (Map iteration order is insertion order)
-			const firstKey = cache.keys().next().value
-			cache.delete(firstKey)
-		}
-		return result
-	}
-
-	// Raw sample in shader-normalized space. Returns full info for this (x,z).
-	const sampleRaw = (px, py) => {
-		// === Base fractal noise (eroded-surface seed) ===
-		fractalNoise(noise, px, py, TERRAIN_CONFIG.heightFrequency, TERRAIN_CONFIG.heightOctaves, TERRAIN_CONFIG.heightLacunarity, TERRAIN_CONFIG.heightGain, tmpND, tmpND2)
-		// n *= HEIGHT_AMP; shader scales value and derivs by heightAmp
-		const h0 = tmpND[0] * TERRAIN_CONFIG.heightAmp
-		const sx0 = tmpND[1] * TERRAIN_CONFIG.heightAmp
-		const sy0 = tmpND[2] * TERRAIN_CONFIG.heightAmp
-
-		// shader: fadeTarget = clamp(n.x / (HEIGHT_AMP * 0.6), -1, 1)
-		const fadeTarget = Math.max(-1, Math.min(1, h0 / (TERRAIN_CONFIG.heightAmp * 0.6)))
-		// shader: n = n * 0.5 + vec3(0.5, 0, 0)
-		const h1 = h0 * 0.5 + 0.5
-		const sx1 = sx0 * 0.5
-		const sy1 = sy0 * 0.5
-
-		// === Erosion ===
-		erosionFilter(noise, px, py, h1, sx1, sy1, fadeTarget, cfg, erosionOut, tmpPhac, tmpHash)
-
-		// shader: offset = mix(heightOffset, -fadeTarget, heightOffsetPreserve) * magnitude
-		const offset = mix(cfg.heightOffset, -fadeTarget, cfg.heightOffsetPreserve) * erosionOut.magnitude
-		const eroded = h1 + erosionOut.dHeight + offset
-		const slopeX = sx1 + erosionOut.dSlopeX
-		const slopeY = sy1 + erosionOut.dSlopeY
-
-		return {
-			height: eroded,
-			slopeX,
-			slopeY,
-			ridgeMap: erosionOut.ridgeMap,
-			erosion: erosionOut.dHeight / (erosionOut.magnitude || 1),
-			magnitude: erosionOut.magnitude,
-		}
+	// LRU caches (Map preserves insertion order), one per LOD band so banded
+	// samples never pollute the exact band-0 results.
+	const bandCaches = []
+	const bandCacheLimits = []
+	for (let band = 0; band <= MAX_BAND; band++) {
+		bandCaches.push(new Map())
+		bandCacheLimits.push(band === 0 ? CACHE_LIMIT : 8192)
 	}
 
 	// Base terrain sample in world space before spline corridor deformation.
-	// Returns all derived quantities; road/rivers are applied in sample().
-	const sampleBase = (x, z) => {
-		const distSq = x * x + z * z
-		if (distSq >= oceanRadiusSq) {
-			return {
-				height: oceanFloorHeight,
-				slopeX: 0,
-				slopeZ: 0,
-				ridgeMap: 1,
-				erosion: 0,
+	// Heights in meters; slopes are accumulated in meters-per-shader-unit and
+	// converted to world (m/m) at the end.
+	const sampleBase = (x, z, bandTable) => {
+		const px = x / worldScale
+		const py = z / worldScale
+
+		const clim = climateSampler.sample(x, z, climScratch)
+
+		// === 1. Base elevation spline over continentalness ===
+		evaluateElevationSpline(splinePoints, clim.c, splineOut)
+		let hM = splineOut[0]
+		let sxS = splineOut[1] * clim.dcx
+		let szS = splineOut[1] * clim.dcz
+
+		// === 2. Rolling hills — faded down across the shoreline so beaches
+		// and the sea floor stay calm ===
+		smoothstepD(hillsCfg.oceanFade[0], hillsCfg.oceanFade[1], clim.c, ssHillFade)
+		const hillScale = mix(hillsCfg.oceanFloorScale, 1, ssHillFade[0])
+		if (bandTable.hillsOctaves > 0) {
+			fractalNoise(hillsNoise, px, py, hillsCfg.frequency, bandTable.hillsOctaves, hillsCfg.lacunarity, hillsCfg.gain, tmpND, tmpND2)
+		} else {
+			tmpND[0] = 0
+			tmpND[1] = 0
+			tmpND[2] = 0
+		}
+		const hillH = tmpND[0] * hillsCfg.amplitude
+		const dHillScale = (1 - hillsCfg.oceanFloorScale) * ssHillFade[1]
+		hM += hillH * hillScale
+		sxS += tmpND[1] * hillsCfg.amplitude * hillScale + hillH * dHillScale * clim.dcx
+		szS += tmpND[2] * hillsCfg.amplitude * hillScale + hillH * dHillScale * clim.dcz
+
+		// fadeTarget steers erosion crease/ridge rounding (legacy behaviour:
+		// driven by the local large-scale relief)
+		let fadeTarget = clamp(hillH / (hillsCfg.amplitude * 0.6), -1, 1)
+
+		// === 3. Ridged mountains — only inland (continental gate) and only in
+		// high-mountainness regions (peaks gate) ===
+		let mountainRelief = 0
+		let mountainGate = 0
+		smoothstepD(mountainsCfg.continentalGate[0], mountainsCfg.continentalGate[1], clim.c, ssGateC)
+		if (ssGateC[0] > 0 && bandTable.mountainOctaves > 0) {
+			smoothstepD(mountainsCfg.peaksGate[0], mountainsCfg.peaksGate[1], clim.p, ssGateP)
+			if (ssGateP[0] > 0) {
+				ridgedFractalNoise(
+					mountainsNoise,
+					px,
+					py,
+					mountainsCfg.frequency,
+					bandTable.mountainOctaves,
+					mountainsCfg.lacunarity,
+					mountainsCfg.gain,
+					tmpND,
+					tmpND2,
+					mountainsCfg.octaves
+				)
+				// Sharpen: square the ridge profile so valleys widen and crests steepen
+				let r = tmpND[0]
+				let drx = 2 * r * tmpND[1]
+				let drz = 2 * r * tmpND[2]
+				r = r * r
+
+				const w = ssGateC[0] * ssGateP[0]
+				const dwx = ssGateC[1] * clim.dcx * ssGateP[0] + ssGateC[0] * ssGateP[1] * clim.dpx
+				const dwz = ssGateC[1] * clim.dcz * ssGateP[0] + ssGateC[0] * ssGateP[1] * clim.dpz
+
+				hM += r * mountainsCfg.amplitude * w
+				sxS += mountainsCfg.amplitude * (drx * w + r * dwx)
+				szS += mountainsCfg.amplitude * (drz * w + r * dwz)
+
+				mountainGate = w
+				mountainRelief = r * w
+				fadeTarget = clamp(fadeTarget + (r * 2 - 1) * w, -1, 1)
 			}
 		}
 
-		const px = x / worldScale
-		const py = z / worldScale
-		const raw = sampleRaw(px, py)
+		// === 4. Erosion — full strength inland, boosted in mountains, faded
+		// out across the beach band and skipped underwater (the sea hides it,
+		// and skipping makes ocean tiles ~5x cheaper) ===
+		smoothstepD(erosionCfg.shoreFade[0], erosionCfg.shoreFade[1], hM, ssShore)
+		const erosionMult = ssShore[0] * (1 + (erosionCfg.mountainBoost - 1) * mountainGate)
 
-		// Map shader-height [0,1] to world meters.
-		// worldHeight = (shaderHeight - heightOrigin) * heightScale
-		let worldHeight = (raw.height - heightOrigin) * heightScale
+		let ridgeMap = 1
+		let erosionVal = 0
+		if (erosionMult > 0.02 && bandTable.erosionOctaves > 0) {
+			const invHeightScale = 1 / heightScale
+			const hN = hM * invHeightScale
+			const sxN = sxS * invHeightScale
+			const szN = szS * invHeightScale
 
-		// Slope in world space: dHeight/dx_world = dHeight_shader/dp * (1/worldScale) * heightScale
-		const slopeScale = heightScale / worldScale
-		let worldSlopeX = raw.slopeX * slopeScale
-		let worldSlopeZ = raw.slopeY * slopeScale
+			erosionFilter(erosionNoise, px, py, hN, sxN, szN, fadeTarget, erosionCfg, erosionMult, bandTable.erosionOctaves, erosionOut, tmpPhac, tmpHash)
 
-		// Spawn flatten — blend world height toward 0 near origin.
-		// Also smooth the ridgemap so debug samples stay coherent.
-		let ridgeMap = raw.ridgeMap
-		if (distSq < spawnRadiusSq) {
-			const dist = Math.sqrt(distSq)
+			const offset = mix(erosionCfg.heightOffset, -erosionOut.fadeTarget, erosionCfg.heightOffsetPreserve) * erosionOut.magnitude
+			hM = (hN + erosionOut.dHeight + offset) * heightScale
+			sxS = (sxN + erosionOut.dSlopeX) * heightScale
+			szS = (szN + erosionOut.dSlopeY) * heightScale
+			ridgeMap = erosionOut.ridgeMap
+			erosionVal = erosionOut.dHeight / (erosionOut.magnitude || 1)
+		}
+
+		// Convert slopes from meters-per-shader-unit to world m/m
+		let worldHeight = hM
+		let worldSlopeX = sxS / worldScale
+		let worldSlopeZ = szS / worldScale
+
+		// === 5. Spawn flatten — blend world height toward 0 near origin ===
+		if (x * x + z * z < spawnRadiusSq) {
+			const dist = Math.sqrt(x * x + z * z)
 			const t = dist / spawnRadius
 			const blend = t * t * (3 - 2 * t)
 			worldHeight *= blend
@@ -424,63 +416,55 @@ export const createTerrainHelpers = () => {
 			ridgeMap = mix(1, ridgeMap, blend)
 		}
 
-		// Ocean falloff — terrain tapers into the ocean beyond oceanRadius.
-		// Mirrors the beach profile from the original Terrain component.
-		if (distSq > oceanTransitionStartSq) {
-			const dist = Math.sqrt(distSq)
-			const t = (dist - oceanTransitionStart) / ocean.transition // 0 at shore, 1 at ocean
-			const bezierT = t * t * (3 - 2 * t) // smoothstep
-
-			// Two-stage beach profile: gentle slope then steeper drop-off
-			let beachHeight
-			if (t < 0.5) {
-				const localT = t * 2
-				beachHeight = worldHeight * (1 - localT) + oceanMidpointHeight * localT
-			} else {
-				const localT = (t - 0.5) * 2
-				const dropCurve = localT * localT // Quadratic — steeper descent
-				beachHeight = oceanMidpointHeight * (1 - dropCurve) + oceanFloorHeight * dropCurve
-			}
-
-			// Suppress terrain noise as we enter the water
-			const noiseSuppression = (1 - bezierT) * (1 - bezierT) * (1 - bezierT)
-			worldHeight = worldHeight * noiseSuppression + beachHeight * (1 - noiseSuppression)
-			worldSlopeX *= noiseSuppression
-			worldSlopeZ *= noiseSuppression
-			ridgeMap = mix(ridgeMap, 1, bezierT)
-		}
-
 		return {
 			height: worldHeight,
 			slopeX: worldSlopeX,
 			slopeZ: worldSlopeZ,
 			ridgeMap,
-			erosion: raw.erosion,
+			erosion: erosionVal,
+			climate: {
+				continental: clim.c,
+				moisture: clim.m,
+				mountain: mountainRelief,
+			},
+			// Filled in by splineCorridors.applyToSample — declared here so the
+			// object keeps a stable hidden class (no shape transition on assign).
+			surface: null,
 		}
 	}
 
-	const splineCorridors = createSplineCorridorSystem(TERRAIN_CONFIG.roads, sampleBase)
+	// Road routing always samples the exact (band 0) terrain.
+	const splineCorridors = createSplineCorridorSystem(TERRAIN_CONFIG.roads, (x, z) => sampleBase(x, z, bandTables[0]))
 	const roadVisualRoutes = splineCorridors.getRoadVisualRoutes()
 
-	// Full sample in world space. Caches the shader-space sample and applies
-	// the world-space height remap, spawn/ocean shaping, and spline corridors.
+	const roadConfig = TERRAIN_CONFIG.roads
+	const spawnSafeRadius = roadConfig?.spawnSafeRadius ?? 0
+	const spawnSafeTransition = roadConfig?.spawnSafeTransition ?? 0
+	const spawnSafeEnd = spawnSafeRadius + spawnSafeTransition
+
+	// Full sample in world space. Caches the climate + height sample and
+	// applies spline corridors and the road spawn-safe flatten.
 	// Returns all derived quantities — callers pick what they need.
-	const sample = (x, z) => {
-		const key = cacheKey(x, z)
-		const cached = cache.get(key)
-		if (cached !== undefined) {
-			// LRU touch — re-insert
-			cache.delete(key)
-			cache.set(key, cached)
-			return cached
+	//
+	// `step` (optional) is the caller's sample spacing in meters; coarse steps
+	// evaluate a band-limited (cheaper) noise stack. Omit it (band 0) for
+	// anything gameplay-visible up close: physics, vegetation placement,
+	// object snapping.
+	const sample = (x, z, step = 0) => {
+		const band = step > 2 ? bandForStep(step) : 0
+		const cache = bandCaches[band]
+		const cacheable = x < MAX_CACHED_COORD && x > -MAX_CACHED_COORD && z < MAX_CACHED_COORD && z > -MAX_CACHED_COORD
+		const key = cacheable ? cacheKey(x, z) : 0
+		if (cacheable) {
+			const cached = cache.get(key)
+			// FIFO eviction (no LRU touch): the delete+set reorder costs more than
+			// the occasional recompute it saves — capacity (32k) dwarfs any
+			// per-frame working set, so hot entries effectively never evict.
+			if (cached !== undefined) return cached
 		}
 
-		const base = sampleBase(x, z)
-		const result = splineCorridors.applyToSample(x, z, base)
-		const roadConfig = TERRAIN_CONFIG.roads
-		const spawnSafeRadius = roadConfig?.spawnSafeRadius ?? 0
-		const spawnSafeTransition = roadConfig?.spawnSafeTransition ?? 0
-		const spawnSafeEnd = spawnSafeRadius + spawnSafeTransition
+		// applyToSample mutates and returns the (freshly allocated) base sample.
+		const result = splineCorridors.applyToSample(x, z, sampleBase(x, z, bandTables[band]))
 
 		if (result.height > 0 && spawnSafeEnd > 0) {
 			const distSq = x * x + z * z
@@ -491,10 +475,18 @@ export const createTerrainHelpers = () => {
 			}
 		}
 
-		return cacheResult(key, result)
+		if (cacheable) {
+			cache.set(key, result)
+			if (cache.size > bandCacheLimits[band]) {
+				// Evict oldest entry (Map iteration order is insertion order)
+				cache.delete(cache.keys().next().value)
+			}
+		}
+		return result
 	}
 
-	const getHeight = (x, z) => sample(x, z).height
+	const getHeight = (x, z, step = 0) => sample(x, z, step).height
+	const getClimate = (x, z) => sample(x, z).climate
 
 	const getNormal = (x, z, target = new Vector3()) => {
 		const s = sample(x, z)
@@ -526,6 +518,7 @@ export const createTerrainHelpers = () => {
 		getHeight,
 		getNormal,
 		getSurface,
+		getClimate,
 		isWater,
 		getRoadVisualRoutes: () => roadVisualRoutes,
 		// Exposed for debugging / future shader-side use.

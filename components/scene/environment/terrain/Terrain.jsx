@@ -1,19 +1,21 @@
 import { useMemo, useEffect } from 'react'
 
 import { createTerrainHelpers } from '../../../../utils/terrain/heightSampler'
-import useTerrainQuadtree from '../../../../hooks/useTerrainQuadtree'
+import useTerrainTiles from '../../../../hooks/useTerrainTiles'
 import useWaterMaterial from '../../../../hooks/useWaterMaterial'
 import useTerrainMaterial from '../../../../hooks/useTerrainMaterial'
 import useVegetation from '../../../../hooks/useVegetation'
 import useGameStore from '../../../../store/gameStore'
 import TerrainTile from './TerrainTile'
+import VegetationSystem from './VegetationSystem'
 
 // Main terrain component
 const Terrain = () => {
-	// Use quadtree LOD system
-	const leafTiles = useTerrainQuadtree()
+	// Quadtree LOD streaming — tile geometry is generated in the worker pool
+	const renderTiles = useTerrainTiles()
 
-	// Create shared terrain helpers (height/normal/ridgemap sampling)
+	// Shared terrain helpers (height/normal sampling) for gameplay systems:
+	// physics queries, buoyancy, tire tracks, spawning etc.
 	const terrainHelpers = useMemo(() => createTerrainHelpers(), [])
 
 	// Register terrain helpers in the game store
@@ -32,17 +34,10 @@ const Terrain = () => {
 
 	return (
 		<group name='Terrain'>
-			{leafTiles.map(({ node, edgeStitchInfo }) => (
-				<TerrainTile
-					key={node.key}
-					node={node}
-					terrainHelpers={terrainHelpers}
-					edgeStitchInfo={edgeStitchInfo}
-					terrainMaterial={terrainMaterial}
-					waterMaterial={waterMaterial}
-					vegetationModels={vegetationModels}
-				/>
+			{renderTiles.map(({ node, geometry }) => (
+				<TerrainTile key={node.key} node={node} geometry={geometry} terrainMaterial={terrainMaterial} waterMaterial={waterMaterial} />
 			))}
+			<VegetationSystem vegetationModels={vegetationModels} />
 		</group>
 	)
 }

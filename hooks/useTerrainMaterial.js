@@ -4,30 +4,25 @@ import { CanvasTexture, ClampToEdgeWrapping, LinearFilter, LinearMipmapLinearFil
 
 import TERRAIN_CONFIG from '../config/terrain'
 import { QUADTREE_VIEW_RANGE, QUADTREE_ROOT_SIZE } from '../config/lod'
-import { terrainUsesRoadAttributes } from '../utils/terrain/materialFeatures'
+import { terrainUsesRoadAttributes, terrainUsesClimateAttributes } from '../utils/terrain/materialFeatures'
 import { createProceduralRoadTexture } from '../utils/terrain/proceduralRoadTextures'
 
-// Uniform field definitions - maps layer properties to shader uniform names and values
+// Uniform field definitions - texture/LOD parameters stay uniforms; blend
+// condition thresholds are compiled in as constants (the shader is generated
+// from config anyway, and constants let the compiler fold the blend math).
 const UNIFORM_FIELDS = [
 	{ key: 'TextureScale', path: 'textureScale', condition: () => true },
 	{ key: 'NormalScale', path: 'normalScale', condition: (layer) => layer.normalScale !== undefined },
 	{ key: 'LODDistance', path: 'lod.distance', condition: (layer) => layer.lod },
 	{ key: 'LODLevels', path: 'lod.levels', condition: (layer) => layer.lod },
 	{ key: 'LODScaleFactor', path: 'lod.scaleFactor', condition: (layer) => layer.lod, default: 2.0 },
-	{ key: 'HeightMin', path: 'height.min', condition: (layer) => layer.height?.min !== undefined },
-	{ key: 'HeightMax', path: 'height.max', condition: (layer) => layer.height?.max !== undefined },
-	{ key: 'HeightTransitionMin', path: 'height.transitionMin', condition: (layer) => layer.height?.min !== undefined, default: 20.0 },
-	{ key: 'HeightTransitionMax', path: 'height.transitionMax', condition: (layer) => layer.height?.max !== undefined, default: 20.0 },
-	{ key: 'HeightInfluence', path: 'height.influence', condition: (layer) => layer.height },
-	{ key: 'SlopeMin', path: 'slope.min', condition: (layer) => layer.slope?.min !== undefined },
-	{ key: 'SlopeMax', path: 'slope.max', condition: (layer) => layer.slope?.max !== undefined },
-	{ key: 'SlopeInfluence', path: 'slope.influence', condition: (layer) => layer.slope },
-	{ key: 'SlopeTransition', path: 'slope.transition', condition: (layer) => layer.slope, default: 0.1 },
 ]
 
 // Get nested property value from object using dot notation
 const getNestedValue = (obj, path) => path.split('.').reduce((acc, key) => acc?.[key], obj)
 const ROAD_WEIGHT_CHANNELS = ['x', 'y', 'z', 'w']
+// Climate attribute component per field (matches useTerrainGeometry layout)
+const CLIMATE_COMPONENTS = { continental: 'x', moisture: 'y', mountain: 'z' }
 const isTexturePath = (texture) => typeof texture === 'string'
 const isProceduralTexture = (texture) => texture?.procedural === 'road'
 const glslFloat = (value) => {
@@ -160,8 +155,7 @@ const generateLayerUniformsAndDeclarations = (layers) => {
 		UNIFORM_FIELDS.forEach(({ key, path, condition, default: defaultValue }) => {
 			if (condition(layer)) {
 				const value = getNestedValue(layer, path)
-				// Convert boolean to number for shader uniforms
-				const finalValue = value !== undefined ? (typeof value === 'boolean' ? (value ? 1.0 : 0.0) : value) : defaultValue
+				const finalValue = value !== undefined ? value : defaultValue
 				uniforms[`${prefix}${key}`] = finalValue
 				declarations += `uniform float ${prefix}${key};\n`
 			}
@@ -171,11 +165,85 @@ const generateLayerUniformsAndDeclarations = (layers) => {
 	return { uniforms, declarations }
 }
 
+// Optional world-space noise perturbation of a blend input value.
+// Returns a GLSL expression for the (possibly noisy) value.
+const noisyValueExpr = (baseExpr, noise) => {
+	if (!noise) return baseExpr
+	const scale = glslFloat(noise.scale ?? 0.02)
+	const strength = glslFloat(noise.strength ?? 0.1)
+	return `(${baseExpr} + (valueNoise2D(vWorldPos.xz * ${scale}) - 0.5) * ${strength})`
+}
+
+// Emit factor code for a min/max threshold condition on `valueExpr`,
+// multiplied into `groupVar`. Matches the legacy height/slope semantics:
+//  - min & max: fade in below min, fade out above max
+//  - min only:  fade in across [min - t, min + t]
+//  - max only:  fade out across [max - t, max + t]
+const generateThresholdFactor = (groupVar, valueExpr, cond, transitionMinDefault, transitionMaxDefault) => {
+	const hasMin = cond.min !== undefined
+	const hasMax = cond.max !== undefined
+	if (!hasMin && !hasMax) return ''
+
+	const tMin = glslFloat(cond.transitionMin ?? cond.transition ?? transitionMinDefault)
+	const tMax = glslFloat(cond.transitionMax ?? cond.transition ?? transitionMaxDefault)
+	const influence = glslFloat(cond.influence ?? 1.0)
+	const minV = glslFloat(cond.min)
+	const maxV = glslFloat(cond.max)
+
+	let factorExpr
+	if (hasMin && hasMax) {
+		factorExpr = `smoothstep(${minV} - ${tMin}, ${minV}, ${valueExpr}) * (1.0 - smoothstep(${maxV}, ${maxV} + ${tMax}, ${valueExpr}))`
+	} else if (hasMin) {
+		factorExpr = `smoothstep(${minV} - ${tMin}, ${minV} + ${tMin}, ${valueExpr})`
+	} else {
+		factorExpr = `1.0 - smoothstep(${maxV} - ${tMax}, ${maxV} + ${tMax}, ${valueExpr})`
+	}
+
+	return `
+				${groupVar} *= mix(1.0, ${factorExpr}, ${influence});`
+}
+
+// Generate the factor code for one condition group (height + slope + climate).
+const generateGroupCode = (group, index, groupIndex) => {
+	const groupVar = `layer${index}Group${groupIndex}`
+	let code = `
+			float ${groupVar} = 1.0;
+			{`
+
+	if (group.height) {
+		const valueExpr = noisyValueExpr('vWorldPos.y', group.height.noise)
+		code += generateThresholdFactor(groupVar, valueExpr, group.height, 20.0, 20.0)
+	}
+
+	if (group.slope) {
+		const valueExpr = noisyValueExpr('(1.0 - abs(vWorldNormal.y))', group.slope.noise)
+		code += generateThresholdFactor(groupVar, valueExpr, group.slope, 0.1, 0.1)
+	}
+
+	if (group.climate) {
+		for (const [field, component] of Object.entries(CLIMATE_COMPONENTS)) {
+			const cond = group.climate[field]
+			if (!cond) continue
+			const valueExpr = noisyValueExpr(`vClimate.${component}`, cond.noise)
+			code += generateThresholdFactor(groupVar, valueExpr, cond, 0.05, 0.05)
+		}
+	}
+
+	code += `
+			}`
+	return code
+}
+
+// Collect a layer's condition groups: explicit `anyOf` array, or the layer's
+// own height/slope/climate conditions as a single group.
+const getConditionGroups = (layer) => {
+	if (Array.isArray(layer.anyOf)) return layer.anyOf
+	if (layer.height || layer.slope || layer.climate) return [layer]
+	return []
+}
+
 // Generate blend factor calculation for a layer
 const generateBlendCode = (layer, index) => {
-	const hasHeight = layer.height
-	const hasSlope = layer.slope
-
 	if (layer.road) {
 		if (layer.road.renderOnTerrain === 'projected') {
 			const trackOpacity = glslFloat(layer.road.visual?.trackOpacity ?? 1)
@@ -218,81 +286,29 @@ const generateBlendCode = (layer, index) => {
 		return code
 	}
 
+	const groups = getConditionGroups(layer)
+
 	// Base layer or layer with no blend params - always fully visible
-	if (!hasHeight && !hasSlope) {
+	if (groups.length === 0) {
 		return `
 		// Layer ${index} (${layer.name}) - no blend conditions
 		float layer${index}Blend = 1.0;`
 	}
 
-	const prefix = `uLayer${index}`
+	// Each group's conditions multiply; groups combine with max() so a layer
+	// can cover several distinct situations (e.g. beach sand OR desert sand).
 	let code = `
-		// Layer ${index} (${layer.name}) blend calculation
-		float layer${index}Blend = 1.0;
-		{
-			float factor;`
+		// Layer ${index} (${layer.name}) blend calculation (${groups.length} condition group${groups.length > 1 ? 's' : ''})
+		float layer${index}Blend;
+		{`
+	groups.forEach((group, g) => {
+		code += generateGroupCode(group, index, g)
+	})
 
-	// Height blending
-	if (hasHeight) {
-		const hasMin = layer.height.min !== undefined
-		const hasMax = layer.height.max !== undefined
-
-		if (hasMin && hasMax) {
-			// Range: visible between min and max
-			code += `
-			// Height: visible between min and max
-			factor = smoothstep(${prefix}HeightMin - ${prefix}HeightTransitionMin, ${prefix}HeightMin, vWorldPos.y);
-			factor *= 1.0 - smoothstep(${prefix}HeightMax, ${prefix}HeightMax + ${prefix}HeightTransitionMax, vWorldPos.y);
-			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
-		} else if (hasMin) {
-			// Only min: visible above min
-			code += `
-			// Height: visible above min
-			factor = smoothstep(${prefix}HeightMin - ${prefix}HeightTransitionMin, ${prefix}HeightMin + ${prefix}HeightTransitionMin, vWorldPos.y);
-			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
-		} else if (hasMax) {
-			// Only max: visible below max
-			code += `
-			// Height: visible below max
-			factor = 1.0 - smoothstep(${prefix}HeightMax - ${prefix}HeightTransitionMax, ${prefix}HeightMax + ${prefix}HeightTransitionMax, vWorldPos.y);
-			layer${index}Blend *= mix(1.0, factor, ${prefix}HeightInfluence);`
-		}
-	}
-
-	// Slope blending (slope value: 0 = flat, 1 = vertical)
-	if (hasSlope) {
-		const hasMin = layer.slope.min !== undefined
-		const hasMax = layer.slope.max !== undefined
-
-		code += `
-		// Slope factor (0 = flat, 1 = steep)
-		float slope${index} = 1.0 - abs(vWorldNormal.y);`
-
-		if (hasMin && hasMax) {
-			// Range: visible between min and max slope
-			code += `
-			// Slope: visible between min and max
-			factor = smoothstep(${prefix}SlopeMin - ${prefix}SlopeTransition, ${prefix}SlopeMin, slope${index});
-			factor *= 1.0 - smoothstep(${prefix}SlopeMax, ${prefix}SlopeMax + ${prefix}SlopeTransition, slope${index});
-			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
-		} else if (hasMin) {
-			// Only min: visible on steeper slopes (above min)
-			code += `
-			// Slope: visible on steep slopes (above min)
-			factor = smoothstep(${prefix}SlopeMin - ${prefix}SlopeTransition, ${prefix}SlopeMin + ${prefix}SlopeTransition, slope${index});
-			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
-		} else if (hasMax) {
-			// Only max: visible on flatter slopes (below max)
-			code += `
-			// Slope: visible on flat slopes (below max)
-			factor = 1.0 - smoothstep(${prefix}SlopeMax - ${prefix}SlopeTransition, ${prefix}SlopeMax + ${prefix}SlopeTransition, slope${index});
-			layer${index}Blend *= mix(1.0, factor, ${prefix}SlopeInfluence);`
-		}
-	}
-
+	const maxExpr = groups.reduce((expr, _, g) => (g === 0 ? `layer${index}Group0` : `max(${expr}, layer${index}Group${g})`), '')
 	code += `
-	}
-	layer${index}Blend = clamp(layer${index}Blend, 0.0, 1.0);`
+			layer${index}Blend = clamp(${maxExpr}, 0.0, 1.0);
+		}`
 
 	return code
 }
@@ -342,10 +358,20 @@ const generateRoadSurfaceCode = (layer, index) => {
 	return code
 }
 
+// Large-scale albedo variation so big uniform fields (grass, sand) read as
+// patchy from a distance instead of a flat tint.
+const generateColorVariationCode = (layer, index) => {
+	if (!layer.colorVariation) return ''
+	const { scale = 0.005, strength = 0.3, color = [1, 1, 1] } = layer.colorVariation
+	return `
+		float colorVar${index} = valueNoise2D(vWorldPos.xz * ${glslFloat(scale)});
+		layer${index}Color.rgb *= mix(vec3(1.0), ${glslVec3(color)}, colorVar${index} * ${glslFloat(strength)});`
+}
+
 // Generate color sampling code for a layer
 const generateSamplingCode = (layer, index) => {
 	const prefix = `uLayer${index}`
-	const hasBlendConditions = layer.height || layer.slope || layer.road
+	const hasBlendConditions = layer.road || getConditionGroups(layer).length > 0
 	const normalScaleStr = layer.normalScale !== undefined ? `${prefix}NormalScale` : '1.0'
 
 	// Skip sampling if blend is near zero (optimization for layers with blend conditions)
@@ -365,14 +391,14 @@ const generateSamplingCode = (layer, index) => {
 		float scaleLower${index} = ${prefix}TextureScale / lodInfo${index}.x;
 		float scaleUpper${index} = ${prefix}TextureScale / lodInfo${index}.y;
 		float lodBlend${index} = lodInfo${index}.z;
-		
+
 		vec2 uvLower${index} = vWorldPos.xz * scaleLower${index};
 		vec2 uvUpper${index} = vWorldPos.xz * scaleUpper${index};
-		
+
 		vec4 colorLower${index} = sRGBToLinear(texture(${prefix}Texture, uvLower${index}));
 		vec4 colorUpper${index} = sRGBToLinear(texture(${prefix}Texture, uvUpper${index}));
 		layer${index}Color = mix(colorLower${index}, colorUpper${index}, lodBlend${index});
-		
+
 		vec3 normalLower${index} = texture(${prefix}NormalMap, uvLower${index}).xyz * 2.0 - 1.0;
 		vec3 normalUpper${index} = texture(${prefix}NormalMap, uvUpper${index}).xyz * 2.0 - 1.0;
 		vec3 normalSample${index} = mix(normalLower${index}, normalUpper${index}, lodBlend${index});
@@ -382,7 +408,7 @@ const generateSamplingCode = (layer, index) => {
 			normalSample${index}.x + vWorldNormal.x,
 			abs(normalSample${index}.z) * vWorldNormal.y,
 			normalSample${index}.y + vWorldNormal.z
-		));`
+		));${generateColorVariationCode(layer, index)}`
 	} else {
 		const usePathUV = layer.road?.usePathUV && layer.road.renderOnTerrain !== 'projected'
 		const uvExpression = usePathUV ? `vec2(vRoadParams.x, vRoadParams.y) * ${prefix}TextureScale` : `vWorldPos.xz * ${prefix}TextureScale`
@@ -396,7 +422,7 @@ const generateSamplingCode = (layer, index) => {
 			layer${index}NormalSample.x + vWorldNormal.x,
 			abs(layer${index}NormalSample.z) * vWorldNormal.y,
 			layer${index}NormalSample.y + vWorldNormal.z
-		));${generateRoadSurfaceCode(layer, index)}`
+		));${generateColorVariationCode(layer, index)}${generateRoadSurfaceCode(layer, index)}`
 	}
 
 	code += conditionalEnd
@@ -447,7 +473,7 @@ const generateNormalBlendingCode = (layers) => {
  * Features:
  * - Preserves standard PBR lighting (identical to meshStandardMaterial)
  * - Config-driven layer system with arbitrary texture layers
- * - Height-based, slope-based, and curvature-based blending
+ * - Height-, slope-, and climate-based blending with OR condition groups
  * - World-space UV mapping
  *
  * @returns {THREE.MeshStandardMaterial} Shared terrain material instance
@@ -458,6 +484,7 @@ const useTerrainMaterial = (terrainHelpers) => {
 	const TERRAIN_LAYERS = terrainConfig.layers
 	const roadLayer = useMemo(() => getRoadLayer(TERRAIN_LAYERS), [TERRAIN_LAYERS])
 	const useRoadAttributes = useMemo(() => terrainUsesRoadAttributes(TERRAIN_LAYERS), [TERRAIN_LAYERS])
+	const useClimateAttributes = useMemo(() => terrainUsesClimateAttributes(TERRAIN_LAYERS), [TERRAIN_LAYERS])
 	const roadProjection = useMemo(() => {
 		const routes = terrainHelpers?.getRoadVisualRoutes?.() ?? []
 		return createRoadProjectionMask(routes, roadLayer)
@@ -547,6 +574,19 @@ const useTerrainMaterial = (terrainHelpers) => {
 				varying vec4 vRoadWeights;
 				varying vec4 vRoadParams;`
 				: ''
+			const climateVertexDeclarations = useClimateAttributes
+				? `
+				attribute vec4 climate;
+				varying vec4 vClimate;`
+				: ''
+			const climateVertexAssignments = useClimateAttributes
+				? `
+				vClimate = climate;`
+				: ''
+			const climateFragmentVaryings = useClimateAttributes
+				? `
+				varying vec4 vClimate;`
+				: ''
 
 			// Set texture uniforms
 			TERRAIN_LAYERS.forEach((layer, index) => {
@@ -576,14 +616,14 @@ const useTerrainMaterial = (terrainHelpers) => {
 				'#include <common>',
 				`#include <common>
 				varying vec3 vWorldPos;
-				varying vec3 vWorldNormal;${roadVertexDeclarations}`
+				varying vec3 vWorldNormal;${roadVertexDeclarations}${climateVertexDeclarations}`
 			)
 
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <worldpos_vertex>',
 				`#include <worldpos_vertex>
 				vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
-				vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);${roadVertexAssignments}`
+				vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);${roadVertexAssignments}${climateVertexAssignments}`
 			)
 
 			// Fragment shader - add terrain blending
@@ -600,10 +640,7 @@ const useTerrainMaterial = (terrainHelpers) => {
 
 				// Varyings
 				varying vec3 vWorldPos;
-				varying vec3 vWorldNormal;${roadFragmentVaryings}
-
-				// Blend factors for each layer
-				${TERRAIN_LAYERS.map((_, i) => `float layer${i}Blend;`).join('\n				')}
+				varying vec3 vWorldNormal;${roadFragmentVaryings}${climateFragmentVaryings}
 
 				// sRGB to linear color space conversion
 				vec3 sRGBToLinear(vec3 srgb) {
@@ -660,7 +697,6 @@ const useTerrainMaterial = (terrainHelpers) => {
 				`#include <map_fragment>
 
 				// Calculate blend factors FIRST so we can skip sampling when blend is zero
-				layer0Blend = 1.0; // Base layer always fully visible initially
 				${shaderCode.blendCalculations}
 
 				// Sample layer textures (with early-out for layers with zero blend)
@@ -689,7 +725,7 @@ const useTerrainMaterial = (terrainHelpers) => {
 				gl_FragColor.a *= distanceFade;`
 			)
 		}
-	}, [layerTextures, shaderCode, TERRAIN_LAYERS, fadeStartDistance, fadeEndDistance, roadProjection, useRoadAttributes])
+	}, [layerTextures, shaderCode, TERRAIN_LAYERS, fadeStartDistance, fadeEndDistance, roadProjection, useRoadAttributes, useClimateAttributes])
 
 	// We don't need map/normalMap props since all layers are sampled in custom shader code
 	// But we need a normalMap to trigger USE_NORMALMAP define, so pass the first layer's normal

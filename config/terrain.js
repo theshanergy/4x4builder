@@ -2,23 +2,103 @@ const TERRAIN_CONFIG = {
 	// Deterministic seed for terrain generation
 	seed: 1234,
 
-	// World scaling — shader works in normalized [0,1] space.
+	// World scaling — noise fields work in normalized space.
 	// worldScale: 1 shader unit = worldScale meters.
-	// heightScale: shader-height 1.0 = heightScale meters.
-	// heightOrigin: shader-height mapped to 0m in world.
+	// heightScale: normalization used by the erosion filter (shader-height 1.0 = heightScale meters).
 	worldScale: 1000,
 	heightScale: 400,
-	heightOrigin: 0.36,
 
 	// Spawn Area - flat safe zone that transitions to natural terrain
 	spawnRadius: 600,
 
-	// --- Base fractal height noise (pre-erosion) ---
-	heightFrequency: 3.0,
-	heightAmp: 0.125,
-	heightOctaves: 3,
-	heightLacunarity: 2.0,
-	heightGain: 0.1,
+	// --- Climate fields (biome backbone) ---
+	// Frequencies are in shader units (1 / worldScale meters), so e.g.
+	// frequency 0.105 ≈ a 9.5 km wavelength.
+	climate: {
+		// Deep ocean (-1) → shoreline (~0) → far inland (+1). Domain-warped.
+		// `contrast` stretches the (center-heavy) fbm distribution across the
+		// full field range via tanh — higher = more extreme oceans/inland.
+		continental: {
+			frequency: 0.105,
+			octaves: 3,
+			lacunarity: 2.0,
+			gain: 0.5,
+			contrast: 3.6,
+			// Positive bias shifts the world toward land (less ocean coverage)
+			bias: 0.15,
+			warpFrequency: 0.35,
+			warpStrength: 0.45,
+		},
+		// Sandy desert (0) → lush grassland/forest (1)
+		moisture: {
+			frequency: 0.16,
+			octaves: 3,
+			lacunarity: 2.0,
+			gain: 0.5,
+			contrast: 3.6,
+		},
+		// Where inland terrain is allowed to grow ridged peaks (0..1)
+		mountain: {
+			frequency: 0.2,
+			octaves: 2,
+			lacunarity: 2.0,
+			gain: 0.5,
+			contrast: 3.4,
+		},
+		// Ease all fields toward fixed values near the origin so every seed
+		// spawns in the same flat coastal-desert setting.
+		spawn: {
+			innerRadius: 700,
+			radius: 2800,
+			continental: 0.07,
+			moisture: 0.2,
+			mountain: 0.1,
+		},
+	},
+
+	// Base elevation (meters) as a function of continentalness.
+	// Piecewise-smoothstep control points, sorted by continentalness.
+	elevationSpline: [
+		[-1.0, -54],
+		[-0.35, -44],
+		[-0.12, -16],
+		[-0.03, -3],
+		[0.03, 2.5],
+		[0.1, 7],
+		[0.22, 16],
+		[0.4, 42],
+		[0.6, 95],
+		[0.8, 150],
+		[1.0, 190],
+	],
+
+	// --- Rolling-hills fractal noise (medium-scale relief) ---
+	hills: {
+		frequency: 3.0,
+		octaves: 3,
+		lacunarity: 2.0,
+		gain: 0.1,
+		amplitude: 25,
+		// Hill amplitude ramps up with continentalness across this range so
+		// beaches/coastal plains stay gentle (occasional inlets and ponds)
+		// while inland terrain gets full relief.
+		oceanFade: [-0.06, 0.35],
+		oceanFloorScale: 0.3,
+	},
+
+	// --- Ridged-fractal mountains ---
+	mountains: {
+		frequency: 0.21,
+		octaves: 5,
+		lacunarity: 2.05,
+		gain: 0.5,
+		// Peak height contribution in meters (on top of the elevation spline)
+		amplitude: 380,
+		// Mountains only inland: smoothstep over continentalness
+		continentalGate: [0.16, 0.42],
+		// ...and only where the mountainness field is high
+		peaksGate: [0.55, 0.8],
+	},
 
 	// --- Phacelle-noise erosion ---
 	erosion: {
@@ -41,21 +121,13 @@ const TERRAIN_CONFIG = {
 		octaves: 5,
 		lacunarity: 2.0,
 		gain: 0.5,
-		heightOffset: -0.65,
+		heightOffset: 0.0,
 		heightOffsetPreserve: 0.0,
-	},
-
-	// Ocean boundary — terrain tapers off into the sea beyond this radius
-	ocean: {
-		// Distance from origin (meters) where land meets the ocean
-		radius: 5000,
-		// Width of the beach/falloff transition zone (meters)
-		transition: 500,
-		// How far below water level the ocean floor sinks (meters)
-		depth: 30,
-		// Normalized depth at the transition midpoint (0 = water surface, 1 = full ocean depth)
-		// Controls the shape of the beach profile — lower = gentler initial slope
-		beachMidpointDepth: 0.2,
+		// Erosion ramps in across this pre-erosion height band (meters) so
+		// beaches stay smooth and underwater terrain skips erosion entirely.
+		shoreFade: [1.5, 20],
+		// Erosion strength multiplier inside mountain massifs
+		mountainBoost: 1.45,
 	},
 
 	// Seeded spline corridors. Roads are sampled through a spatial index during
@@ -140,7 +212,10 @@ const TERRAIN_CONFIG = {
 		],
 	},
 
-	// Terrain Layers (shader material)
+	// Terrain Layers (shader material). Layers paint in order over the base
+	// (index 0). Conditions within a group multiply; `anyOf` groups combine
+	// with max() so a layer can cover several distinct situations (e.g. sand
+	// on beaches OR in arid deserts).
 	layers: [
 		{
 			name: 'rock',
@@ -155,6 +230,40 @@ const TERRAIN_CONFIG = {
 			},
 		},
 		{
+			name: 'grass',
+			textures: {
+				albedo: '/assets/images/ground/wispy-grass-meadow_albedo.jpg',
+				normal: '/assets/images/ground/wispy-grass-meadow_normal.jpg',
+			},
+			textureScale: 0.18,
+			normalScale: 0.6,
+			height: {
+				min: 1.5,
+				max: 250,
+				transitionMin: 2.5,
+				transitionMax: 45,
+				influence: 1.0,
+			},
+			slope: {
+				max: 0.4,
+				influence: 1.0,
+				transition: 0.2,
+			},
+			climate: {
+				moisture: {
+					min: 0.44,
+					transition: 0.09,
+					noise: { scale: 0.025, strength: 0.16 },
+				},
+			},
+			// Large-scale hue variation so meadows read as patchy, not uniform
+			colorVariation: {
+				scale: 0.004,
+				strength: 0.45,
+				color: [0.82, 0.78, 0.5],
+			},
+		},
+		{
 			name: 'sand',
 			textures: {
 				albedo: '/assets/images/ground/sand.jpg',
@@ -162,17 +271,63 @@ const TERRAIN_CONFIG = {
 			},
 			textureScale: 0.4,
 			normalScale: 0.5,
+			anyOf: [
+				// Beaches — low elevation flats next to the waterline, any biome
+				{
+					height: {
+						min: -10,
+						max: 4.5,
+						transitionMin: 6,
+						transitionMax: 3.5,
+						influence: 1.0,
+					},
+					slope: {
+						max: 0.2,
+						influence: 0.85,
+						transition: 0.12,
+					},
+				},
+				// Arid desert — dry climate at low/mid elevation
+				{
+					height: {
+						max: 95,
+						transitionMax: 40,
+						influence: 1.0,
+					},
+					slope: {
+						max: 0.28,
+						influence: 0.9,
+						transition: 0.15,
+					},
+					climate: {
+						moisture: {
+							max: 0.36,
+							transition: 0.08,
+							noise: { scale: 0.025, strength: 0.16 },
+						},
+					},
+				},
+			],
+		},
+		{
+			name: 'snow',
+			textures: {
+				albedo: '/assets/images/ground/snow.jpg',
+				normal: '/assets/images/ground/snow_normal.jpg',
+			},
+			textureScale: 0.09,
+			normalScale: 0.7,
 			height: {
-				min: 0,
-				max: 45,
-				transitionMin: 3,
-				transitionMax: 55,
+				min: 240,
+				transitionMin: 50,
 				influence: 1.0,
+				// Break the snowline up with world-space noise (meters)
+				noise: { scale: 0.012, strength: 60 },
 			},
 			slope: {
-				max: 0.05,
-				influence: 0.9,
-				transition: 0.03,
+				max: 0.55,
+				influence: 0.85,
+				transition: 0.25,
 			},
 		},
 		{
