@@ -35,6 +35,7 @@ const Vehicle = () => {
 	// Get vehicle store
 	const performanceDegraded = useGameStore((state) => state.performanceDegraded)
 	const isMobile = useGameStore((state) => state.isMobile)
+	const terrainHelpers = useGameStore((state) => state.terrainHelpers)
 
 	const chassisRef = useRef(null)
 	const chassisGroupRef = useRef(null) // Reference to the visual group that follows interpolated physics
@@ -64,6 +65,26 @@ const Vehicle = () => {
 
 	// Use vehicle physics
 	const { vehicleController } = useVehiclePhysics(chassisRef, physicsWheels)
+
+	// Spawn the chassis on the terrain surface. The ground at the origin sits
+	// slightly below y=0 (the spawn road corridor carves it down), and physics
+	// stays paused until first input, so a body left at y=0 hangs in the air.
+	// Tire bottoms are level with the chassis origin (wheel centers sit one
+	// tire radius up), so the chassis y is the highest ground height among the
+	// wheel contact points. Frozen once driving starts — re-deriving it would
+	// teleport the moving body through the position prop.
+	const spawnPositionRef = useRef([0, 0, 0])
+	const spawnPosition = useMemo(() => {
+		if (terrainHelpers?.getHeight && !useGameStore.getState().physicsEnabledOnce) {
+			let ground = -Infinity
+			for (const wheel of wheelPositions) {
+				const height = terrainHelpers.getHeight(wheel.position[0], wheel.position[2])
+				if (height > ground) ground = height
+			}
+			spawnPositionRef.current = [0, ground, 0]
+		}
+		return spawnPositionRef.current
+	}, [terrainHelpers, wheelPositions])
 
 	// Broadcast transform to multiplayer server
 	useVehicleBroadcast(chassisRef, vehicleController)
@@ -96,7 +117,7 @@ const Vehicle = () => {
 
 	return (
 		<>
-			<RigidBody ref={chassisRef} type='dynamic' colliders={false} canSleep={false} linearDamping={0.05} angularDamping={1}>
+			<RigidBody ref={chassisRef} type='dynamic' position={spawnPosition} colliders={false} canSleep={false} linearDamping={0.05} angularDamping={1}>
 				<CuboidCollider args={colliderArgs} position={colliderPosition} />
 				<group ref={chassisGroupRef} name='Vehicle'>
 					<VehicleAudio />
