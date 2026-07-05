@@ -193,6 +193,8 @@ export default class MessageHandler {
 			return // Silently ignore invalid updates
 		}
 		
+		room.touch()
+		
 		// Update player state
 		player.updateTransform(message)
 		
@@ -221,6 +223,8 @@ export default class MessageHandler {
 			return
 		}
 		
+		room.touch()
+		
 		// Update player config
 		player.updateVehicleConfig(message.config)
 		
@@ -238,6 +242,8 @@ export default class MessageHandler {
 		if (!room) {
 			return
 		}
+		
+		room.touch()
 		
 		// Broadcast reset to other players
 		room.broadcast(createMessage(MessageTypes.VEHICLE_RESET, {
@@ -261,6 +267,8 @@ export default class MessageHandler {
 			return // Silently ignore invalid names
 		}
 		
+		room.touch()
+		
 		player.setName(newName)
 		
 		// Broadcast to all players including the sender (to confirm the update)
@@ -283,6 +291,8 @@ export default class MessageHandler {
 		if (typeof text !== 'string' || text.trim().length === 0 || text.length > 200) {
 			return // Silently ignore invalid messages
 		}
+		
+		room.touch()
 		
 		// Log chat message on server
 		console.log(`[CHAT] [${room.id}] ${player.name}: ${text.trim()}`)
