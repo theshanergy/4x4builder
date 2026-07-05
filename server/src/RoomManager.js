@@ -39,6 +39,11 @@ class Room {
 		}
 	}
 
+	// Mark the room as active after valid player activity
+	touch() {
+		this.lastActivity = Date.now()
+	}
+
 	// Check if room is full
 	isFull() {
 		return this.players.size >= this.settings.maxPlayers

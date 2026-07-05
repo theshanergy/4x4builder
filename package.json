@@ -13,16 +13,16 @@
 	},
 	"dependencies": {
 		"@react-three/drei": "^10.7.7",
-		"@react-three/fiber": "^9.6.0",
+		"@react-three/fiber": "^9.6.1",
 		"@react-three/rapier": "^2.2.0",
 		"@react-three/xr": "^6.6.29",
-		"@tailwindcss/vite": "^4.2.2",
+		"@tailwindcss/vite": "^4.2.4",
 		"classnames": "^2.5.1",
 		"immer": "^11.1.4",
 		"react": "^19.2.5",
 		"react-dom": "^19.2.5",
-		"react-router-dom": "^7.14.1",
-		"tailwindcss": "^4.2.2",
+		"react-router-dom": "^7.14.2",
+		"tailwindcss": "^4.2.4",
 		"three": "^0.184.0",
 		"three-stdlib": "^2.36.1",
 		"vite-plugin-svgr": "^5.2.0",
@@ -34,7 +34,7 @@
 		"@vitejs/plugin-basic-ssl": "^2.3.0",
 		"@vitejs/plugin-react": "^6.0.1",
 		"r3f-perf": "^7.2.3",
-		"vite": "^8.0.8",
+		"vite": "^8.0.10",
 		"vite-plugin-glsl": "^1.6.0"
 	}
 }
