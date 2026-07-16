@@ -5,6 +5,7 @@ import Editor from './Editor'
 import Logo from './Logo'
 import MultiplayerPanel from './MultiplayerPanel'
 import FeedbackButton from './FeedbackButton'
+import MoreGames from './MoreGames'
 
 // Sidebar component
 const Sidebar = () => {
@@ -24,7 +25,10 @@ const Sidebar = () => {
 			<Logo />
 			<Editor />
 			<MultiplayerPanel />
-			<FeedbackButton />
+			<div className='mt-auto flex flex-col gap-4'>
+				<FeedbackButton />
+				<MoreGames />
+			</div>
 		</Drawer>
 	)
 }
