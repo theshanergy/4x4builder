@@ -1,0 +1,9 @@
+*
+!.dockerignore
+!server/
+!server/**
+!network/
+!network/**
+server/.env*
+server/*.log
+server/node_modules/
